@@ -1,0 +1,20 @@
+[
+  {
+    "stable_id": "8af767f0a01b84de60af011ec3562fa6e6eb1d826d429eddbb7bd38456046ca5",
+    "name": "getServiceHealth",
+    "qualified_name": "getServiceHealth",
+    "kind": "function",
+    "parent_name": null,
+    "start_line": 1,
+    "end_line": 3,
+    "start_column": 0,
+    "end_column": 1,
+    "parameters": [],
+    "return_type": "string",
+    "is_exported": true,
+    "is_async": false,
+    "visibility": null,
+    "docstring": null,
+    "signature": "getServiceHealth(): string"
+  }
+]

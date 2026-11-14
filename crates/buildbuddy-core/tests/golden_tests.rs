@@ -58,6 +58,49 @@ fn test_verify_ts_golden() {
 }
 
 #[test]
+fn test_verify_ts_default_fn_golden() {
+    let dir = fixtures_dir().join("ts-basic");
+    let sample_path = dir.join("default-fn.ts");
+    let content = fs::read_to_string(&sample_path).expect("Read default-fn.ts");
+
+    let manager = ParserManager::new();
+    let result = manager
+        .parse_source("fixtures/ts-basic/default-fn.ts", Some("ts"), &content)
+        .expect("Parse default-fn.ts");
+
+    assert_eq!(result.status, ParseStatus::Full);
+    assert!(!result.symbols.is_empty());
+    assert!(!result.exports.is_empty());
+
+    let symbols_path = dir.join("default-fn-expected-symbols.json");
+    let imports_path = dir.join("default-fn-expected-imports.json");
+    let exports_path = dir.join("default-fn-expected-exports.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(&symbols_path, serde_json::to_string_pretty(&result.symbols).unwrap()).expect("Write default-fn-expected-symbols.json");
+        fs::write(&imports_path, serde_json::to_string_pretty(&result.imports).unwrap()).expect("Write default-fn-expected-imports.json");
+        fs::write(&exports_path, serde_json::to_string_pretty(&result.exports).unwrap()).expect("Write default-fn-expected-exports.json");
+    } else {
+        assert!(symbols_path.exists(), "default-fn-expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(imports_path.exists(), "default-fn-expected-imports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(exports_path.exists(), "default-fn-expected-exports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+    }
+
+    let expected_symbols: Vec<buildbuddy_core::symbols::ExtractedSymbol> =
+        serde_json::from_str(&fs::read_to_string(&symbols_path).expect("Read symbols")).expect("Deserialize symbols");
+    assert_eq!(result.symbols, expected_symbols, "Symbols mismatch");
+
+    let expected_imports: Vec<buildbuddy_core::symbols::ExtractedImport> =
+        serde_json::from_str(&fs::read_to_string(&imports_path).expect("Read imports")).expect("Deserialize imports");
+    assert_eq!(result.imports, expected_imports, "Imports mismatch");
+
+    let expected_exports: Vec<buildbuddy_core::symbols::ExtractedExport> =
+        serde_json::from_str(&fs::read_to_string(&exports_path).expect("Read exports")).expect("Deserialize exports");
+    assert_eq!(result.exports, expected_exports, "Exports mismatch");
+}
+
+#[test]
 fn test_ts_malformed_file_partial_status() {
     let dir = fixtures_dir().join("ts-basic");
     let malformed_path = dir.join("malformed.ts");
@@ -135,6 +178,53 @@ fn test_verify_py_golden() {
     let expected_exports: Vec<buildbuddy_core::symbols::ExtractedExport> =
         serde_json::from_str(&fs::read_to_string(&exports_path).expect("Read exports")).expect("Deserialize exports");
     assert_eq!(result.exports, expected_exports, "Exports mismatch");
+}
+
+#[test]
+fn test_verify_py_all_export_golden() {
+    let dir = fixtures_dir().join("py-basic");
+    let sample_path = dir.join("all_export.py");
+    let content = fs::read_to_string(&sample_path).expect("Read all_export.py");
+
+    let manager = ParserManager::new();
+    let result = manager
+        .parse_source("fixtures/py-basic/all_export.py", Some("py"), &content)
+        .expect("Parse all_export.py");
+
+    assert_eq!(result.status, ParseStatus::Full);
+    assert!(!result.symbols.is_empty());
+    assert!(!result.exports.is_empty());
+
+    let symbols_path = dir.join("all-export-expected-symbols.json");
+    let imports_path = dir.join("all-export-expected-imports.json");
+    let exports_path = dir.join("all-export-expected-exports.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(&symbols_path, serde_json::to_string_pretty(&result.symbols).unwrap()).expect("Write all-export-expected-symbols.json");
+        fs::write(&imports_path, serde_json::to_string_pretty(&result.imports).unwrap()).expect("Write all-export-expected-imports.json");
+        fs::write(&exports_path, serde_json::to_string_pretty(&result.exports).unwrap()).expect("Write all-export-expected-exports.json");
+    } else {
+        assert!(symbols_path.exists(), "all-export-expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(imports_path.exists(), "all-export-expected-imports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(exports_path.exists(), "all-export-expected-exports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+    }
+
+    let expected_symbols: Vec<buildbuddy_core::symbols::ExtractedSymbol> =
+        serde_json::from_str(&fs::read_to_string(&symbols_path).expect("Read symbols")).expect("Deserialize symbols");
+    assert_eq!(result.symbols, expected_symbols, "Symbols mismatch");
+
+    let expected_imports: Vec<buildbuddy_core::symbols::ExtractedImport> =
+        serde_json::from_str(&fs::read_to_string(&imports_path).expect("Read imports")).expect("Deserialize imports");
+    assert_eq!(result.imports, expected_imports, "Imports mismatch");
+
+    let expected_exports: Vec<buildbuddy_core::symbols::ExtractedExport> =
+        serde_json::from_str(&fs::read_to_string(&exports_path).expect("Read exports")).expect("Deserialize exports");
+    assert_eq!(result.exports, expected_exports, "Exports mismatch");
+
+    // Explicitly assert that only public_api is exported and DEFAULT_RETRIES / internal_worker are not exported
+    assert_eq!(result.exports.len(), 1);
+    assert_eq!(result.exports[0].exported_name, "public_api");
 }
 
 #[test]

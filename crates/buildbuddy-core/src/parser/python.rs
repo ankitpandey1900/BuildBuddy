@@ -80,7 +80,8 @@ impl LanguageAdapter for PythonAdapter {
         }
 
         let source_bytes = source.as_bytes();
-        extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports, &mut exports);
+        let all_exports = find_all_export_names(root_node, source_bytes);
+        extract_from_node(root_node, source_bytes, relative_path, None, false, all_exports.as_ref(), &mut symbols, &mut imports, &mut exports);
 
         let status = if has_syntax_errors {
             ParseStatus::Partial
@@ -100,12 +101,58 @@ impl LanguageAdapter for PythonAdapter {
     }
 }
 
+fn find_all_export_names(node: Node, source: &[u8]) -> Option<std::collections::HashSet<String>> {
+    let mut cursor = node.walk();
+    let mut set = std::collections::HashSet::new();
+    let mut found = false;
+
+    for child in node.children(&mut cursor) {
+        if child.kind() == "expression_statement" {
+            let mut inner = child.walk();
+            for sub in child.children(&mut inner) {
+                if sub.kind() == "assignment" || sub.kind() == "augmented_assignment" {
+                    if let Some(left) = sub.child_by_field_name("left") {
+                        if node_text(left, source) == "__all__" {
+                            if let Some(right) = sub.child_by_field_name("right") {
+                                found = true;
+                                collect_strings_from_node(right, source, &mut set);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if found {
+        Some(set)
+    } else {
+        None
+    }
+}
+
+fn collect_strings_from_node(node: Node, source: &[u8], set: &mut std::collections::HashSet<String>) {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "string" {
+            let text = node_text(child, source);
+            let unquoted = text.trim_matches(|c| c == '\'' || c == '"');
+            if !unquoted.is_empty() {
+                set.insert(unquoted.to_string());
+            }
+        } else {
+            collect_strings_from_node(child, source, set);
+        }
+    }
+}
+
 fn extract_from_node(
     node: Node,
     source: &[u8],
     relative_path: &str,
     parent_scope: Option<&str>,
     is_inside_class: bool,
+    all_exports: Option<&std::collections::HashSet<String>>,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
     exports: &mut Vec<ExtractedExport>,
@@ -121,10 +168,10 @@ fn extract_from_node(
                 extract_import_from_statement(child, source, imports);
             }
             "decorated_definition" => {
-                extract_decorated_definition(child, source, relative_path, parent_scope, is_inside_class, symbols, imports, exports);
+                extract_decorated_definition(child, source, relative_path, parent_scope, is_inside_class, all_exports, symbols, imports, exports);
             }
             "function_definition" => {
-                if let Some(sym) = extract_function(child, source, relative_path, parent_scope, is_inside_class, None, None) {
+                if let Some(sym) = extract_function(child, source, relative_path, parent_scope, is_inside_class, None, None, all_exports) {
                     let func_qname = sym.qualified_name.clone();
                     if sym.is_exported && sym.parent_name.is_none() {
                         exports.push(ExtractedExport {
@@ -137,12 +184,12 @@ fn extract_from_node(
                     symbols.push(sym);
 
                     if let Some(body) = child.child_by_field_name("body") {
-                        extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports, exports);
+                        extract_from_node(body, source, relative_path, Some(&func_qname), false, all_exports, symbols, imports, exports);
                     }
                 }
             }
             "class_definition" => {
-                if let Some(class_sym) = extract_class(child, source, relative_path, None, None) {
+                if let Some(class_sym) = extract_class(child, source, relative_path, None, None, all_exports) {
                     let class_name = class_sym.name.clone();
                     if class_sym.is_exported {
                         exports.push(ExtractedExport {
@@ -155,18 +202,18 @@ fn extract_from_node(
                     symbols.push(class_sym);
 
                     if let Some(body) = child.child_by_field_name("body") {
-                        extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports, exports);
+                        extract_from_node(body, source, relative_path, Some(&class_name), true, all_exports, symbols, imports, exports);
                     }
                 }
             }
             "expression_statement" => {
                 if parent_scope.is_none() {
-                    extract_module_variable(child, source, relative_path, symbols, exports);
+                    extract_module_variable(child, source, relative_path, all_exports, symbols, exports);
                 }
             }
             _ => {
                 if child.kind() == "module" || child.kind() == "block" {
-                    extract_from_node(child, source, relative_path, parent_scope, is_inside_class, symbols, imports, exports);
+                    extract_from_node(child, source, relative_path, parent_scope, is_inside_class, all_exports, symbols, imports, exports);
                 }
             }
         }
@@ -179,6 +226,7 @@ fn extract_decorated_definition(
     relative_path: &str,
     parent_scope: Option<&str>,
     is_inside_class: bool,
+    all_exports: Option<&std::collections::HashSet<String>>,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
     exports: &mut Vec<ExtractedExport>,
@@ -214,7 +262,7 @@ fn extract_decorated_definition(
     let full_range = Some((node.start_position(), node.end_position()));
 
     if def.kind() == "function_definition" {
-        if let Some(sym) = extract_function(def, source, relative_path, parent_scope, is_inside_class, decorator_prefix.as_deref(), full_range) {
+        if let Some(sym) = extract_function(def, source, relative_path, parent_scope, is_inside_class, decorator_prefix.as_deref(), full_range, all_exports) {
             let func_qname = sym.qualified_name.clone();
             if sym.is_exported && sym.parent_name.is_none() {
                 exports.push(ExtractedExport {
@@ -227,11 +275,11 @@ fn extract_decorated_definition(
             symbols.push(sym);
 
             if let Some(body) = def.child_by_field_name("body") {
-                extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports, exports);
+                extract_from_node(body, source, relative_path, Some(&func_qname), false, all_exports, symbols, imports, exports);
             }
         }
     } else if def.kind() == "class_definition" {
-        if let Some(class_sym) = extract_class(def, source, relative_path, decorator_prefix.as_deref(), full_range) {
+        if let Some(class_sym) = extract_class(def, source, relative_path, decorator_prefix.as_deref(), full_range, all_exports) {
             let class_name = class_sym.name.clone();
             if class_sym.is_exported {
                 exports.push(ExtractedExport {
@@ -244,7 +292,7 @@ fn extract_decorated_definition(
             symbols.push(class_sym);
 
             if let Some(body) = def.child_by_field_name("body") {
-                extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports, exports);
+                extract_from_node(body, source, relative_path, Some(&class_name), true, all_exports, symbols, imports, exports);
             }
         }
     }
@@ -258,6 +306,7 @@ fn extract_function(
     is_inside_class: bool,
     decorator_prefix: Option<&str>,
     full_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
+    all_exports: Option<&std::collections::HashSet<String>>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -305,7 +354,13 @@ fn extract_function(
         Some("public".to_string())
     };
 
-    let is_exported = !name.starts_with('_') && parent_scope.is_none();
+    let is_exported = if parent_scope.is_some() {
+        false
+    } else if let Some(set) = all_exports {
+        set.contains(&name)
+    } else {
+        !name.starts_with('_')
+    };
 
     Some(ExtractedSymbol {
         stable_id,
@@ -333,6 +388,7 @@ fn extract_class(
     relative_path: &str,
     decorator_prefix: Option<&str>,
     full_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
+    all_exports: Option<&std::collections::HashSet<String>>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -354,6 +410,12 @@ fn extract_class(
     let (start_pos, end_pos) = full_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Class);
 
+    let is_exported = if let Some(set) = all_exports {
+        set.contains(&name)
+    } else {
+        !name.starts_with('_')
+    };
+
     Some(ExtractedSymbol {
         stable_id,
         name: name.clone(),
@@ -366,7 +428,7 @@ fn extract_class(
         end_column: end_pos.column,
         parameters: Vec::new(),
         return_type: None,
-        is_exported: !name.starts_with('_'),
+        is_exported,
         is_async: false,
         visibility: Some("public".to_string()),
         docstring,
@@ -378,6 +440,7 @@ fn extract_module_variable(
     node: Node,
     source: &[u8],
     relative_path: &str,
+    all_exports: Option<&std::collections::HashSet<String>>,
     symbols: &mut Vec<ExtractedSymbol>,
     exports: &mut Vec<ExtractedExport>,
 ) {
@@ -394,7 +457,11 @@ fn extract_module_variable(
                     let end_pos = child.end_position();
                     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &name, kind);
 
-                    let is_exported = !name.starts_with('_');
+                    let is_exported = if let Some(set) = all_exports {
+                        set.contains(&name)
+                    } else {
+                        !name.starts_with('_')
+                    };
                     if is_exported {
                         exports.push(ExtractedExport {
                             exported_name: name.clone(),

@@ -45,6 +45,3 @@ const INTERNAL_SECRET = 'secret_token';
 export { INTERNAL_SECRET };
 export default UserService;
 
-export default function getServiceHealth(): string {
-    return 'healthy';
-}

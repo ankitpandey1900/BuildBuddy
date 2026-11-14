@@ -231,23 +231,5 @@
     "visibility": null,
     "docstring": null,
     "signature": "const INTERNAL_SECRET"
-  },
-  {
-    "stable_id": "f0bc27fbf485cd87465be88401adc0673e3921d877c490515298cffed365f4a5",
-    "name": "getServiceHealth",
-    "qualified_name": "getServiceHealth",
-    "kind": "function",
-    "parent_name": null,
-    "start_line": 48,
-    "end_line": 50,
-    "start_column": 0,
-    "end_column": 1,
-    "parameters": [],
-    "return_type": "string",
-    "is_exported": true,
-    "is_async": false,
-    "visibility": null,
-    "docstring": null,
-    "signature": "getServiceHealth(): string"
   }
 ]

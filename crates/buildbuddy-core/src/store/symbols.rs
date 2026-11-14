@@ -133,11 +133,12 @@ pub fn persist_file_parse_result(
 
     // 4. Insert exports with source_evidence provenance
     {
+        let export_confidence = if result.language == "python" { "static" } else { "confirmed" };
         let mut export_evidence_stmt = tx.prepare(
             "INSERT INTO source_evidence (
                 project_id, file_path, start_line, end_line, start_column, end_column,
                 snippet, confidence, evidence_type
-            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, 'confirmed', 'export_stmt')",
+            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 'export_stmt')",
         )?;
 
         let mut export_stmt = tx.prepare(
@@ -162,6 +163,7 @@ pub fn persist_file_parse_result(
                 exp.line_number as i64,
                 exp.line_number as i64,
                 snippet,
+                export_confidence,
             ])?;
             let evidence_id = tx.last_insert_rowid();
 
