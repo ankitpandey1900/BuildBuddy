@@ -73,6 +73,22 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
 
       {file && (
         <div className="flex items-center gap-1.5 flex-shrink-0 text-caption font-mono text-text-muted">
+          {file.status && file.status !== "parsed" && file.status !== "pending" && (
+            <span
+              className={`text-[9px] px-1 py-0.2 rounded font-mono border uppercase tracking-wider ${
+                file.status === "partial"
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : file.status === "unsupported"
+                  ? "bg-surface-raised text-text-muted border-border-subtle"
+                  : file.status === "skipped_too_large"
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : "bg-red-500/10 text-red-400 border-red-500/30"
+              }`}
+              title={`Parse status: ${file.status}`}
+            >
+              {file.status === "skipped_too_large" ? "oversized" : file.status}
+            </span>
+          )}
           {file.function_count + file.class_count > 0 && (
             <span
               className="text-[10px] px-1 py-0.5 rounded bg-surface-raised text-accent font-semibold border border-border-subtle"

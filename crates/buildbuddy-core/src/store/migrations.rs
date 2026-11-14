@@ -114,6 +114,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             alias TEXT,
             is_type_only INTEGER DEFAULT 0 NOT NULL,
             line_number INTEGER NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
 

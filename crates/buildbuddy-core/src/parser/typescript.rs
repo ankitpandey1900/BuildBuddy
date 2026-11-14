@@ -87,6 +87,7 @@ impl LanguageAdapter for TypeScriptAdapter {
 
         let source_bytes = source.as_bytes();
         extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports);
+        mark_exported_symbols(root_node, source_bytes, &mut symbols);
 
         let status = if has_syntax_errors {
             ParseStatus::Partial
@@ -119,15 +120,16 @@ fn extract_from_node(
     for child in node.children(&mut cursor) {
         match child.kind() {
             "export_statement" => {
+                if child.child_by_field_name("source").is_some() {
+                    extract_import(child, source, imports);
+                }
                 extract_from_node(child, source, relative_path, parent_name, true, symbols, imports);
             }
             "import_statement" => {
                 extract_import(child, source, imports);
             }
             "function_declaration" => {
-                if let Some(sym) = extract_function(child, source, relative_path, parent_name, is_parent_exported) {
-                    symbols.push(sym);
-                }
+                extract_function(child, source, relative_path, parent_name, is_parent_exported, symbols, imports);
             }
             "class_declaration" => {
                 if let Some(class_sym) = extract_class(child, source, relative_path, is_parent_exported) {
@@ -150,7 +152,7 @@ fn extract_from_node(
                 }
             }
             "lexical_declaration" | "variable_declaration" => {
-                extract_variable_declarations(child, source, relative_path, is_parent_exported, symbols);
+                extract_variable_declarations(child, source, relative_path, parent_name, is_parent_exported, symbols, imports);
             }
             _ => {
                 // Descend for nested blocks if needed, but avoid recursing into function bodies
@@ -168,8 +170,13 @@ fn extract_function(
     relative_path: &str,
     parent_name: Option<&str>,
     is_exported: bool,
-) -> Option<ExtractedSymbol> {
-    let name_node = node.child_by_field_name("name")?;
+    symbols: &mut Vec<ExtractedSymbol>,
+    imports: &mut Vec<ExtractedImport>,
+) {
+    let name_node = match node.child_by_field_name("name") {
+        Some(n) => n,
+        None => return,
+    };
     let name = node_text(name_node, source);
     let qualified_name = match parent_name {
         Some(p) => format!("{}.{}", p, name),
@@ -195,10 +202,10 @@ fn extract_function(
     let end_pos = node.end_position();
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Function);
 
-    Some(ExtractedSymbol {
+    symbols.push(ExtractedSymbol {
         stable_id,
         name,
-        qualified_name,
+        qualified_name: qualified_name.clone(),
         kind: SymbolKind::Function,
         parent_name: parent_name.map(|s| s.to_string()),
         start_line: start_pos.row + 1,
@@ -212,7 +219,12 @@ fn extract_function(
         visibility: None,
         docstring: None,
         signature,
-    })
+    });
+
+    // Recurse into function body to extract nested functions
+    if let Some(body) = node.child_by_field_name("body") {
+        extract_from_node(body, source, relative_path, Some(&qualified_name), false, symbols, imports);
+    }
 }
 
 fn extract_class(
@@ -224,6 +236,16 @@ fn extract_class(
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
     let qualified_name = name.clone();
+
+    let heritage = node
+        .children(&mut node.walk())
+        .find(|c| c.kind() == "class_heritage")
+        .map(|n| node_text(n, source));
+
+    let signature = match heritage {
+        Some(h) => format!("class {} {}", name, h),
+        None => format!("class {}", name),
+    };
 
     let start_pos = node.start_position();
     let end_pos = node.end_position();
@@ -245,7 +267,7 @@ fn extract_class(
         is_async: false,
         visibility: None,
         docstring: None,
-        signature: format!("class {}", name),
+        signature,
     })
 }
 
@@ -386,8 +408,10 @@ fn extract_variable_declarations(
     node: Node,
     source: &[u8],
     relative_path: &str,
+    parent_name: Option<&str>,
     is_exported: bool,
     symbols: &mut Vec<ExtractedSymbol>,
+    imports: &mut Vec<ExtractedImport>,
 ) {
     let is_const = node.children(&mut node.walk()).any(|c| c.kind() == "const");
     let mut cursor = node.walk();
@@ -397,7 +421,10 @@ fn extract_variable_declarations(
             if let Some(name_node) = child.child_by_field_name("name") {
                 if name_node.kind() == "identifier" {
                     let name = node_text(name_node, source);
-                    let qualified_name = name.clone();
+                    let qualified_name = match parent_name {
+                        Some(p) => format!("{}.{}", p, name),
+                        None => name.clone(),
+                    };
                     let kind = if is_const { SymbolKind::Constant } else { SymbolKind::Variable };
 
                     // Check if assigned to an arrow function
@@ -418,16 +445,16 @@ fn extract_variable_declarations(
                             symbols.push(ExtractedSymbol {
                                 stable_id,
                                 name: name.clone(),
-                                qualified_name,
+                                qualified_name: qualified_name.clone(),
                                 kind: SymbolKind::Function,
-                                parent_name: None,
+                                parent_name: parent_name.map(|s| s.to_string()),
                                 start_line: start_pos.row + 1,
                                 end_line: end_pos.row + 1,
                                 start_column: start_pos.column,
                                 end_column: end_pos.column,
                                 parameters: parameters.clone(),
                                 return_type: return_type.clone(),
-                                is_exported,
+                                is_exported: is_exported && parent_name.is_none(),
                                 is_async,
                                 visibility: None,
                                 docstring: None,
@@ -439,6 +466,13 @@ fn extract_variable_declarations(
                                     return_type.as_deref().unwrap_or("any")
                                 ),
                             });
+
+                            // Recurse into arrow function body for nested declarations
+                            if let Some(body) = val.child_by_field_name("body") {
+                                if body.kind() == "statement_block" {
+                                    extract_from_node(body, source, relative_path, Some(&qualified_name), false, symbols, imports);
+                                }
+                            }
                             continue;
                         }
                     }
@@ -452,19 +486,60 @@ fn extract_variable_declarations(
                         name: name.clone(),
                         qualified_name,
                         kind,
-                        parent_name: None,
+                        parent_name: parent_name.map(|s| s.to_string()),
                         start_line: start_pos.row + 1,
                         end_line: end_pos.row + 1,
                         start_column: start_pos.column,
                         end_column: end_pos.column,
                         parameters: Vec::new(),
                         return_type: None,
-                        is_exported,
+                        is_exported: is_exported && parent_name.is_none(),
                         is_async: false,
                         visibility: None,
                         docstring: None,
                         signature: format!("{} {}", if is_const { "const" } else { "let" }, name),
                     });
+                }
+            }
+        }
+    }
+}
+
+fn mark_exported_symbols(
+    root_node: Node,
+    source: &[u8],
+    symbols: &mut [ExtractedSymbol],
+) {
+    let mut cursor = root_node.walk();
+    for child in root_node.children(&mut cursor) {
+        if child.kind() == "export_statement" {
+            let mut c_cursor = child.walk();
+            for sub in child.children(&mut c_cursor) {
+                if sub.kind() == "export_clause" {
+                    let mut spec_cursor = sub.walk();
+                    for spec in sub.children(&mut spec_cursor) {
+                        if spec.kind() == "export_specifier" {
+                            if let Some(n) = spec.child_by_field_name("name") {
+                                let name = node_text(n, source);
+                                for sym in symbols.iter_mut() {
+                                    if sym.name == name && sym.parent_name.is_none() {
+                                        sym.is_exported = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(val) = child.child_by_field_name("value") {
+                if val.kind() == "identifier" {
+                    let default_name = node_text(val, source);
+                    for sym in symbols.iter_mut() {
+                        if sym.name == default_name && sym.parent_name.is_none() {
+                            sym.is_exported = true;
+                        }
+                    }
                 }
             }
         }
@@ -607,4 +682,74 @@ fn format_param_list(parameters: &[Parameter]) -> String {
 fn node_text(node: Node, source: &[u8]) -> String {
     node.utf8_text(source).unwrap_or("").to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ts_comprehensive_extraction() {
+        let code = r#"
+import { BaseService } from './base';
+import type { IService } from './types';
+
+export class UserService extends BaseService implements IService {
+    public async getUser(id: string): Promise<string> {
+        return id;
+    }
+}
+
+export async function calculateMetrics(data: number[]): Promise<number> {
+    function sum(a: number, b: number): number {
+        return a + b;
+    }
+    return data.reduce(sum, 0);
+}
+
+export const processItem = async (item: string): Promise<string> => {
+    return item.trim();
+};
+
+const API_VERSION = 'v1';
+export { API_VERSION };
+export default UserService;
+"#;
+        let adapter = TypeScriptAdapter::new();
+        let result = adapter.parse("src/service.ts", code, &ParserLimits::default()).unwrap();
+
+        assert_eq!(result.status, ParseStatus::Full);
+        assert_eq!(result.imports.len(), 2);
+        assert_eq!(result.imports[0].source_module, "./base");
+        assert_eq!(result.imports[1].source_module, "./types");
+
+        let class_sym = result.symbols.iter().find(|s| s.name == "UserService").unwrap();
+        assert_eq!(class_sym.kind, SymbolKind::Class);
+        assert!(class_sym.signature.contains("extends BaseService implements IService"));
+        assert!(class_sym.is_exported);
+
+        let method_sym = result.symbols.iter().find(|s| s.name == "getUser").unwrap();
+        assert_eq!(method_sym.kind, SymbolKind::Method);
+        assert_eq!(method_sym.parent_name.as_deref(), Some("UserService"));
+
+        let func_sym = result.symbols.iter().find(|s| s.name == "calculateMetrics").unwrap();
+        assert_eq!(func_sym.kind, SymbolKind::Function);
+        assert!(func_sym.is_async);
+
+        let nested_func = result.symbols.iter().find(|s| s.name == "sum").unwrap();
+        assert_eq!(nested_func.kind, SymbolKind::Function);
+        assert_eq!(nested_func.parent_name.as_deref(), Some("calculateMetrics"));
+        assert_eq!(nested_func.qualified_name, "calculateMetrics.sum");
+        assert!(!nested_func.is_exported);
+
+        let arrow_sym = result.symbols.iter().find(|s| s.name == "processItem").unwrap();
+        assert_eq!(arrow_sym.kind, SymbolKind::Function);
+        assert!(arrow_sym.is_exported);
+        assert!(arrow_sym.is_async);
+
+        let const_sym = result.symbols.iter().find(|s| s.name == "API_VERSION").unwrap();
+        assert_eq!(const_sym.kind, SymbolKind::Constant);
+        assert!(const_sym.is_exported, "API_VERSION should be marked exported by export clause");
+    }
+}
+
 

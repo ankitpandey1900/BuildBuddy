@@ -35,16 +35,9 @@ pub async fn start_parse(
     let project = get_project_by_id(&conn, project_id).map_err(|e| e.to_string())?;
     let all_files = list_files_for_project(&conn, project_id, None, None).map_err(|e| e.to_string())?;
 
-    let supported_exts = ["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "pyw", "pyi"];
+    // Include all discovered files so unsupported/skipped files are never silently omitted
     let files_to_parse: Vec<FileToParse> = all_files
         .into_iter()
-        .filter(|f| {
-            if let Some(ext) = &f.extension {
-                supported_exts.contains(&ext.to_lowercase().as_str())
-            } else {
-                false
-            }
-        })
         .map(|f| FileToParse {
             file_id: f.id,
             relative_path: f.relative_path,

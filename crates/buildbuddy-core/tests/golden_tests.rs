@@ -14,7 +14,7 @@ fn fixtures_dir() -> PathBuf {
 }
 
 #[test]
-fn test_generate_or_verify_ts_golden() {
+fn test_verify_ts_golden() {
     let dir = fixtures_dir().join("ts-basic");
     let sample_path = dir.join("sample.ts");
     let content = fs::read_to_string(&sample_path).expect("Read sample.ts");
@@ -29,9 +29,16 @@ fn test_generate_or_verify_ts_golden() {
     assert!(!result.imports.is_empty());
 
     let expected_path = dir.join("expected-symbols.json");
-    if !expected_path.exists() {
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
         let serialized = serde_json::to_string_pretty(&result.symbols).unwrap();
         fs::write(&expected_path, serialized).expect("Write expected-symbols.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
     }
 
     let expected_str = fs::read_to_string(&expected_path).expect("Read expected-symbols.json");
@@ -78,7 +85,7 @@ fn test_ts_rescan_idempotent_symbol_ids() {
 }
 
 #[test]
-fn test_generate_or_verify_py_golden() {
+fn test_verify_py_golden() {
     let dir = fixtures_dir().join("py-basic");
     let sample_path = dir.join("sample.py");
     let content = fs::read_to_string(&sample_path).expect("Read sample.py");
@@ -93,9 +100,16 @@ fn test_generate_or_verify_py_golden() {
     assert!(!result.imports.is_empty());
 
     let expected_path = dir.join("expected-symbols.json");
-    if !expected_path.exists() {
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
         let serialized = serde_json::to_string_pretty(&result.symbols).unwrap();
         fs::write(&expected_path, serialized).expect("Write expected-symbols.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
     }
 
     let expected_str = fs::read_to_string(&expected_path).expect("Read expected-symbols.json");

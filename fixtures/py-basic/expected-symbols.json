@@ -5,8 +5,8 @@
     "qualified_name": "DEFAULT_TIMEOUT",
     "kind": "constant",
     "parent_name": null,
-    "start_line": 5,
-    "end_line": 5,
+    "start_line": 7,
+    "end_line": 7,
     "start_column": 0,
     "end_column": 20,
     "parameters": [],
@@ -23,8 +23,8 @@
     "qualified_name": "DatabaseConnection",
     "kind": "class",
     "parent_name": null,
-    "start_line": 7,
-    "end_line": 18,
+    "start_line": 9,
+    "end_line": 28,
     "start_column": 0,
     "end_column": 19,
     "parameters": [],
@@ -33,7 +33,7 @@
     "is_async": false,
     "visibility": "public",
     "docstring": "Manages raw connection to database.",
-    "signature": "class DatabaseConnection"
+    "signature": "class DatabaseConnection(BaseConnection)"
   },
   {
     "stable_id": "af1e68ff90b7ee83d599539aca17249a67862d877b5463eeca4ec8646ece1786",
@@ -41,8 +41,8 @@
     "qualified_name": "DatabaseConnection.__init__",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 10,
-    "end_line": 11,
+    "start_line": 12,
+    "end_line": 13,
     "start_column": 4,
     "end_column": 22,
     "parameters": [
@@ -70,8 +70,8 @@
     "qualified_name": "DatabaseConnection.connect",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 13,
-    "end_line": 15,
+    "start_line": 15,
+    "end_line": 17,
     "start_column": 4,
     "end_column": 19,
     "parameters": [
@@ -82,11 +82,53 @@
       }
     ],
     "return_type": "bool",
-    "is_exported": true,
+    "is_exported": false,
     "is_async": false,
     "visibility": "public",
     "docstring": "Connects to the database.",
     "signature": "def connect(self) -> bool"
+  },
+  {
+    "stable_id": "7dd12c0d7752b3140a97a559b9d1aa6af2565085932eebe8f1baa65bb8f6b59c",
+    "name": "is_connected",
+    "qualified_name": "DatabaseConnection.is_connected",
+    "kind": "method",
+    "parent_name": "DatabaseConnection",
+    "start_line": 20,
+    "end_line": 21,
+    "start_column": 4,
+    "end_column": 19,
+    "parameters": [
+      {
+        "name": "self",
+        "type_annotation": null,
+        "default_value": null
+      }
+    ],
+    "return_type": "bool",
+    "is_exported": false,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": null,
+    "signature": "@property\ndef is_connected(self) -> bool"
+  },
+  {
+    "stable_id": "367337f1fbe9479483c3d7f66e1fa357bdeaa60bae0f092e225a03b45df0ae99",
+    "name": "create_default",
+    "qualified_name": "DatabaseConnection.create_default",
+    "kind": "method",
+    "parent_name": "DatabaseConnection",
+    "start_line": 24,
+    "end_line": 25,
+    "start_column": 4,
+    "end_column": 12,
+    "parameters": [],
+    "return_type": null,
+    "is_exported": false,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": null,
+    "signature": "@staticmethod\ndef create_default()"
   },
   {
     "stable_id": "1f429eaff2227c7d1506be7b0ec1f40a7189bf2e3377ba69d7c5ede6e96b58b2",
@@ -94,8 +136,8 @@
     "qualified_name": "DatabaseConnection._internal_ping",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 17,
-    "end_line": 18,
+    "start_line": 27,
+    "end_line": 28,
     "start_column": 4,
     "end_column": 19,
     "parameters": [
@@ -118,8 +160,8 @@
     "qualified_name": "fetch_records",
     "kind": "function",
     "parent_name": null,
-    "start_line": 20,
-    "end_line": 22,
+    "start_line": 30,
+    "end_line": 35,
     "start_column": 0,
     "end_column": 13,
     "parameters": [
@@ -140,5 +182,29 @@
     "visibility": "public",
     "docstring": "Fetches records asynchronously.",
     "signature": "async def fetch_records(query: str, limit: int) -> List[dict]"
+  },
+  {
+    "stable_id": "7b5bc57c5ffa25d234f99d0810172961090f8877feaced2a684500bf134eeb18",
+    "name": "sanitize",
+    "qualified_name": "fetch_records.sanitize",
+    "kind": "function",
+    "parent_name": "fetch_records",
+    "start_line": 32,
+    "end_line": 33,
+    "start_column": 4,
+    "end_column": 28,
+    "parameters": [
+      {
+        "name": "param",
+        "type_annotation": "str",
+        "default_value": null
+      }
+    ],
+    "return_type": "str",
+    "is_exported": false,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": null,
+    "signature": "def sanitize(param: str) -> str"
   }
 ]

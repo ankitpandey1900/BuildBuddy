@@ -43,4 +43,16 @@ We tested and verified compilation on MSVC for the following mutually compatible
 - `rusqlite = "0.31"` with `features = ["bundled"]` for offline embedded SQLite + FTS5
 - `rayon = "1.10"` for parallel worker pool parsing
 
+## 3. Parsing Provenance and Golden Test Policy
+
+### Context
+Code intelligence requires strict provenance linking every symbol and import to its exact source range and snippet. Golden tests must guard against silent drift and unintended symbol loss.
+
+### Decision
+1. **Provenance Enforcement**: Every symbol and import persisted to SQLite has an associated `source_evidence` row (`start_line`, `end_line`, `snippet`, `evidence_type = 'symbol_def' | 'import_stmt'`). The `imports` table references `source_evidence(id)` via `source_evidence_id`.
+2. **Verify-Only Golden Tests**: `test_verify_ts_golden` and `test_verify_py_golden` are strictly verify-only. If `expected-symbols.json` is missing or mismatched, tests fail. Regenerating expected JSON requires the explicit opt-in environment flag `UPDATE_GOLDEN=1`.
+3. **Tree-sitter Timeout Interrupt**: Native timeouts are enforced via `parser.set_timeout_micros()`, which leverages Tree-sitter's C-level loop deadline check (`ts_parser_set_timeout_micros`) to halt runaway parses mid-execution rather than checking elapsed time after completion.
+4. **Non-Silent Handling**: Files marked `Unsupported`, `Partial`, `SkippedTooLarge`, or `Timeout` are persisted with their explicit status and displayed in the Explorer with visual status badges.
+
+
 

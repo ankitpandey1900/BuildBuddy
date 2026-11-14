@@ -84,15 +84,40 @@ pub fn persist_file_parse_result(
         }
     }
 
-    // 3. Insert imports
+    // 3. Insert imports with source_evidence provenance
     {
+        let mut import_evidence_stmt = tx.prepare(
+            "INSERT INTO source_evidence (
+                project_id, file_path, start_line, end_line, start_column, end_column,
+                snippet, confidence, evidence_type
+            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, 'confirmed', 'import_stmt')",
+        )?;
+
         let mut import_stmt = tx.prepare(
             "INSERT INTO imports (
-                project_id, file_id, source_module, imported_name, alias, is_type_only, line_number
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                project_id, file_id, source_module, imported_name, alias, is_type_only, line_number,
+                source_evidence_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )?;
 
         for imp in &result.imports {
+            let snippet = if let Some(alias) = &imp.alias {
+                format!("import {} as {} from '{}'", imp.imported_name, alias, imp.source_module)
+            } else if imp.imported_name.is_empty() {
+                format!("import '{}'", imp.source_module)
+            } else {
+                format!("import {} from '{}'", imp.imported_name, imp.source_module)
+            };
+
+            import_evidence_stmt.execute(params![
+                project_id,
+                result.relative_path,
+                imp.line_number as i64,
+                imp.line_number as i64,
+                snippet,
+            ])?;
+            let evidence_id = tx.last_insert_rowid();
+
             import_stmt.execute(params![
                 project_id,
                 file_id,
@@ -101,6 +126,7 @@ pub fn persist_file_parse_result(
                 imp.alias,
                 if imp.is_type_only { 1 } else { 0 },
                 imp.line_number as i64,
+                evidence_id,
             ])?;
         }
     }
@@ -299,6 +325,84 @@ mod tests {
         let fts_matches = search_symbols_fts(&conn, proj.id, "fetchUserData", 10).unwrap();
         assert_eq!(fts_matches.len(), 1);
         assert_eq!(fts_matches[0].0, "fetchUserData");
+    }
+
+    #[test]
+    fn test_no_symbol_or_import_without_provenance_evidence() {
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let proj = create_or_get_project(&conn, "/test/path", "test").unwrap();
+
+        conn.execute(
+            "INSERT INTO files (project_id, relative_path, file_name, extension, size_bytes, content_hash, status)
+             VALUES (?1, 'src/api.ts', 'api.ts', 'ts', 500, 'hash', 'pending')",
+            params![proj.id],
+        ).unwrap();
+        let file_id = conn.last_insert_rowid();
+
+        let sym = ExtractedSymbol {
+            stable_id: "sym-1".to_string(),
+            name: "testFn".to_string(),
+            qualified_name: "testFn".to_string(),
+            kind: SymbolKind::Function,
+            parent_name: None,
+            start_line: 1,
+            end_line: 5,
+            start_column: 0,
+            end_column: 1,
+            parameters: Vec::new(),
+            return_type: None,
+            is_exported: false,
+            is_async: false,
+            visibility: None,
+            docstring: None,
+            signature: "function testFn()".to_string(),
+        };
+
+        let imp = ExtractedImport {
+            source_module: "./utils".to_string(),
+            imported_name: "helper".to_string(),
+            alias: None,
+            is_type_only: false,
+            line_number: 1,
+        };
+
+        let result = FileParseResult {
+            relative_path: "src/api.ts".to_string(),
+            language: "typescript".to_string(),
+            status: ParseStatus::Full,
+            symbols: vec![sym],
+            imports: vec![imp],
+            errors: Vec::new(),
+        };
+
+        persist_file_parse_result(&mut conn, proj.id, file_id, &result).unwrap();
+
+        // Assert strictly zero orphaned symbols without source_evidence
+        let orphaned_symbols: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM symbols WHERE source_evidence_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphaned_symbols, 0, "Found symbols without source_evidence");
+
+        // Assert strictly zero orphaned imports without source_evidence
+        let orphaned_imports: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM imports WHERE source_evidence_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphaned_imports, 0, "Found imports without source_evidence");
+
+        // Assert evidence details match
+        let evidence_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM source_evidence", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(evidence_count, 2, "Expected 1 symbol evidence + 1 import evidence");
     }
 }
 

@@ -77,7 +77,7 @@ impl LanguageAdapter for PythonAdapter {
         }
 
         let source_bytes = source.as_bytes();
-        extract_from_node(root_node, source_bytes, relative_path, None, &mut symbols, &mut imports);
+        extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports);
 
         let status = if has_syntax_errors {
             ParseStatus::Partial
@@ -100,7 +100,8 @@ fn extract_from_node(
     node: Node,
     source: &[u8],
     relative_path: &str,
-    parent_class: Option<&str>,
+    parent_scope: Option<&str>,
+    is_inside_class: bool,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
 ) {
@@ -114,30 +115,95 @@ fn extract_from_node(
             "import_from_statement" => {
                 extract_import_from_statement(child, source, imports);
             }
+            "decorated_definition" => {
+                extract_decorated_definition(child, source, relative_path, parent_scope, is_inside_class, symbols, imports);
+            }
             "function_definition" => {
-                if let Some(sym) = extract_function(child, source, relative_path, parent_class) {
+                if let Some(sym) = extract_function(child, source, relative_path, parent_scope, is_inside_class, None) {
+                    let func_qname = sym.qualified_name.clone();
                     symbols.push(sym);
+
+                    if let Some(body) = child.child_by_field_name("body") {
+                        extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports);
+                    }
                 }
             }
             "class_definition" => {
-                if let Some(class_sym) = extract_class(child, source, relative_path) {
+                if let Some(class_sym) = extract_class(child, source, relative_path, None) {
                     let class_name = class_sym.name.clone();
                     symbols.push(class_sym);
 
                     if let Some(body) = child.child_by_field_name("body") {
-                        extract_from_node(body, source, relative_path, Some(&class_name), symbols, imports);
+                        extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports);
                     }
                 }
             }
             "expression_statement" => {
-                if parent_class.is_none() {
+                if parent_scope.is_none() {
                     extract_module_variable(child, source, relative_path, symbols);
                 }
             }
             _ => {
                 if child.kind() == "module" || child.kind() == "block" {
-                    extract_from_node(child, source, relative_path, parent_class, symbols, imports);
+                    extract_from_node(child, source, relative_path, parent_scope, is_inside_class, symbols, imports);
                 }
+            }
+        }
+    }
+}
+
+fn extract_decorated_definition(
+    node: Node,
+    source: &[u8],
+    relative_path: &str,
+    parent_scope: Option<&str>,
+    is_inside_class: bool,
+    symbols: &mut Vec<ExtractedSymbol>,
+    imports: &mut Vec<ExtractedImport>,
+) {
+    let mut decorators = Vec::new();
+    let mut definition_node = None;
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+        if child.kind() == "decorator" {
+            decorators.push(node_text(child, source));
+        } else if child.kind() == "function_definition" || child.kind() == "class_definition" {
+            definition_node = Some(child);
+        }
+    }
+
+    if definition_node.is_none() {
+        definition_node = node.child_by_field_name("definition");
+    }
+
+    let def = match definition_node {
+        Some(d) => d,
+        None => return,
+    };
+
+    let decorator_prefix = if decorators.is_empty() {
+        None
+    } else {
+        Some(decorators.join("\n"))
+    };
+
+    if def.kind() == "function_definition" {
+        if let Some(sym) = extract_function(def, source, relative_path, parent_scope, is_inside_class, decorator_prefix.as_deref()) {
+            let func_qname = sym.qualified_name.clone();
+            symbols.push(sym);
+
+            if let Some(body) = def.child_by_field_name("body") {
+                extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports);
+            }
+        }
+    } else if def.kind() == "class_definition" {
+        if let Some(class_sym) = extract_class(def, source, relative_path, decorator_prefix.as_deref()) {
+            let class_name = class_sym.name.clone();
+            symbols.push(class_sym);
+
+            if let Some(body) = def.child_by_field_name("body") {
+                extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports);
             }
         }
     }
@@ -147,17 +213,19 @@ fn extract_function(
     node: Node,
     source: &[u8],
     relative_path: &str,
-    parent_class: Option<&str>,
+    parent_scope: Option<&str>,
+    is_inside_class: bool,
+    decorator_prefix: Option<&str>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
-    let qualified_name = match parent_class {
-        Some(cls) => format!("{}.{}", cls, name),
+    let qualified_name = match parent_scope {
+        Some(scope) => format!("{}.{}", scope, name),
         None => name.clone(),
     };
 
     let is_async = node.children(&mut node.walk()).any(|c| c.kind() == "async");
-    let kind = if parent_class.is_some() {
+    let kind = if is_inside_class {
         SymbolKind::Method
     } else {
         SymbolKind::Function
@@ -171,7 +239,7 @@ fn extract_function(
 
     let docstring = extract_docstring(node.child_by_field_name("body"), source);
 
-    let signature = format!(
+    let raw_sig = format!(
         "{}{}({}){}",
         if is_async { "async def " } else { "def " },
         name,
@@ -179,11 +247,15 @@ fn extract_function(
         return_type.as_ref().map(|r| format!(" -> {}", r)).unwrap_or_default()
     );
 
+    let signature = match decorator_prefix {
+        Some(d) => format!("{}\n{}", d, raw_sig),
+        None => raw_sig,
+    };
+
     let start_pos = node.start_position();
     let end_pos = node.end_position();
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, kind);
 
-    // Private if starts with underscore (but not dunder)
     let visibility = if name.starts_with("__") && name.ends_with("__") {
         Some("special".to_string())
     } else if name.starts_with('_') {
@@ -192,14 +264,14 @@ fn extract_function(
         Some("public".to_string())
     };
 
-    let is_exported = !name.starts_with('_');
+    let is_exported = !name.starts_with('_') && parent_scope.is_none();
 
     Some(ExtractedSymbol {
         stable_id,
         name,
         qualified_name,
         kind,
-        parent_name: parent_class.map(|s| s.to_string()),
+        parent_name: parent_scope.map(|s| s.to_string()),
         start_line: start_pos.row + 1,
         end_line: end_pos.row + 1,
         start_column: start_pos.column,
@@ -218,6 +290,7 @@ fn extract_class(
     node: Node,
     source: &[u8],
     relative_path: &str,
+    decorator_prefix: Option<&str>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -226,9 +299,14 @@ fn extract_class(
     let docstring = extract_docstring(node.child_by_field_name("body"), source);
 
     let superclasses = node.child_by_field_name("superclasses").map(|n| node_text(n, source));
-    let signature = match superclasses {
+    let raw_sig = match superclasses {
         Some(s) => format!("class {}{}", name, s),
         None => format!("class {}", name),
+    };
+
+    let signature = match decorator_prefix {
+        Some(d) => format!("{}\n{}", d, raw_sig),
+        None => raw_sig,
     };
 
     let start_pos = node.start_position();
@@ -448,3 +526,75 @@ fn format_param_list(parameters: &[Parameter]) -> String {
 fn node_text(node: Node, source: &[u8]) -> String {
     node.utf8_text(source).unwrap_or("").to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_python_comprehensive_extraction() {
+        let code = r#"
+from .utils import format_row
+from ..core.base import BaseConnection
+
+class DatabaseConnection(BaseConnection):
+    """Manages raw connection to database."""
+
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+
+    @property
+    def is_connected(self) -> bool:
+        return True
+
+    @staticmethod
+    def create_default():
+        pass
+
+async def fetch_records(query: str, limit: int = 100) -> List[dict]:
+    """Fetches records asynchronously."""
+    def sanitize(param: str) -> str:
+        return param.strip()
+    return []
+"#;
+        let adapter = PythonAdapter::new();
+        let result = adapter.parse("src/db.py", code, &ParserLimits::default()).unwrap();
+
+        assert_eq!(result.status, ParseStatus::Full);
+        assert_eq!(result.imports.len(), 2);
+        assert_eq!(result.imports[0].source_module, ".utils");
+        assert_eq!(result.imports[0].imported_name, "format_row");
+        assert_eq!(result.imports[1].source_module, "..core.base");
+        assert_eq!(result.imports[1].imported_name, "BaseConnection");
+
+        let class_sym = result.symbols.iter().find(|s| s.name == "DatabaseConnection").unwrap();
+        assert_eq!(class_sym.kind, SymbolKind::Class);
+        assert_eq!(class_sym.signature, "class DatabaseConnection(BaseConnection)");
+        assert_eq!(class_sym.docstring.as_deref(), Some("Manages raw connection to database."));
+
+        let init_method = result.symbols.iter().find(|s| s.name == "__init__").unwrap();
+        assert_eq!(init_method.kind, SymbolKind::Method);
+        assert_eq!(init_method.parent_name.as_deref(), Some("DatabaseConnection"));
+
+        let prop_method = result.symbols.iter().find(|s| s.name == "is_connected").unwrap();
+        assert_eq!(prop_method.kind, SymbolKind::Method);
+        assert_eq!(prop_method.parent_name.as_deref(), Some("DatabaseConnection"));
+        assert!(prop_method.signature.contains("@property"));
+
+        let static_method = result.symbols.iter().find(|s| s.name == "create_default").unwrap();
+        assert_eq!(static_method.kind, SymbolKind::Method);
+        assert!(static_method.signature.contains("@staticmethod"));
+
+        let func_sym = result.symbols.iter().find(|s| s.name == "fetch_records").unwrap();
+        assert_eq!(func_sym.kind, SymbolKind::Function);
+        assert!(func_sym.is_async);
+        assert_eq!(func_sym.parent_name, None);
+
+        let nested_func = result.symbols.iter().find(|s| s.name == "sanitize").unwrap();
+        assert_eq!(nested_func.kind, SymbolKind::Function);
+        assert_eq!(nested_func.parent_name.as_deref(), Some("fetch_records"));
+        assert_eq!(nested_func.qualified_name, "fetch_records.sanitize");
+        assert!(!nested_func.is_exported);
+    }
+}
+

@@ -5,8 +5,8 @@
     "qualified_name": "API_VERSION",
     "kind": "constant",
     "parent_name": null,
-    "start_line": 4,
-    "end_line": 4,
+    "start_line": 6,
+    "end_line": 6,
     "start_column": 13,
     "end_column": 31,
     "parameters": [],
@@ -23,8 +23,8 @@
     "qualified_name": "UserProfile",
     "kind": "interface",
     "parent_name": null,
-    "start_line": 6,
-    "end_line": 10,
+    "start_line": 8,
+    "end_line": 12,
     "start_column": 7,
     "end_column": 1,
     "parameters": [],
@@ -41,8 +41,8 @@
     "qualified_name": "Status",
     "kind": "type_alias",
     "parent_name": null,
-    "start_line": 12,
-    "end_line": 12,
+    "start_line": 14,
+    "end_line": 14,
     "start_column": 7,
     "end_column": 55,
     "parameters": [],
@@ -59,8 +59,8 @@
     "qualified_name": "UserService",
     "kind": "class",
     "parent_name": null,
-    "start_line": 14,
-    "end_line": 28,
+    "start_line": 16,
+    "end_line": 31,
     "start_column": 7,
     "end_column": 1,
     "parameters": [],
@@ -69,7 +69,7 @@
     "is_async": false,
     "visibility": null,
     "docstring": null,
-    "signature": "class UserService"
+    "signature": "class UserService extends BaseService implements IService"
   },
   {
     "stable_id": "58bfe9ed77c6205675503caa22634d4d9b717b07be3a847ab2ac019327420165",
@@ -77,8 +77,8 @@
     "qualified_name": "UserService.constructor",
     "kind": "method",
     "parent_name": "UserService",
-    "start_line": 17,
-    "end_line": 19,
+    "start_line": 19,
+    "end_line": 22,
     "start_column": 4,
     "end_column": 5,
     "parameters": [
@@ -101,8 +101,8 @@
     "qualified_name": "UserService.getUser",
     "kind": "method",
     "parent_name": "UserService",
-    "start_line": 21,
-    "end_line": 23,
+    "start_line": 24,
+    "end_line": 26,
     "start_column": 4,
     "end_column": 5,
     "parameters": [
@@ -125,8 +125,8 @@
     "qualified_name": "UserService.getServiceRole",
     "kind": "method",
     "parent_name": "UserService",
-    "start_line": 25,
-    "end_line": 27,
+    "start_line": 28,
+    "end_line": 30,
     "start_column": 4,
     "end_column": 5,
     "parameters": [],
@@ -143,8 +143,8 @@
     "qualified_name": "calculateMetrics",
     "kind": "function",
     "parent_name": null,
-    "start_line": 30,
-    "end_line": 32,
+    "start_line": 33,
+    "end_line": 38,
     "start_column": 7,
     "end_column": 1,
     "parameters": [
@@ -160,5 +160,76 @@
     "visibility": null,
     "docstring": null,
     "signature": "async calculateMetrics(data: number[]): Promise<number>"
+  },
+  {
+    "stable_id": "c597b0724f6999eac602b5c5fddcce881f49d39145c937d1f431327aaaf8c91d",
+    "name": "sum",
+    "qualified_name": "calculateMetrics.sum",
+    "kind": "function",
+    "parent_name": "calculateMetrics",
+    "start_line": 34,
+    "end_line": 36,
+    "start_column": 4,
+    "end_column": 5,
+    "parameters": [
+      {
+        "name": "a",
+        "type_annotation": "number",
+        "default_value": null
+      },
+      {
+        "name": "b",
+        "type_annotation": "number",
+        "default_value": null
+      }
+    ],
+    "return_type": "number",
+    "is_exported": false,
+    "is_async": false,
+    "visibility": null,
+    "docstring": null,
+    "signature": "sum(a: number, b: number): number"
+  },
+  {
+    "stable_id": "7ac59baea7788111139d87e7863e4762c93c13844582d195cefae47ef3426894",
+    "name": "processUser",
+    "qualified_name": "processUser",
+    "kind": "function",
+    "parent_name": null,
+    "start_line": 40,
+    "end_line": 42,
+    "start_column": 13,
+    "end_column": 1,
+    "parameters": [
+      {
+        "name": "id",
+        "type_annotation": "string",
+        "default_value": null
+      }
+    ],
+    "return_type": "Promise<string>",
+    "is_exported": true,
+    "is_async": true,
+    "visibility": null,
+    "docstring": null,
+    "signature": "const processUser = async (id: string): Promise<string>"
+  },
+  {
+    "stable_id": "7f74308e91d105791b3031c136a796ab73f29723ec67c20e0e0011945e9f3542",
+    "name": "INTERNAL_SECRET",
+    "qualified_name": "INTERNAL_SECRET",
+    "kind": "constant",
+    "parent_name": null,
+    "start_line": 44,
+    "end_line": 44,
+    "start_column": 6,
+    "end_column": 38,
+    "parameters": [],
+    "return_type": null,
+    "is_exported": true,
+    "is_async": false,
+    "visibility": null,
+    "docstring": null,
+    "signature": "const INTERNAL_SECRET"
   }
 ]
