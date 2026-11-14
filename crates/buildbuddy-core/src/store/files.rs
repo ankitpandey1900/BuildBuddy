@@ -19,7 +19,7 @@ pub struct FileRecord {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScannedFileInsert {
     pub relative_path: String,
     pub file_name: String,

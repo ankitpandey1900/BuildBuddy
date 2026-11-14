@@ -96,5 +96,54 @@ When a `const` or assignment is encountered:
 - **Declaration Columns Range**:
   - `start_column` and `end_column` describe the complete declaration statement, including leading keywords (`export`, `async`, `public`, `static`) or decorators.
 
+## 5. Import Resolution, Dependency Analysis & Incremental Engine
+
+### 1. TypeScript & JavaScript Import Resolution
+- **Probing Priority**:
+  1. Direct match with exact path.
+  2. Extension mapping: replaces `.js`, `.jsx`, `.mjs`, `.cjs` with `.ts`, `.tsx`, `.d.ts`.
+  3. Candidate extensions: `.ts`, `.tsx`, `.d.ts`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.json`.
+  4. Index file candidates: `/index.ts`, `/index.tsx`, `/index.d.ts`, `/index.js`, `/index.jsx`, `/index.mjs`, `/index.cjs`, `/index.json`.
+- **Path Aliases & BaseUrl**:
+  - Parsed from `tsconfig.json` (or `jsconfig.json`) `compilerOptions.paths` and `compilerOptions.baseUrl`.
+  - Wildcard prefixes like `@components/*` map to target directory paths relative to baseUrl.
+- **Status Classification**:
+  - Matches project file: `ResolutionStatus::Internal`.
+  - Relative prefix (`./`, `../`, `/`) without match: `ResolutionStatus::Unresolved`.
+  - Non-relative prefix without alias match: `ResolutionStatus::External`.
+
+### 2. Python Import Resolution
+- **Relative Imports (PEP 328)**:
+  - Count leading dots: 1 dot = current package directory, 2 dots = parent directory, 3 dots = grandparent directory.
+  - Probes `<path>.py` and `<path>/__init__.py`.
+- **Absolute Imports**:
+  - Probes root directory package/module and `src/` prefix package/module.
+  - Standard library and third-party packages classified as `ResolutionStatus::External`.
+
+### 3. Circular Dependency Cycle Detection
+- Tarjan's Strongly Connected Components (SCC) algorithm runs over internal import edges.
+- Components with `len > 1` (or self-loops) are extracted and persisted in `findings` table under category `circular_dependency` with severity `medium` and confidence `confirmed`.
+
+### 4. Manifest Parsing & Unused Dependencies
+- Parsers:
+  - `package.json`: `dependencies` (direct), `devDependencies` (dev), `peerDependencies` (peer), `optionalDependencies` (optional).
+  - `requirements.txt`: PEP 508 version specs, dev classification if filename contains `dev` or `test`.
+  - `pyproject.toml`: PEP 621 `[project.dependencies]` & `[project.optional-dependencies]`, and Poetry `[tool.poetry.dependencies]` & `[tool.poetry.group.<group>.dependencies]`.
+- Unused Heuristic:
+  - Compares manifest packages against imported package root names (handling scoped npm packages `@scope/pkg`, Python underscore/hyphen normalization, and `@types/` packages).
+  - Common build tools (`vite`, `vitest`, `eslint`, `prettier`, `pytest`, `black`, `mypy`, etc.) flagged with `is_likely_tooling = true` and `info` severity; unimported runtime packages flagged with `low` severity and confidence `inferred`.
+
+### 5. Incremental Scan & Hash Change Tracking
+- Compares BLAKE3 hashes against SQLite `files` table.
+- Unchanged files are skipped entirely (`files_skipped_unchanged`).
+- Modified files delete existing symbols, imports, exports, and edges, and queue for re-parse.
+- Deleted files trigger SQLite cascade deletion of all child records.
+
+### 6. Read-Only Git Detection
+- Inspects `.git/HEAD`, refs, and `packed-refs` via pure Rust filesystem reading.
+- Handles worktrees and submodules (`gitdir: <path>`).
+- Never spawns git CLI, never executes or modifies the project.
+
+
 
 

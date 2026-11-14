@@ -97,3 +97,34 @@ export type ViewType =
   | "security"
   | "reports"
   | "documentation";
+
+export interface DependencyOverview {
+  internal_edges_count: number;
+  external_dependencies_count: number;
+  unresolved_count: number;
+  circular_cycles_count: number;
+  unused_dependencies_count: number;
+}
+
+export interface CircularDependencyCycle {
+  cycle_files: string[];
+}
+
+export interface ImportEdge {
+  source_file_id: number;
+  source_file_path: string;
+  target_file_id: number | null;
+  target_file_path: string | null;
+  target_module: string;
+  imported_name: string;
+  is_type_only: boolean;
+  line_number: number;
+  resolution_status: "internal" | "external" | "unresolved";
+  source_evidence_id: number | null;
+}
+
+export interface GitRepoStatus {
+  is_git_repo: boolean;
+  current_branch: string | null;
+  commit_hash: string | null;
+}

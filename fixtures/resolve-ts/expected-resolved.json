@@ -1,0 +1,81 @@
+{
+  "edges": [
+    {
+      "source_file": "src/barrel.ts",
+      "target_module": "./components/button",
+      "imported_name": "",
+      "resolution_status": "internal",
+      "target_file": "src/components/button.ts"
+    },
+    {
+      "source_file": "src/cycle_a.ts",
+      "target_module": "./cycle_b",
+      "imported_name": "b",
+      "resolution_status": "internal",
+      "target_file": "src/cycle_b.ts"
+    },
+    {
+      "source_file": "src/cycle_b.ts",
+      "target_module": "./cycle_a",
+      "imported_name": "a",
+      "resolution_status": "internal",
+      "target_file": "src/cycle_a.ts"
+    },
+    {
+      "source_file": "src/index.ts",
+      "target_module": "./barrel",
+      "imported_name": "Button",
+      "resolution_status": "internal",
+      "target_file": "src/barrel.ts"
+    },
+    {
+      "source_file": "src/index.ts",
+      "target_module": "./cycle_a",
+      "imported_name": "a",
+      "resolution_status": "internal",
+      "target_file": "src/cycle_a.ts"
+    },
+    {
+      "source_file": "src/index.ts",
+      "target_module": "./utils",
+      "imported_name": "formatData",
+      "resolution_status": "internal",
+      "target_file": "src/utils/index.ts"
+    },
+    {
+      "source_file": "src/index.ts",
+      "target_module": "@components/button",
+      "imported_name": "Button",
+      "resolution_status": "internal",
+      "target_file": "src/components/button.ts"
+    },
+    {
+      "source_file": "src/index.ts",
+      "target_module": "react",
+      "imported_name": "React",
+      "resolution_status": "external",
+      "target_file": null
+    }
+  ],
+  "cycles": [
+    [
+      "src/cycle_a.ts",
+      "src/cycle_b.ts"
+    ]
+  ],
+  "manifest_dependencies": [
+    {
+      "name": "react",
+      "version_spec": "^18.2.0",
+      "dep_type": "direct"
+    },
+    {
+      "name": "vitest",
+      "version_spec": "^1.0.0",
+      "dep_type": "dev"
+    }
+  ],
+  "unused_dependencies": [
+    "vitest"
+  ]
+}

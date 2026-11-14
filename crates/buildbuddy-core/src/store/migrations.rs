@@ -159,6 +159,52 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             INSERT INTO fts_symbols(rowid, name, qualified_name, signature, docstring)
             VALUES (new.id, new.name, new.qualified_name, new.signature, new.docstring);
         END;
+
+        CREATE TABLE IF NOT EXISTS import_edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            source_file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            target_file_id INTEGER REFERENCES files(id) ON DELETE CASCADE,
+            target_module TEXT NOT NULL,
+            imported_name TEXT NOT NULL,
+            is_type_only INTEGER DEFAULT 0 NOT NULL,
+            line_number INTEGER NOT NULL,
+            resolution_status TEXT CHECK(resolution_status IN ('internal', 'external', 'unresolved')) NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_import_edges_project ON import_edges(project_id);
+        CREATE INDEX IF NOT EXISTS idx_import_edges_src ON import_edges(source_file_id);
+        CREATE INDEX IF NOT EXISTS idx_import_edges_tgt ON import_edges(target_file_id);
+
+        CREATE TABLE IF NOT EXISTS manifest_dependencies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            manifest_file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            package_name TEXT NOT NULL,
+            version_spec TEXT,
+            dependency_type TEXT CHECK(dependency_type IN ('direct', 'dev', 'peer', 'optional')) NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_manifest_deps_project ON manifest_dependencies(project_id);
+
+        CREATE TABLE IF NOT EXISTS findings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            category TEXT CHECK(category IN ('circular_dependency', 'unused_dependency', 'dead_code', 'security', 'complexity')) NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            severity TEXT CHECK(severity IN ('info', 'low', 'medium', 'high', 'critical')) NOT NULL,
+            confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            metadata_json TEXT DEFAULT '{}' NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);
         "
     )?;
     Ok(())
@@ -191,6 +237,10 @@ mod tests {
         assert!(tables.contains(&"source_evidence".to_string()));
         assert!(tables.contains(&"symbols".to_string()));
         assert!(tables.contains(&"imports".to_string()));
+        assert!(tables.contains(&"exports".to_string()));
+        assert!(tables.contains(&"import_edges".to_string()));
+        assert!(tables.contains(&"manifest_dependencies".to_string()));
+        assert!(tables.contains(&"findings".to_string()));
         assert!(tables.contains(&"fts_symbols".to_string()));
     }
 }

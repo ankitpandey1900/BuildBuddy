@@ -59,6 +59,11 @@ pub fn run() {
             commands::explorer::get_file_symbols,
             commands::explorer::get_file_imports,
             commands::explorer::search_symbols,
+            commands::graph::get_dependencies_overview,
+            commands::graph::get_circular_dependencies,
+            commands::graph::get_import_edges,
+            commands::graph::get_git_status,
+            commands::graph::resolve_and_persist_project_graph,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");

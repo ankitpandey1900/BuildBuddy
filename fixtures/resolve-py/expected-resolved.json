@@ -1,0 +1,70 @@
+{
+  "edges": [
+    {
+      "source_file": "pkg/cycle_x.py",
+      "target_module": ".cycle_y",
+      "imported_name": "val_y",
+      "resolution_status": "internal",
+      "target_file": "pkg/cycle_y.py"
+    },
+    {
+      "source_file": "pkg/cycle_y.py",
+      "target_module": ".cycle_x",
+      "imported_name": "val_x",
+      "resolution_status": "internal",
+      "target_file": "pkg/cycle_x.py"
+    },
+    {
+      "source_file": "pkg/main.py",
+      "target_module": ".cycle_x",
+      "imported_name": "val_x",
+      "resolution_status": "internal",
+      "target_file": "pkg/cycle_x.py"
+    },
+    {
+      "source_file": "pkg/main.py",
+      "target_module": ".utils",
+      "imported_name": "format_row",
+      "resolution_status": "internal",
+      "target_file": "pkg/utils.py"
+    },
+    {
+      "source_file": "pkg/main.py",
+      "target_module": "requests",
+      "imported_name": "",
+      "resolution_status": "external",
+      "target_file": null
+    }
+  ],
+  "cycles": [
+    [
+      "pkg/cycle_x.py",
+      "pkg/cycle_y.py"
+    ]
+  ],
+  "manifest_dependencies": [
+    {
+      "name": "pytest",
+      "version_spec": ">=7.0.0",
+      "dep_type": "dev"
+    },
+    {
+      "name": "pytest",
+      "version_spec": ">=7.0.0",
+      "dep_type": "direct"
+    },
+    {
+      "name": "requests",
+      "version_spec": ">=2.28.0",
+      "dep_type": "direct"
+    },
+    {
+      "name": "requests",
+      "version_spec": ">=2.28.0",
+      "dep_type": "direct"
+    }
+  ],
+  "unused_dependencies": [
+    "pytest"
+  ]
+}

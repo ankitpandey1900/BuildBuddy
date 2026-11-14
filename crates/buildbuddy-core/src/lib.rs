@@ -2,6 +2,9 @@ pub mod scanner;
 pub mod store;
 pub mod parser;
 pub mod symbols;
+pub mod manifest;
+pub mod graph;
+pub mod vcs;
 
 pub fn verify_tree_sitter_compatibility() -> bool {
     let mut parser = tree_sitter::Parser::new();

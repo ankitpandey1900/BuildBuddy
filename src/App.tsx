@@ -1,10 +1,11 @@
 import React from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ExplorerView } from "@/components/explorer/ExplorerView";
+import { DependenciesView } from "@/components/dependencies/DependenciesView";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
-import { LayoutDashboard, GitGraph, Boxes, Network, Database, Code2, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
+import { LayoutDashboard, GitGraph, Network, Database, Code2, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
 
 export const App: React.FC = () => {
   const project = useProjectState();
@@ -48,11 +49,15 @@ export const App: React.FC = () => {
         );
       case "dependencies":
         return (
-          <PlaceholderView
-            title="Dependency Inventory"
-            icon={<Boxes className="w-8 h-8 text-accent" />}
-            description="Internal module coupling, circular dependencies, and manifest package inspection."
-            badge="Phase 2 / Task 5"
+          <DependenciesView
+            currentProject={project.currentProject}
+            onSelectFile={(filePath) => {
+              const match = project.files.find((f) => f.relative_path === filePath);
+              if (match) {
+                project.selectFile(match);
+                ui.setActiveView("explorer");
+              }
+            }}
           />
         );
       case "apis":
