@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark Theme Default */
+  --bg-canvas: #0D1117;
+  --bg-surface: #161B22;
+  --bg-subtle: #21262D;
+  --bg-elevated: #30363D;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.10);
+
+  --text-primary: #F0F6FC;
+  --text-secondary: #C9D1D9;
+  --text-muted: #8B949E;
+  --text-faint: #484F58;
+
+  --border-subtle: #21262D;
+  --border-default: #30363D;
+  --border-strong: #6E7681;
+  --border-focus: #58A6FF;
+
+  --accent-default: #388BFD;
+  --accent-hover: #58A6FF;
+  --accent-subtle: rgba(56, 139, 253, 0.15);
+  --accent-text: #79C0FF;
+
+  /* Domain Tokens */
+  --domain-frontend-bg: #1C2433;
+  --domain-frontend-border: #58A6FF;
+  --domain-backend-bg: #1A2824;
+  --domain-backend-border: #3FB950;
+  --domain-database-bg: #2B2319;
+  --domain-database-border: #D29922;
+  --domain-external-bg: #271F30;
+  --domain-external-border: #BC8CFF;
+}
+
+[data-theme='light'] {
+  --bg-canvas: #F6F8FA;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F0F2F5;
+  --bg-elevated: #E1E4E8;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.08);
+
+  --text-primary: #1F2328;
+  --text-secondary: #424A53;
+  --text-muted: #656D76;
+  --text-faint: #8C959F;
+
+  --border-subtle: #E1E4E8;
+  --border-default: #D0D7DE;
+  --border-strong: #8C959F;
+  --border-focus: #0969DA;
+
+  --accent-default: #0969DA;
+  --accent-hover: #1A7F37;
+  --accent-subtle: rgba(9, 105, 218, 0.10);
+  --accent-text: #0969DA;
+
+  /* Domain Tokens */
+  --domain-frontend-bg: #EEF4FF;
+  --domain-frontend-border: #0969DA;
+  --domain-backend-bg: #EBF8EE;
+  --domain-backend-border: #1A7F37;
+  --domain-database-bg: #FFF8E6;
+  --domain-database-border: #9A6700;
+  --domain-external-bg: #F5EEFF;
+  --domain-external-border: #8250DF;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Accessible Focus Ring */
+.focus-ring {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+

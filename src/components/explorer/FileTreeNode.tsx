@@ -1,0 +1,83 @@
+import React from "react";
+import { FileCode, ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
+import type { FileRecord } from "@/types/ipc";
+
+export interface TreeNode {
+  id: string;
+  name: string;
+  path: string;
+  isFolder: boolean;
+  children?: TreeNode[];
+  fileRecord?: FileRecord;
+}
+
+interface FileTreeNodeProps {
+  node: TreeNode;
+  depth: number;
+  isExpanded: boolean;
+  isSelected: boolean;
+  onToggleExpand: (path: string) => void;
+  onSelectFile: (file: FileRecord) => void;
+}
+
+export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
+  node,
+  depth,
+  isExpanded,
+  isSelected,
+  onToggleExpand,
+  onSelectFile,
+}) => {
+  const paddingLeft = `${depth * 14 + 8}px`;
+
+  if (node.isFolder) {
+    return (
+      <div
+        style={{ paddingLeft }}
+        onClick={() => onToggleExpand(node.path)}
+        className="h-6 flex items-center gap-1.5 cursor-pointer hover:bg-hover text-text-primary text-meta select-none group"
+      >
+        <span className="text-text-muted group-hover:text-text-primary">
+          {isExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5" />
+          )}
+        </span>
+        {isExpanded ? (
+          <FolderOpen className="w-3.5 h-3.5 text-accent" />
+        ) : (
+          <Folder className="w-3.5 h-3.5 text-text-muted" />
+        )}
+        <span className="truncate font-medium">{node.name}</span>
+      </div>
+    );
+  }
+
+  const file = node.fileRecord;
+  return (
+    <div
+      style={{ paddingLeft }}
+      onClick={() => file && onSelectFile(file)}
+      className={`h-6 flex items-center justify-between pr-2 cursor-pointer text-meta select-none group transition-colors ${
+        isSelected
+          ? "bg-accent/15 text-accent-text border-l-2 border-accent"
+          : "hover:bg-hover text-text-secondary hover:text-text-primary"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 truncate min-w-0">
+        <span className="w-3.5" /> {/* Align with folder arrow */}
+        <FileCode className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? "text-accent" : "text-text-muted"}`} />
+        <span className="truncate">{node.name}</span>
+      </div>
+
+      {file && (
+        <div className="flex items-center gap-2 flex-shrink-0 text-caption font-mono text-text-muted">
+          {file.line_count > 0 && (
+            <span>{file.line_count.toLocaleString()}L</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};

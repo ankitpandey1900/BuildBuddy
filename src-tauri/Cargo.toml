@@ -1,0 +1,29 @@
+[package]
+name = "buildbuddy"
+version = "0.1.0"
+description = "Software understanding and engineering intelligence workbench"
+edition = "2021"
+
+[lib]
+name = "buildbuddy_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-dialog = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+ignore = "0.4"
+walkdir = "2.4"
+tokio = { version = "1", features = ["full"] }
+blake3 = { version = "1.5", default-features = false, features = ["pure"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3.10"
+
