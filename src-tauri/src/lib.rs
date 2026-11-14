@@ -9,6 +9,7 @@ use rusqlite::Connection;
 pub struct AppState {
     pub db_path: PathBuf,
     pub scan_cancel_flag: Arc<AtomicBool>,
+    pub parse_cancel_flag: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -16,6 +17,7 @@ impl AppState {
         Self {
             db_path,
             scan_cancel_flag: Arc::new(AtomicBool::new(false)),
+            parse_cancel_flag: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -49,11 +51,15 @@ pub fn run() {
             commands::project::set_project_settings,
             commands::scanner::start_scan,
             commands::scanner::cancel_scan,
+            commands::parser::start_parse,
+            commands::parser::cancel_parse,
             commands::explorer::get_files,
             commands::explorer::get_file_details,
             commands::explorer::read_file_content,
+            commands::explorer::get_file_symbols,
+            commands::explorer::get_file_imports,
+            commands::explorer::search_symbols,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");
 }
-

@@ -104,8 +104,8 @@ pub fn update_project_settings(conn: &Connection, id: i64, settings_json: &str) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::store::connection::open_in_memory;
-    use crate::core::store::migrations::run_migrations;
+    use crate::store::connection::open_in_memory;
+    use crate::store::migrations::run_migrations;
 
     #[test]
     fn test_project_crud() {

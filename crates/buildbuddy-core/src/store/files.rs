@@ -172,9 +172,9 @@ pub fn get_file_by_id(conn: &Connection, file_id: i64) -> Result<FileRecord> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::store::connection::open_in_memory;
-    use crate::core::store::migrations::run_migrations;
-    use crate::core::store::projects::create_or_get_project;
+    use crate::store::connection::open_in_memory;
+    use crate::store::migrations::run_migrations;
+    use crate::store::projects::create_or_get_project;
 
     #[test]
     fn test_file_batch_insert_and_query() {

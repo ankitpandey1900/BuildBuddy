@@ -80,6 +80,70 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_files_project_path ON files(project_id, relative_path);
         CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
         CREATE INDEX IF NOT EXISTS idx_files_hash ON files(project_id, content_hash);
+
+        CREATE TABLE IF NOT EXISTS symbols (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            stable_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            qualified_name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            parent_name TEXT,
+            signature TEXT,
+            return_type TEXT,
+            visibility TEXT,
+            is_exported INTEGER DEFAULT 0 NOT NULL,
+            is_async INTEGER DEFAULT 0 NOT NULL,
+            docstring TEXT,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            UNIQUE(project_id, stable_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_symbols_file_id ON symbols(file_id);
+        CREATE INDEX IF NOT EXISTS idx_symbols_stable_id ON symbols(project_id, stable_id);
+        CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(project_id, name);
+
+        CREATE TABLE IF NOT EXISTS imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            source_module TEXT NOT NULL,
+            imported_name TEXT NOT NULL,
+            alias TEXT,
+            is_type_only INTEGER DEFAULT 0 NOT NULL,
+            line_number INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_imports_file_id ON imports(file_id);
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS fts_symbols USING fts5(
+            name,
+            qualified_name,
+            signature,
+            docstring,
+            content='symbols',
+            content_rowid='id'
+        );
+
+        CREATE TRIGGER IF NOT EXISTS trg_symbols_ai AFTER INSERT ON symbols BEGIN
+            INSERT INTO fts_symbols(rowid, name, qualified_name, signature, docstring)
+            VALUES (new.id, new.name, new.qualified_name, new.signature, new.docstring);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_symbols_ad AFTER DELETE ON symbols BEGIN
+            INSERT INTO fts_symbols(fts_symbols, rowid, name, qualified_name, signature, docstring)
+            VALUES ('delete', old.id, old.name, old.qualified_name, old.signature, old.docstring);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_symbols_au AFTER UPDATE ON symbols BEGIN
+            INSERT INTO fts_symbols(fts_symbols, rowid, name, qualified_name, signature, docstring)
+            VALUES ('delete', old.id, old.name, old.qualified_name, old.signature, old.docstring);
+            INSERT INTO fts_symbols(rowid, name, qualified_name, signature, docstring)
+            VALUES (new.id, new.name, new.qualified_name, new.signature, new.docstring);
+        END;
         "
     )?;
     Ok(())
@@ -88,7 +152,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::store::connection::open_in_memory;
+    use crate::store::connection::open_in_memory;
 
     #[test]
     fn test_migrations_run_cleanly() {
@@ -110,6 +174,9 @@ mod tests {
         assert!(tables.contains(&"analysis_runs".to_string()));
         assert!(tables.contains(&"files".to_string()));
         assert!(tables.contains(&"source_evidence".to_string()));
+        assert!(tables.contains(&"symbols".to_string()));
+        assert!(tables.contains(&"imports".to_string()));
+        assert!(tables.contains(&"fts_symbols".to_string()));
     }
 }
 

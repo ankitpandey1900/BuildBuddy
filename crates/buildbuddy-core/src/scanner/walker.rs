@@ -5,10 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-use crate::core::scanner::classifier::classify_file;
-use crate::core::scanner::hasher::hash_file;
-use crate::core::scanner::ignore::IgnoreFilter;
-use crate::core::store::files::ScannedFileInsert;
+use crate::scanner::classifier::classify_file;
+use crate::scanner::hasher::hash_file;
+use crate::scanner::ignore::IgnoreFilter;
+use crate::store::files::ScannedFileInsert;
 
 #[derive(Debug, Clone)]
 pub struct ScanProgress {

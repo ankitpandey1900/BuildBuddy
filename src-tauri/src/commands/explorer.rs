@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::store::files::{get_file_by_id as get_file_db, list_files_for_project, FileRecord};
 use crate::core::store::projects::get_project_by_id;
+use crate::core::store::symbols::{get_imports_for_file, get_symbols_for_file, search_symbols_fts};
+use crate::core::symbols::{ExtractedImport, ExtractedSymbol};
 use crate::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,5 +109,34 @@ pub async fn read_file_content(
         content,
         is_truncated,
     })
+}
+
+#[tauri::command]
+pub async fn get_file_symbols(
+    file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<ExtractedSymbol>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    get_symbols_for_file(&conn, file_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_file_imports(
+    file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<ExtractedImport>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    get_imports_for_file(&conn, file_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_symbols(
+    project_id: i64,
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<(String, String, String)>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    search_symbols_fts(&conn, project_id, &query, limit.unwrap_or(20)).map_err(|e| e.to_string())
 }
 

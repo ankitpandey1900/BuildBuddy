@@ -33,6 +33,32 @@ export interface FileContentDto {
   is_truncated: boolean;
 }
 
+export interface SymbolDto {
+  stable_id: string;
+  name: string;
+  qualified_name: string;
+  kind: "function" | "class" | "method" | "interface" | "type_alias" | "constant" | "variable";
+  parent_name: string | null;
+  start_line: number;
+  end_line: number;
+  start_column: number;
+  end_column: number;
+  signature: string;
+  return_type: string | null;
+  visibility: string | null;
+  is_exported: boolean;
+  is_async: boolean;
+  docstring: string | null;
+}
+
+export interface ImportDto {
+  source_module: string;
+  imported_name: string;
+  alias: string | null;
+  is_type_only: boolean;
+  line_number: number;
+}
+
 export interface ScanProgressPayload {
   project_id: number;
   files_scanned: number;
@@ -47,6 +73,19 @@ export interface ScanCompletePayload {
   status: "completed" | "cancelled" | "failed";
 }
 
+export interface ParseProgressPayload {
+  project_id: number;
+  files_parsed: number;
+  total_files: number;
+  current_file: string;
+}
+
+export interface ParseCompletePayload {
+  project_id: number;
+  total_parsed: number;
+  status: "completed" | "cancelled" | "failed";
+}
+
 export type ViewType =
   | "overview"
   | "explorer"
@@ -58,4 +97,3 @@ export type ViewType =
   | "security"
   | "reports"
   | "documentation";
-

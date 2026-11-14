@@ -1,0 +1,144 @@
+[
+  {
+    "stable_id": "f2d1b6bb8628d7de7cc7f888b870fb96dd6685d41dea77dc194849aa0d2bd878",
+    "name": "DEFAULT_TIMEOUT",
+    "qualified_name": "DEFAULT_TIMEOUT",
+    "kind": "constant",
+    "parent_name": null,
+    "start_line": 5,
+    "end_line": 5,
+    "start_column": 0,
+    "end_column": 20,
+    "parameters": [],
+    "return_type": null,
+    "is_exported": true,
+    "is_async": false,
+    "visibility": null,
+    "docstring": null,
+    "signature": "DEFAULT_TIMEOUT = ..."
+  },
+  {
+    "stable_id": "bacda44a71bac9c94c8482f3847c46165aa71de4fdb71bc5385cdbc380133248",
+    "name": "DatabaseConnection",
+    "qualified_name": "DatabaseConnection",
+    "kind": "class",
+    "parent_name": null,
+    "start_line": 7,
+    "end_line": 18,
+    "start_column": 0,
+    "end_column": 19,
+    "parameters": [],
+    "return_type": null,
+    "is_exported": true,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": "Manages raw connection to database.",
+    "signature": "class DatabaseConnection"
+  },
+  {
+    "stable_id": "af1e68ff90b7ee83d599539aca17249a67862d877b5463eeca4ec8646ece1786",
+    "name": "__init__",
+    "qualified_name": "DatabaseConnection.__init__",
+    "kind": "method",
+    "parent_name": "DatabaseConnection",
+    "start_line": 10,
+    "end_line": 11,
+    "start_column": 4,
+    "end_column": 22,
+    "parameters": [
+      {
+        "name": "self",
+        "type_annotation": null,
+        "default_value": null
+      },
+      {
+        "name": "dsn",
+        "type_annotation": "str",
+        "default_value": null
+      }
+    ],
+    "return_type": null,
+    "is_exported": false,
+    "is_async": false,
+    "visibility": "special",
+    "docstring": null,
+    "signature": "def __init__(self, dsn: str)"
+  },
+  {
+    "stable_id": "cabc2e4e845b085a34e9aa7704a1ff888aa43f1255b8cd5db683c8810006c950",
+    "name": "connect",
+    "qualified_name": "DatabaseConnection.connect",
+    "kind": "method",
+    "parent_name": "DatabaseConnection",
+    "start_line": 13,
+    "end_line": 15,
+    "start_column": 4,
+    "end_column": 19,
+    "parameters": [
+      {
+        "name": "self",
+        "type_annotation": null,
+        "default_value": null
+      }
+    ],
+    "return_type": "bool",
+    "is_exported": true,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": "Connects to the database.",
+    "signature": "def connect(self) -> bool"
+  },
+  {
+    "stable_id": "1f429eaff2227c7d1506be7b0ec1f40a7189bf2e3377ba69d7c5ede6e96b58b2",
+    "name": "_internal_ping",
+    "qualified_name": "DatabaseConnection._internal_ping",
+    "kind": "method",
+    "parent_name": "DatabaseConnection",
+    "start_line": 17,
+    "end_line": 18,
+    "start_column": 4,
+    "end_column": 19,
+    "parameters": [
+      {
+        "name": "self",
+        "type_annotation": null,
+        "default_value": null
+      }
+    ],
+    "return_type": "bool",
+    "is_exported": false,
+    "is_async": false,
+    "visibility": "private",
+    "docstring": null,
+    "signature": "def _internal_ping(self) -> bool"
+  },
+  {
+    "stable_id": "9d83ceda1d857b3b00e7be76200fe95b3b04d1ff09fcde1c60b3a47516bfb93f",
+    "name": "fetch_records",
+    "qualified_name": "fetch_records",
+    "kind": "function",
+    "parent_name": null,
+    "start_line": 20,
+    "end_line": 22,
+    "start_column": 0,
+    "end_column": 13,
+    "parameters": [
+      {
+        "name": "query",
+        "type_annotation": "str",
+        "default_value": null
+      },
+      {
+        "name": "limit",
+        "type_annotation": "int",
+        "default_value": null
+      }
+    ],
+    "return_type": "List[dict]",
+    "is_exported": true,
+    "is_async": true,
+    "visibility": "public",
+    "docstring": "Fetches records asynchronously.",
+    "signature": "async def fetch_records(query: str, limit: int) -> List[dict]"
+  }
+]

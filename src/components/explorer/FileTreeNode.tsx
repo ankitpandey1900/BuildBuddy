@@ -72,7 +72,15 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
       </div>
 
       {file && (
-        <div className="flex items-center gap-2 flex-shrink-0 text-caption font-mono text-text-muted">
+        <div className="flex items-center gap-1.5 flex-shrink-0 text-caption font-mono text-text-muted">
+          {file.function_count + file.class_count > 0 && (
+            <span
+              className="text-[10px] px-1 py-0.5 rounded bg-surface-raised text-accent font-semibold border border-border-subtle"
+              title={`${file.function_count} functions, ${file.class_count} classes`}
+            >
+              {file.function_count + file.class_count} sym
+            </span>
+          )}
           {file.line_count > 0 && (
             <span>{file.line_count.toLocaleString()}L</span>
           )}

@@ -30,3 +30,17 @@ The official and supported Windows build environment for BuildBuddy is **MSVC (M
 2. GNU toolchain requires separate GCC runtime DLL distributions (`libgcc_s_seh-1.dll`, `libwinpthread-1.dll`).
 3. Tauri 2 officially targets and tests against MSVC on Windows, ensuring first-class WebView2 and Windows API bindings.
 
+## 2. Tree-sitter Grammar & Core Dependencies
+
+### Context
+Tree-sitter Rust bindings vary across major/minor versions in the `Language` ABI and exported function symbols. To avoid C ABI mismatches, all grammar crates must target the same Tree-sitter runtime version.
+
+### Decision & Verified Versions
+We tested and verified compilation on MSVC for the following mutually compatible versions:
+- `tree-sitter = "0.22"` (resolved: `0.22.6`)
+- `tree-sitter-typescript = "0.21"` (resolved: `0.21.2`, provides `language_typescript()` and `language_tsx()`)
+- `tree-sitter-python = "0.21"` (resolved: `0.21.0`, provides `language()`)
+- `rusqlite = "0.31"` with `features = ["bundled"]` for offline embedded SQLite + FTS5
+- `rayon = "1.10"` for parallel worker pool parsing
+
+

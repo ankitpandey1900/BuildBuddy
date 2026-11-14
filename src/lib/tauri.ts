@@ -1,6 +1,16 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen, UnlistenFn } from "@tauri-apps/api/event";
-import type { FileContentDto, FileRecord, Project, ScanCompletePayload, ScanProgressPayload } from "@/types/ipc";
+import type {
+  FileContentDto,
+  FileRecord,
+  ImportDto,
+  ParseCompletePayload,
+  ParseProgressPayload,
+  Project,
+  ScanCompletePayload,
+  ScanProgressPayload,
+  SymbolDto,
+} from "@/types/ipc";
 
 // Safely detect if running inside Tauri webview
 export const isTauri = () => {
@@ -115,4 +125,46 @@ export async function onScanComplete(
     callback(event.payload);
   });
 }
+
+export async function getFileSymbols(fileId: number): Promise<SymbolDto[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<SymbolDto[]>("get_file_symbols", { fileId });
+}
+
+export async function getFileImports(fileId: number): Promise<ImportDto[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<ImportDto[]>("get_file_imports", { fileId });
+}
+
+export async function startParse(
+  projectId: number,
+  concurrency?: number,
+): Promise<void> {
+  if (!isTauri()) return;
+  return await tauriInvoke<void>("start_parse", { projectId, concurrency });
+}
+
+export async function cancelParse(): Promise<void> {
+  if (!isTauri()) return;
+  return await tauriInvoke<void>("cancel_parse");
+}
+
+export async function onParseProgress(
+  callback: (payload: ParseProgressPayload) => void,
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return await tauriListen<ParseProgressPayload>("parse:progress", (event) => {
+    callback(event.payload);
+  });
+}
+
+export async function onParseComplete(
+  callback: (payload: ParseCompletePayload) => void,
+): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  return await tauriListen<ParseCompletePayload>("parse:complete", (event) => {
+    callback(event.payload);
+  });
+}
+
 

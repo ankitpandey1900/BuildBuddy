@@ -44,6 +44,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       />
 
       <SourceViewer
+        selectedFile={selectedFile}
         fileContent={fileContent}
         isLoading={isLoadingContent}
         theme={theme}
