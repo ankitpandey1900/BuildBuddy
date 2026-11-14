@@ -37,6 +37,13 @@
     },
     {
       "source_file": "src/index.ts",
+      "target_module": "./missing_submodule",
+      "imported_name": "missingHelper",
+      "resolution_status": "unresolved",
+      "target_file": null
+    },
+    {
+      "source_file": "src/index.ts",
       "target_module": "./utils",
       "imported_name": "formatData",
       "resolution_status": "internal",

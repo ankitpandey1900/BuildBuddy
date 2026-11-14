@@ -82,9 +82,31 @@ pub async fn start_scan(
                 let final_status = if is_cancelled { "cancelled" } else { "completed" };
                 let total_count = files.len();
 
-                // Persist files in SQLite
-                if let Err(e) = batch_insert_or_update_files(&mut db_conn, project_id, run_id, &files) {
-                    eprintln!("Failed to persist scanned files: {}", e);
+                // Compute incremental plan
+                let plan = match crate::core::scanner::incremental::IncrementalEngine::compute_plan(&db_conn, project_id, &files) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("Failed to compute incremental plan: {}", e);
+                        return;
+                    }
+                };
+
+                // Apply plan deletions & wipe evidence for modified/deleted files
+                if let Err(e) = crate::core::scanner::incremental::IncrementalEngine::apply_plan_deletions(&mut db_conn, &plan) {
+                    eprintln!("Failed to apply plan deletions: {}", e);
+                }
+
+                // Batch insert or update only added and modified files
+                let mut to_update = Vec::new();
+                to_update.extend(plan.added);
+                for (_, mod_file) in plan.modified {
+                    to_update.push(mod_file);
+                }
+
+                if !to_update.is_empty() {
+                    if let Err(e) = batch_insert_or_update_files(&mut db_conn, project_id, run_id, &to_update) {
+                        eprintln!("Failed to persist scanned files: {}", e);
+                    }
                 }
 
                 // Update analysis_run record

@@ -174,3 +174,4 @@ mod tests {
         assert_eq!(cycles[0].cycle_files, vec!["x.ts", "y.ts", "z.ts"]);
     }
 }
+

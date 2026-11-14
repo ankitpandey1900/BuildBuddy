@@ -10,6 +10,12 @@ use crate::scanner::hasher::hash_file;
 use crate::scanner::ignore::IgnoreFilter;
 use crate::store::files::ScannedFileInsert;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkippedItem {
+    pub path: String,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct ScanProgress {
     pub files_scanned: usize,
@@ -20,14 +26,28 @@ pub fn scan_directory<F>(
     root_path: &Path,
     custom_ignores: &[String],
     cancel_flag: Arc<AtomicBool>,
-    mut progress_cb: F,
+    progress_cb: F,
 ) -> std::io::Result<Vec<ScannedFileInsert>>
+where
+    F: FnMut(ScanProgress),
+{
+    let (files, _) = scan_directory_detailed(root_path, custom_ignores, cancel_flag, progress_cb)?;
+    Ok(files)
+}
+
+pub fn scan_directory_detailed<F>(
+    root_path: &Path,
+    custom_ignores: &[String],
+    cancel_flag: Arc<AtomicBool>,
+    mut progress_cb: F,
+) -> std::io::Result<(Vec<ScannedFileInsert>, Vec<SkippedItem>)>
 where
     F: FnMut(ScanProgress),
 {
     let canonical_root = root_path.canonicalize().unwrap_or_else(|_| root_path.to_path_buf());
     let filter = IgnoreFilter::new(root_path, custom_ignores);
     let mut scanned_files = Vec::new();
+    let mut skipped = Vec::new();
 
     let walker = WalkDir::new(root_path)
         .follow_links(false) // First step: don't automatically follow symlinks blindly
@@ -45,15 +65,25 @@ where
 
         let path = entry.path();
 
-        // Check symlinks
+        // Check symlinks: must not point outside project root
         if entry.file_type().is_symlink() {
-            if let Ok(target) = path.canonicalize() {
-                // If symlink points outside canonical project root, skip it
-                if !target.starts_with(&canonical_root) {
+            match path.canonicalize() {
+                Ok(target) => {
+                    if !target.starts_with(&canonical_root) {
+                        skipped.push(SkippedItem {
+                            path: path.to_string_lossy().replace('\\', "/"),
+                            reason: "Symlink points outside canonical project root".to_string(),
+                        });
+                        continue;
+                    }
+                }
+                Err(e) => {
+                    skipped.push(SkippedItem {
+                        path: path.to_string_lossy().replace('\\', "/"),
+                        reason: format!("Broken or unresolvable symlink: {}", e),
+                    });
                     continue;
                 }
-            } else {
-                continue;
             }
         }
 
@@ -123,7 +153,7 @@ where
         }
     }
 
-    Ok(scanned_files)
+    Ok((scanned_files, skipped))
 }
 
 fn count_lines(path: &Path) -> std::io::Result<i64> {
@@ -170,6 +200,41 @@ mod tests {
         let cancel = Arc::new(AtomicBool::new(true)); // cancel immediately
         let results = scan_directory(dir.path(), &[], cancel, |_| {}).unwrap();
         assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_symlink_outside_project_not_followed() {
+        let project_dir = tempdir().unwrap();
+        let outside_dir = tempdir().unwrap();
+
+        let secret_file = outside_dir.path().join("secret.txt");
+        fs::write(&secret_file, "classified").unwrap();
+
+        let symlink_path = project_dir.path().join("external_link.txt");
+
+        #[cfg(windows)]
+        let symlink_res = std::os::windows::fs::symlink_file(&secret_file, &symlink_path);
+        #[cfg(unix)]
+        let symlink_res = std::os::unix::fs::symlink(&secret_file, &symlink_path);
+
+        match symlink_res {
+            Ok(()) => {
+                let cancel = Arc::new(AtomicBool::new(false));
+                let (files, skipped) =
+                    scan_directory_detailed(project_dir.path(), &[], cancel, |_| {}).unwrap();
+
+                // Target outside must NOT be indexed as a project file
+                assert!(files.is_empty(), "Outside file should not be indexed");
+                assert_eq!(skipped.len(), 1);
+                assert!(skipped[0].reason.contains("outside canonical project root"));
+            }
+            Err(e) => {
+                println!(
+                    "Skipping symlink test: privilege not held on this system ({}).",
+                    e
+                );
+            }
+        }
     }
 }
 

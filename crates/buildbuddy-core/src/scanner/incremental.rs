@@ -82,22 +82,39 @@ impl IncrementalEngine {
     ) -> Result<()> {
         let tx = conn.transaction()?;
         {
-            let mut del_stmt = tx.prepare("DELETE FROM files WHERE id = ?1")?;
+            let mut get_file_info = tx.prepare("SELECT project_id, relative_path FROM files WHERE id = ?1")?;
+            let mut del_evidence = tx.prepare("DELETE FROM source_evidence WHERE project_id = ?1 AND file_path = ?2")?;
+            let mut del_file = tx.prepare("DELETE FROM files WHERE id = ?1")?;
+
             for &id in &plan.deleted_file_ids {
-                del_stmt.execute(params![id])?;
+                if let Ok((project_id, rel_path)) = get_file_info.query_row(params![id], |r| {
+                    Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+                }) {
+                    del_evidence.execute(params![project_id, rel_path])?;
+                }
+                del_file.execute(params![id])?;
             }
 
-            // For modified files, delete existing symbols, imports, exports, and edges
+            // For modified files, delete existing symbols, imports, exports, edges, and evidence
             let mut del_symbols = tx.prepare("DELETE FROM symbols WHERE file_id = ?1")?;
             let mut del_imports = tx.prepare("DELETE FROM imports WHERE file_id = ?1")?;
             let mut del_exports = tx.prepare("DELETE FROM exports WHERE file_id = ?1")?;
             let mut del_edges = tx.prepare("DELETE FROM import_edges WHERE source_file_id = ?1")?;
+            let mut update_file_pending = tx.prepare(
+                "UPDATE files SET status = 'pending', content_hash = ?1, size_bytes = ?2 WHERE id = ?3"
+            )?;
 
-            for &(id, _) in &plan.modified {
+            for &(id, ref scanned) in &plan.modified {
+                if let Ok((project_id, rel_path)) = get_file_info.query_row(params![id], |r| {
+                    Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+                }) {
+                    del_evidence.execute(params![project_id, rel_path])?;
+                }
                 del_symbols.execute(params![id])?;
                 del_imports.execute(params![id])?;
                 del_exports.execute(params![id])?;
                 del_edges.execute(params![id])?;
+                update_file_pending.execute(params![scanned.content_hash, scanned.size_bytes, id])?;
             }
         }
         tx.commit()?;
@@ -183,5 +200,244 @@ mod tests {
 
         // to_delete.ts is removed, unchanged and modified remain in files
         assert_eq!(remaining, vec!["src/modified.ts".to_string(), "src/unchanged.ts".to_string()]);
+    }
+
+    #[test]
+    fn test_end_to_end_incremental_workflow() {
+        use std::fs;
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+        use tempfile::tempdir;
+        use crate::scanner::walker::scan_directory;
+        use crate::store::files::batch_insert_or_update_files;
+        use crate::parser::ParserManager;
+        use crate::store::symbols::persist_file_parse_result;
+        use crate::graph::{FileImportItem, ProjectGraphResolver, ResolutionStatus};
+        use crate::store::graph::GraphStore;
+
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let project_id = create_or_get_project(&conn, "E2E Incremental", "/tmp/e2e").unwrap().id;
+
+        // Create temp project directory with initial files
+        let project_dir = tempdir().unwrap();
+        let src_dir = project_dir.path().join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let utils_path = src_dir.join("utils.ts");
+        fs::write(&utils_path, "export function helper(): string { return 'ok'; }\n").unwrap();
+
+        let index_path = src_dir.join("index.ts");
+        fs::write(
+            &index_path,
+            "import { helper } from './utils';\nimport { ghost } from './unresolved_module';\nexport const res = helper();\n",
+        )
+        .unwrap();
+
+        let cancel = Arc::new(AtomicBool::new(false));
+
+        // --- 1. Initial Full Scan ---
+        conn.execute(
+            "INSERT INTO analysis_runs (project_id, status) VALUES (?1, 'completed')",
+            params![project_id],
+        )
+        .unwrap();
+        let run_id = conn.last_insert_rowid();
+
+        let initial_scanned = scan_directory(project_dir.path(), &[], cancel.clone(), |_| {}).unwrap();
+        let n = initial_scanned.len();
+        assert_eq!(n, 2);
+
+        let plan1 = IncrementalEngine::compute_plan(&conn, project_id, &initial_scanned).unwrap();
+        assert_eq!(plan1.added.len(), 2);
+        assert_eq!(plan1.modified.len(), 0);
+        assert_eq!(plan1.unchanged.len(), 0);
+        assert_eq!(plan1.files_parsed_count(), 2);
+
+        batch_insert_or_update_files(&mut conn, project_id, run_id, &initial_scanned).unwrap();
+
+        // Parse and persist initial symbols & imports
+        let parser = ParserManager::new();
+        let mut import_items = Vec::new();
+        let mut file_tuples = Vec::new();
+
+        let files_in_db: Vec<(i64, String)> = conn
+            .prepare("SELECT id, relative_path FROM files WHERE project_id = ?1")
+            .unwrap()
+            .query_map(params![project_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        for (fid, rpath) in &files_in_db {
+            file_tuples.push((*fid, rpath.clone()));
+            let full_p = project_dir.path().join(rpath);
+            let content = fs::read_to_string(&full_p).unwrap();
+            let parsed = parser.parse_source(rpath, Some("ts"), &content).unwrap();
+            persist_file_parse_result(&mut conn, project_id, *fid, &parsed).unwrap();
+
+            for imp in parsed.imports {
+                import_items.push(FileImportItem {
+                    source_file_id: *fid,
+                    source_file_path: rpath.clone(),
+                    source_module: imp.source_module,
+                    imported_name: imp.imported_name,
+                    is_type_only: imp.is_type_only,
+                    line_number: imp.line_number,
+                    source_evidence_id: None,
+                });
+            }
+        }
+
+        let resolver = ProjectGraphResolver::new(&file_tuples, None);
+        let edges = resolver.resolve_all(&import_items);
+        GraphStore::insert_import_edges(&mut conn, project_id, &edges).unwrap();
+
+        // Check initial state: 1 internal edge (./utils), 1 unresolved edge (./unresolved_module)
+        let initial_edges = GraphStore::get_import_edges(&conn, project_id).unwrap();
+        assert_eq!(initial_edges.len(), 2);
+        assert_eq!(
+            initial_edges.iter().find(|e| e.target_module == "./unresolved_module").unwrap().resolution_status,
+            ResolutionStatus::Unresolved
+        );
+
+        // --- 2. Check (a): Modify ONE file, assert files_parsed == 1 and files_skipped_unchanged == N - 1 ---
+        fs::write(
+            &utils_path,
+            "export function helper(): string { return 'updated'; }\nexport function helper2(): number { return 42; }\n",
+        )
+        .unwrap();
+
+        let scanned_a = scan_directory(project_dir.path(), &[], cancel.clone(), |_| {}).unwrap();
+        let plan_a = IncrementalEngine::compute_plan(&conn, project_id, &scanned_a).unwrap();
+
+        assert_eq!(plan_a.files_parsed_count(), 1, "Exactly 1 file should be queued for parse");
+        assert_eq!(
+            plan_a.files_skipped_unchanged_count(),
+            n - 1,
+            "N-1 files should be skipped unchanged"
+        );
+        assert_eq!(plan_a.modified.len(), 1);
+        assert_eq!(plan_a.added.len(), 0);
+        assert_eq!(plan_a.deleted_file_ids.len(), 0);
+
+        IncrementalEngine::apply_plan_deletions(&mut conn, &plan_a).unwrap();
+
+        // --- 3. Check (b): Delete a file, assert symbols/imports/edges gone and NO orphan evidence rows ---
+        let delete_target_path = src_dir.join("utils.ts");
+        let deleted_fid = files_in_db.iter().find(|(_, p)| p == "src/utils.ts").unwrap().0;
+        fs::remove_file(&delete_target_path).unwrap();
+
+        let scanned_b = scan_directory(project_dir.path(), &[], cancel.clone(), |_| {}).unwrap();
+        let plan_b = IncrementalEngine::compute_plan(&conn, project_id, &scanned_b).unwrap();
+
+        assert_eq!(plan_b.deleted_file_ids.len(), 1);
+        assert_eq!(plan_b.deleted_file_ids[0], deleted_fid);
+
+        IncrementalEngine::apply_plan_deletions(&mut conn, &plan_b).unwrap();
+
+        let file_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM files WHERE id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(file_count, 0, "Deleted file should be removed from files table");
+
+        let sym_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM symbols WHERE file_id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(sym_count, 0, "Symbols for deleted file must be gone");
+
+        let imp_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM imports WHERE file_id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(imp_count, 0, "Imports for deleted file must be gone");
+
+        let edge_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM import_edges WHERE source_file_id = ?1 OR target_file_id = ?1",
+                params![deleted_fid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(edge_count, 0, "Import edges for deleted file must be gone");
+
+        let orphan_evidence: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM source_evidence WHERE file_path = 'src/utils.ts'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphan_evidence, 0, "No orphan source_evidence rows for deleted file");
+
+        // --- 4. Check (c): Add a file, assert only it is parsed and edges that now resolve to it are updated ---
+        let new_file_path = src_dir.join("unresolved_module.ts");
+        fs::write(&new_file_path, "export const ghost = 'found_now';\n").unwrap();
+
+        let scanned_c = scan_directory(project_dir.path(), &[], cancel.clone(), |_| {}).unwrap();
+        let plan_c = IncrementalEngine::compute_plan(&conn, project_id, &scanned_c).unwrap();
+
+        assert_eq!(plan_c.added.len(), 1, "Only 1 newly added file");
+        assert_eq!(plan_c.files_parsed_count(), 1, "Only newly added file should be parsed");
+        assert_eq!(plan_c.added[0].relative_path, "src/unresolved_module.ts");
+
+        batch_insert_or_update_files(&mut conn, project_id, run_id, &plan_c.added).unwrap();
+
+        let new_file_id: i64 = conn
+            .query_row(
+                "SELECT id FROM files WHERE relative_path = 'src/unresolved_module.ts' AND project_id = ?1",
+                params![project_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+
+        let new_content = fs::read_to_string(&new_file_path).unwrap();
+        let new_parsed = parser.parse_source("src/unresolved_module.ts", Some("ts"), &new_content).unwrap();
+        persist_file_parse_result(&mut conn, project_id, new_file_id, &new_parsed).unwrap();
+
+        // Re-resolve graph
+        let mut updated_tuples = Vec::new();
+        let mut updated_imports = Vec::new();
+
+        let current_files: Vec<(i64, String)> = conn
+            .prepare("SELECT id, relative_path FROM files WHERE project_id = ?1")
+            .unwrap()
+            .query_map(params![project_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        for (fid, rpath) in current_files {
+            updated_tuples.push((fid, rpath.clone()));
+            let full_p = project_dir.path().join(&rpath);
+            let content = fs::read_to_string(&full_p).unwrap();
+            let parsed = parser.parse_source(&rpath, Some("ts"), &content).unwrap();
+            for imp in parsed.imports {
+                updated_imports.push(FileImportItem {
+                    source_file_id: fid,
+                    source_file_path: rpath.clone(),
+                    source_module: imp.source_module,
+                    imported_name: imp.imported_name,
+                    is_type_only: imp.is_type_only,
+                    line_number: imp.line_number,
+                    source_evidence_id: None,
+                });
+            }
+        }
+
+        let resolver2 = ProjectGraphResolver::new(&updated_tuples, None);
+        let updated_edges = resolver2.resolve_all(&updated_imports);
+
+        // The edge './unresolved_module' in src/index.ts that was previously unresolved
+        // must NOW resolve to src/unresolved_module.ts as internal!
+        let resolved_edge = updated_edges
+            .iter()
+            .find(|e| e.target_module == "./unresolved_module")
+            .unwrap();
+        assert_eq!(resolved_edge.resolution_status, ResolutionStatus::Internal);
+        assert_eq!(resolved_edge.target_file_id, Some(new_file_id));
+        assert_eq!(
+            resolved_edge.target_file_path.as_deref(),
+            Some("src/unresolved_module.ts")
+        );
     }
 }

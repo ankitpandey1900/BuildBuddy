@@ -90,3 +90,4 @@ mod tests {
         assert!(parse_package_json(json, "package.json").is_err());
     }
 }
+

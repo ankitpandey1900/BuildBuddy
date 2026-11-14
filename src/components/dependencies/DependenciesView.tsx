@@ -198,3 +198,4 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
     </div>
   );
 };
+

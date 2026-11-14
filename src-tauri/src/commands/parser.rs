@@ -4,7 +4,6 @@ use tauri::{AppHandle, Emitter, State};
 use serde::{Deserialize, Serialize};
 
 use crate::core::parser::{FileToParse, ParserLimits, ParserWorkerPool, WorkerPoolConfig};
-use crate::core::store::files::list_files_for_project;
 use crate::core::store::projects::get_project_by_id;
 use crate::core::store::symbols::persist_file_parse_result;
 use crate::AppState;
@@ -33,17 +32,27 @@ pub async fn start_parse(
 ) -> Result<(), String> {
     let conn = state.conn().map_err(|e| e.to_string())?;
     let project = get_project_by_id(&conn, project_id).map_err(|e| e.to_string())?;
-    let all_files = list_files_for_project(&conn, project_id, None, None).map_err(|e| e.to_string())?;
 
-    // Include all discovered files so unsupported/skipped files are never silently omitted
-    let files_to_parse: Vec<FileToParse> = all_files
-        .into_iter()
-        .map(|f| FileToParse {
-            file_id: f.id,
-            relative_path: f.relative_path,
-            extension: f.extension,
-        })
-        .collect();
+    // Only queue files that need parsing (pending status: newly added or modified)
+    let files_to_parse: Vec<FileToParse> = {
+        let mut stmt = conn
+            .prepare("SELECT id, relative_path, extension FROM files WHERE project_id = ?1 AND status = 'pending'")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([project_id], |r| {
+                Ok(FileToParse {
+                    file_id: r.get(0)?,
+                    relative_path: r.get(1)?,
+                    extension: r.get(2)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        let mut list = Vec::new();
+        for row in rows {
+            list.push(row.map_err(|e| e.to_string())?);
+        }
+        list
+    };
 
     let cancel_flag = state.parse_cancel_flag.clone();
     cancel_flag.store(false, Ordering::Relaxed);
@@ -51,6 +60,15 @@ pub async fn start_parse(
     let db_path = state.db_path.clone();
     let root_path = PathBuf::from(&project.root_path);
     let app_handle = app.clone();
+
+    if files_to_parse.is_empty() {
+        app_handle.emit("parse:complete", ParseCompletePayload {
+            project_id,
+            total_parsed: 0,
+            status: "completed".to_string(),
+        }).ok();
+        return Ok(());
+    }
 
     let num_threads = concurrency.unwrap_or_else(|| {
         std::thread::available_parallelism()

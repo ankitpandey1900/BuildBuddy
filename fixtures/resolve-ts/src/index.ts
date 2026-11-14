@@ -3,7 +3,9 @@ import { Button } from "./barrel";
 import { formatData } from "./utils";
 import { Button as ButtonAlias } from "@components/button";
 import { a } from "./cycle_a";
+import { missingHelper } from "./missing_submodule";
 
 export function run(): void {
-    console.log(React, Button, formatData("test"), ButtonAlias, a);
+    console.log(React, Button, formatData("test"), ButtonAlias, a, missingHelper);
 }
+

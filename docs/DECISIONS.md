@@ -139,10 +139,21 @@ When a `const` or assignment is encountered:
 - Modified files delete existing symbols, imports, exports, and edges, and queue for re-parse.
 - Deleted files trigger SQLite cascade deletion of all child records.
 
-### 6. Read-Only Git Detection
-- Inspects `.git/HEAD`, refs, and `packed-refs` via pure Rust filesystem reading.
-- Handles worktrees and submodules (`gitdir: <path>`).
-- Never spawns git CLI, never executes or modifies the project.
+### 6. Read-Only Git Detection & Changed Files Parser
+
+- **Pure-Rust Git Parser Rationale**:
+  - We considered `git2` (bindings to C `libgit2`) and `gix` (pure-Rust git oxide).
+  - `git2` requires building the C library with CMake and OpenSSL/WinHTTP, introducing native toolchain fragility and potential build failures in restricted or offline environments.
+  - Furthermore, `git2` and `gix` require heavy transitive dependencies (over 80+ crates) that were neither in the initial project configuration nor in the local offline cargo cache.
+  - Spawning a `git` binary violates AGENTS.md rule: "Never modify, execute, or shell out on files from the analyzed project" and introduces runtime system dependencies (git must be installed and in PATH).
+  - Consequently, we chose a hand-crafted pure-Rust parser for Git metadata:
+    1. `.git/HEAD` reference parsing (supports branch symref and detached HEAD sha).
+    2. `.git/refs/heads/*` and `.git/packed-refs` lookup.
+    3. Worktrees and submodules (`gitdir: <path>`).
+    4. `.git/index` binary parser (DIRC v2, v3, v4 format) parsing 62-byte entry headers, mtime, ctime, file size, object SHA-1, flags, and path.
+    5. Pure-Rust RFC 3174 SHA-1 implementation for computing blob hashes (`blob <size>\0<content>`).
+  - **Changed Files Detection**:
+    - By comparing the working tree file size and mtime (or content hash) against `.git/index` entries, and `.git/index` entries against HEAD tree/objects, we reliably identify modified, deleted, and untracked files with zero subprocess execution, zero external network, and zero native C compilation dependencies.
 
 
 

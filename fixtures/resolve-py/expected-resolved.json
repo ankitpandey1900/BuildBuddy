@@ -23,6 +23,20 @@
     },
     {
       "source_file": "pkg/main.py",
+      "target_module": ".missing_pkg",
+      "imported_name": "ghost_fn",
+      "resolution_status": "unresolved",
+      "target_file": null
+    },
+    {
+      "source_file": "pkg/main.py",
+      "target_module": ".subpkg",
+      "imported_name": "sub_helper",
+      "resolution_status": "internal",
+      "target_file": "pkg/subpkg/__init__.py"
+    },
+    {
+      "source_file": "pkg/main.py",
       "target_module": ".utils",
       "imported_name": "format_row",
       "resolution_status": "internal",

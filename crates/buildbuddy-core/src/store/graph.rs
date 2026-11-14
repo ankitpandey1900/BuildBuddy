@@ -22,6 +22,25 @@ impl GraphStore {
             )?;
 
             for edge in edges {
+                let evidence_id = if let Some(eid) = edge.source_evidence_id {
+                    eid
+                } else {
+                    tx.query_row(
+                        "INSERT INTO source_evidence (
+                            project_id, file_path, start_line, end_line,
+                            start_column, end_column, snippet, confidence, evidence_type
+                        ) VALUES (?1, ?2, ?3, ?3, 0, 0, ?4, 'static', 'import_stmt')
+                        RETURNING id",
+                        params![
+                            project_id,
+                            edge.source_file_path,
+                            edge.line_number as i64,
+                            format!("import {} from '{}'", edge.imported_name, edge.target_module),
+                        ],
+                        |row| row.get(0),
+                    )?
+                };
+
                 stmt.execute(params![
                     project_id,
                     edge.source_file_id,
@@ -31,7 +50,7 @@ impl GraphStore {
                     if edge.is_type_only { 1 } else { 0 },
                     edge.line_number as i64,
                     edge.resolution_status.as_str(),
-                    edge.source_evidence_id,
+                    evidence_id,
                 ])?;
             }
         }
@@ -270,5 +289,47 @@ mod tests {
         let overview = GraphStore::get_dependency_overview(&conn, project_id).unwrap();
         assert_eq!(overview.internal_edges_count, 1);
         assert_eq!(overview.circular_cycles_count, 1);
+    }
+
+    #[test]
+    fn test_no_import_edge_without_provenance_evidence() {
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let project_id = create_or_get_project(&conn, "Test Evidence", "/tmp/evidence").unwrap().id;
+
+        conn.execute(
+            "INSERT INTO files (project_id, relative_path, file_name, size_bytes, content_hash, status)
+             VALUES (?1, 'src/main.ts', 'main.ts', 100, 'hash1', 'parsed')",
+            params![project_id],
+        ).unwrap();
+        let file_id = conn.last_insert_rowid();
+
+        let edge = ImportEdge {
+            source_file_id: file_id,
+            source_file_path: "src/main.ts".to_string(),
+            target_file_id: None,
+            target_file_path: None,
+            target_module: "react".to_string(),
+            imported_name: "useState".to_string(),
+            is_type_only: false,
+            line_number: 1,
+            resolution_status: ResolutionStatus::External,
+            source_evidence_id: None,
+        };
+
+        GraphStore::insert_import_edges(&mut conn, project_id, &[edge]).unwrap();
+
+        // Check that source_evidence_id was automatically populated
+        let count_null: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM import_edges WHERE source_evidence_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_null, 0, "No import_edges row should ever have NULL source_evidence_id");
+
+        let edges = GraphStore::get_import_edges(&conn, project_id).unwrap();
+        assert!(edges[0].source_evidence_id.is_some());
     }
 }

@@ -1,75 +1,241 @@
 import React, { useMemo, useState } from "react";
-import { Search, ExternalLink, FileCode, CheckCircle2, HelpCircle } from "lucide-react";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  createColumnHelper,
+  flexRender,
+  SortingState,
+} from "@tanstack/react-table";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, FileCode, CheckCircle2, ExternalLink, Wrench } from "lucide-react";
 import type { ImportEdge } from "@/types/ipc";
+
+export interface DependencyRow {
+  name: string;
+  kind: "internal" | "external" | "dev";
+  version: string;
+  import_count: number;
+  fan_in: number;
+  fan_out: number;
+  filePath?: string;
+}
 
 interface DependenciesTableProps {
   edges: ImportEdge[];
   onSelectFile?: (filePath: string) => void;
 }
 
+const columnHelper = createColumnHelper<DependencyRow>();
+
+export function computeDependencyRows(edges: ImportEdge[]): DependencyRow[] {
+  const rowMap = new Map<string, DependencyRow>();
+
+  // 1. Map of internal files and their inbound/outbound edges
+  const internalOutbound = new Map<string, Set<string>>();
+  const internalInbound = new Map<string, Set<string>>();
+  const internalImportCounts = new Map<string, number>();
+
+  // External package inbound and counts
+  const externalInbound = new Map<string, Set<string>>();
+  const externalImportCounts = new Map<string, number>();
+
+  for (const edge of edges) {
+    // Record outbound for source file
+    if (!internalOutbound.has(edge.source_file_path)) {
+      internalOutbound.set(edge.source_file_path, new Set());
+    }
+    internalOutbound.get(edge.source_file_path)!.add(edge.target_module);
+
+    if (edge.resolution_status === "internal" && edge.target_file_path) {
+      if (!internalInbound.has(edge.target_file_path)) {
+        internalInbound.set(edge.target_file_path, new Set());
+      }
+      internalInbound.get(edge.target_file_path)!.add(edge.source_file_path);
+      internalImportCounts.set(
+        edge.target_file_path,
+        (internalImportCounts.get(edge.target_file_path) || 0) + 1
+      );
+    } else if (edge.resolution_status === "external") {
+      const pkg = edge.target_module.startsWith("@")
+        ? edge.target_module.split("/").slice(0, 2).join("/")
+        : edge.target_module.split("/")[0];
+
+      if (!externalInbound.has(pkg)) {
+        externalInbound.set(pkg, new Set());
+      }
+      externalInbound.get(pkg)!.add(edge.source_file_path);
+      externalImportCounts.set(pkg, (externalImportCounts.get(pkg) || 0) + 1);
+    }
+  }
+
+  // Add internal file entries
+  const allInternalFiles = new Set<string>([
+    ...internalOutbound.keys(),
+    ...internalInbound.keys(),
+  ]);
+
+  for (const filePath of allInternalFiles) {
+    const fanIn = internalInbound.get(filePath)?.size || 0;
+    const fanOut = internalOutbound.get(filePath)?.size || 0;
+    const count = internalImportCounts.get(filePath) || 0;
+
+    rowMap.set(filePath, {
+      name: filePath,
+      kind: "internal",
+      version: "-",
+      import_count: count,
+      fan_in: fanIn,
+      fan_out: fanOut,
+      filePath,
+    });
+  }
+
+  // Add external package entries
+  for (const [pkg, inbounds] of externalInbound) {
+    const count = externalImportCounts.get(pkg) || 0;
+    const isDev = pkg.includes("test") || pkg.includes("vite") || pkg.includes("lint");
+    rowMap.set(pkg, {
+      name: pkg,
+      kind: isDev ? "dev" : "external",
+      version: "*",
+      import_count: count,
+      fan_in: inbounds.size,
+      fan_out: 0,
+    });
+  }
+
+  return Array.from(rowMap.values());
+}
+
 export const DependenciesTable: React.FC<DependenciesTableProps> = ({
   edges,
   onSelectFile,
 }) => {
-  const [filter, setFilter] = useState<"all" | "internal" | "external" | "unresolved">("all");
-  const [search, setSearch] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "fan_in", desc: true },
+  ]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "internal" | "external" | "dev">("all");
 
-  const filteredEdges = useMemo(() => {
-    return edges.filter((edge) => {
-      if (filter !== "all" && edge.resolution_status !== filter) {
-        return false;
-      }
-      if (search.trim()) {
-        const query = search.toLowerCase();
-        return (
-          edge.source_file_path.toLowerCase().includes(query) ||
-          edge.target_module.toLowerCase().includes(query) ||
-          (edge.target_file_path && edge.target_file_path.toLowerCase().includes(query)) ||
-          edge.imported_name.toLowerCase().includes(query)
-        );
-      }
-      return true;
-    });
-  }, [edges, filter, search]);
+  const data = useMemo(() => {
+    const rows = computeDependencyRows(edges);
+    if (kindFilter === "all") return rows;
+    return rows.filter((r) => r.kind === kindFilter);
+  }, [edges, kindFilter]);
 
-  const renderStatusBadge = (status: "internal" | "external" | "unresolved") => {
-    switch (status) {
-      case "internal":
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <CheckCircle2 className="w-2.5 h-2.5" />
-            internal
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: "Dependency / Module",
+        cell: (info) => {
+          const row = info.row.original;
+          return row.kind === "internal" ? (
+            <button
+              type="button"
+              onClick={() => onSelectFile?.(row.filePath || row.name)}
+              className="text-text-primary hover:underline hover:text-accent flex items-center gap-1.5 truncate text-left"
+              title={row.name}
+            >
+              <FileCode className="w-3 h-3 text-text-muted flex-shrink-0" />
+              <span className="truncate">{row.name}</span>
+            </button>
+          ) : (
+            <span className="font-semibold text-text-primary flex items-center gap-1.5 truncate">
+              <ExternalLink className="w-3 h-3 text-text-muted flex-shrink-0" />
+              <span className="truncate">{row.name}</span>
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor("kind", {
+        header: "Category",
+        cell: (info) => {
+          const kind = info.getValue();
+          switch (kind) {
+            case "internal":
+              return (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  internal
+                </span>
+              );
+            case "external":
+              return (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  <ExternalLink className="w-2.5 h-2.5" />
+                  external
+                </span>
+              );
+            case "dev":
+              return (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <Wrench className="w-2.5 h-2.5" />
+                  dev
+                </span>
+              );
+          }
+        },
+      }),
+      columnHelper.accessor("version", {
+        header: "Version",
+        cell: (info) => (
+          <span className="text-text-muted font-mono">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("import_count", {
+        header: "Imports",
+        cell: (info) => (
+          <span className="font-mono text-right block">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("fan_in", {
+        header: "Fan-In",
+        cell: (info) => (
+          <span className="font-mono text-right block font-semibold text-text-primary">
+            {info.getValue()}
           </span>
-        );
-      case "external":
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
-            <ExternalLink className="w-2.5 h-2.5" />
-            external
+        ),
+      }),
+      columnHelper.accessor("fan_out", {
+        header: "Fan-Out",
+        cell: (info) => (
+          <span className="font-mono text-right block text-text-secondary">
+            {info.getValue()}
           </span>
-        );
-      case "unresolved":
-        return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <HelpCircle className="w-2.5 h-2.5" />
-            unresolved
-          </span>
-        );
-    }
-  };
+        ),
+      }),
+    ],
+    [onSelectFile]
+  );
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    enableSortingRemoval: false,
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
 
   return (
     <div className="flex flex-col h-full bg-surface border border-border-default rounded-md overflow-hidden text-xs">
       {/* Controls Bar */}
       <div className="p-2.5 border-b border-border-default flex items-center justify-between gap-3 bg-canvas/30">
         <div className="flex items-center gap-1">
-          {(["all", "internal", "external", "unresolved"] as const).map((tab) => (
+          {(["all", "internal", "external", "dev"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
-              onClick={() => setFilter(tab)}
+              onClick={() => setKindFilter(tab)}
               className={`px-2.5 py-1 rounded text-micro font-medium capitalize transition-colors ${
-                filter === tab
+                kindFilter === tab
                   ? "bg-accent/15 text-accent border border-accent/30"
                   : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
               }`}
@@ -83,9 +249,9 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             type="text"
-            placeholder="Filter module or file..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search dependencies..."
+            value={globalFilter ?? ""}
+            onChange={(e) => setGlobalFilter(e.target.value)}
             className="w-full pl-8 pr-2.5 py-1 bg-surface border border-border-default rounded text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
           />
         </div>
@@ -95,66 +261,60 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-canvas/50 sticky top-0 z-10 text-text-secondary text-micro uppercase tracking-wider font-mono border-b border-border-default select-none">
-            <tr>
-              <th className="py-2 px-3 font-medium">Source File</th>
-              <th className="py-2 px-3 font-medium">Import Target</th>
-              <th className="py-2 px-3 font-medium">Resolved File</th>
-              <th className="py-2 px-3 font-medium">Imported Name</th>
-              <th className="py-2 px-3 font-medium">Kind</th>
-              <th className="py-2 px-3 font-medium text-right">Line</th>
-            </tr>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const canSort = header.column.getCanSort();
+                  const sortDir = header.column.getIsSorted();
+                  return (
+                    <th
+                      key={header.id}
+                      onClick={header.column.getToggleSortingHandler()}
+                      className={`py-2 px-3 font-medium ${
+                        canSort ? "cursor-pointer hover:text-text-primary" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                        {canSort && (
+                          <span className="text-text-muted">
+                            {sortDir === "asc" ? (
+                              <ArrowUp className="w-3 h-3 text-accent" />
+                            ) : sortDir === "desc" ? (
+                              <ArrowDown className="w-3 h-3 text-accent" />
+                            ) : (
+                              <ArrowUpDown className="w-2.5 h-2.5 opacity-40" />
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
           </thead>
           <tbody className="divide-y divide-border-default/50 font-mono text-micro">
-            {filteredEdges.length === 0 ? (
+            {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-text-muted">
-                  No dependency edges found.
+                  No dependencies found matching filters.
                 </td>
               </tr>
             ) : (
-              filteredEdges.map((edge, idx) => (
+              table.getRowModel().rows.map((row) => (
                 <tr
-                  key={idx}
+                  key={row.id}
                   className="hover:bg-hover/60 transition-colors group cursor-default"
                 >
-                  <td className="py-1.5 px-3 truncate max-w-[200px]" title={edge.source_file_path}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectFile?.(edge.source_file_path)}
-                      className="text-text-primary hover:underline hover:text-accent flex items-center gap-1.5 truncate"
-                    >
-                      <FileCode className="w-3 h-3 text-text-muted flex-shrink-0" />
-                      <span className="truncate">{edge.source_file_path}</span>
-                    </button>
-                  </td>
-                  <td className="py-1.5 px-3 truncate max-w-[180px] text-text-primary font-semibold" title={edge.target_module}>
-                    {edge.target_module}
-                  </td>
-                  <td className="py-1.5 px-3 truncate max-w-[200px] text-text-muted" title={edge.target_file_path || "-"}>
-                    {edge.target_file_path ? (
-                      <button
-                        type="button"
-                        onClick={() => onSelectFile?.(edge.target_file_path!)}
-                        className="hover:underline hover:text-accent truncate block text-left"
-                      >
-                        {edge.target_file_path}
-                      </button>
-                    ) : (
-                      <span className="italic text-text-muted/60">-</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 px-3 text-text-secondary truncate max-w-[120px]">
-                    {edge.imported_name || "<default>"}
-                    {edge.is_type_only && (
-                      <span className="ml-1 text-[9px] text-text-muted/80">(type)</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 px-3">
-                    {renderStatusBadge(edge.resolution_status)}
-                  </td>
-                  <td className="py-1.5 px-3 text-right text-text-muted">
-                    {edge.line_number}
-                  </td>
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="py-1.5 px-3">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
                 </tr>
               ))
             )}
@@ -162,9 +322,11 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
         </table>
       </div>
 
-      {/* Footer bar */}
+      {/* Footer summary */}
       <div className="p-2 px-3 border-t border-border-default bg-canvas/30 text-micro text-text-muted flex items-center justify-between">
-        <span>Showing {filteredEdges.length} of {edges.length} import edges</span>
+        <span>
+          Showing {table.getRowModel().rows.length} of {data.length} dependencies
+        </span>
       </div>
     </div>
   );
