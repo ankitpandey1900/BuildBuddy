@@ -131,7 +131,53 @@ pub fn persist_file_parse_result(
         }
     }
 
-    // 4. Update file counts and status
+    // 4. Insert exports with source_evidence provenance
+    {
+        let mut export_evidence_stmt = tx.prepare(
+            "INSERT INTO source_evidence (
+                project_id, file_path, start_line, end_line, start_column, end_column,
+                snippet, confidence, evidence_type
+            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, 'confirmed', 'export_stmt')",
+        )?;
+
+        let mut export_stmt = tx.prepare(
+            "INSERT INTO exports (
+                project_id, file_id, exported_name, local_name, is_default, line_number,
+                source_evidence_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        )?;
+
+        for exp in &result.exports {
+            let snippet = if exp.is_default {
+                format!("export default {}", exp.local_name)
+            } else if exp.exported_name == exp.local_name {
+                format!("export {{ {} }}", exp.local_name)
+            } else {
+                format!("export {{ {} as {} }}", exp.local_name, exp.exported_name)
+            };
+
+            export_evidence_stmt.execute(params![
+                project_id,
+                result.relative_path,
+                exp.line_number as i64,
+                exp.line_number as i64,
+                snippet,
+            ])?;
+            let evidence_id = tx.last_insert_rowid();
+
+            export_stmt.execute(params![
+                project_id,
+                file_id,
+                exp.exported_name,
+                exp.local_name,
+                if exp.is_default { 1 } else { 0 },
+                exp.line_number as i64,
+                evidence_id,
+            ])?;
+        }
+    }
+
+    // 5. Update file counts and status
     tx.execute(
         "UPDATE files SET
             function_count = ?1,
@@ -307,6 +353,7 @@ mod tests {
             status: ParseStatus::Full,
             symbols: vec![sym],
             imports: vec![imp],
+            exports: Vec::new(),
             errors: Vec::new(),
         };
 
@@ -367,12 +414,20 @@ mod tests {
             line_number: 1,
         };
 
+        let exp = crate::symbols::ExtractedExport {
+            exported_name: "testFn".to_string(),
+            local_name: "testFn".to_string(),
+            is_default: false,
+            line_number: 1,
+        };
+
         let result = FileParseResult {
             relative_path: "src/api.ts".to_string(),
             language: "typescript".to_string(),
             status: ParseStatus::Full,
             symbols: vec![sym],
             imports: vec![imp],
+            exports: vec![exp],
             errors: Vec::new(),
         };
 
@@ -398,11 +453,21 @@ mod tests {
             .unwrap();
         assert_eq!(orphaned_imports, 0, "Found imports without source_evidence");
 
+        // Assert strictly zero orphaned exports without source_evidence
+        let orphaned_exports: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM exports WHERE source_evidence_id IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphaned_exports, 0, "Found exports without source_evidence");
+
         // Assert evidence details match
         let evidence_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM source_evidence", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(evidence_count, 2, "Expected 1 symbol evidence + 1 import evidence");
+        assert_eq!(evidence_count, 3, "Expected 1 symbol + 1 import + 1 export evidence");
     }
 }
 

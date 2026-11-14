@@ -1,0 +1,56 @@
+[
+  {
+    "exported_name": "API_VERSION",
+    "local_name": "API_VERSION",
+    "is_default": false,
+    "line_number": 6
+  },
+  {
+    "exported_name": "UserProfile",
+    "local_name": "UserProfile",
+    "is_default": false,
+    "line_number": 8
+  },
+  {
+    "exported_name": "Status",
+    "local_name": "Status",
+    "is_default": false,
+    "line_number": 14
+  },
+  {
+    "exported_name": "UserService",
+    "local_name": "UserService",
+    "is_default": false,
+    "line_number": 16
+  },
+  {
+    "exported_name": "calculateMetrics",
+    "local_name": "calculateMetrics",
+    "is_default": false,
+    "line_number": 33
+  },
+  {
+    "exported_name": "processUser",
+    "local_name": "processUser",
+    "is_default": false,
+    "line_number": 40
+  },
+  {
+    "exported_name": "INTERNAL_SECRET",
+    "local_name": "INTERNAL_SECRET",
+    "is_default": false,
+    "line_number": 45
+  },
+  {
+    "exported_name": "default",
+    "local_name": "UserService",
+    "is_default": true,
+    "line_number": 46
+  },
+  {
+    "exported_name": "default",
+    "local_name": "getServiceHealth",
+    "is_default": true,
+    "line_number": 48
+  }
+]

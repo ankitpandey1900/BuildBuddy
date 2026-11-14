@@ -18,13 +18,37 @@
     "signature": "DEFAULT_TIMEOUT = ..."
   },
   {
+    "stable_id": "f22aa68e445737a4fce0112b8e798a9a727424c415cdf370a61a956a87df9323",
+    "name": "execute_query",
+    "qualified_name": "execute_query",
+    "kind": "function",
+    "parent_name": null,
+    "start_line": 9,
+    "end_line": 12,
+    "start_column": 0,
+    "end_column": 15,
+    "parameters": [
+      {
+        "name": "sql",
+        "type_annotation": "str",
+        "default_value": null
+      }
+    ],
+    "return_type": "bool",
+    "is_exported": true,
+    "is_async": false,
+    "visibility": "public",
+    "docstring": "Executes a query with retry logic.",
+    "signature": "@retry(max_attempts=3, backoff=1.5)\ndef execute_query(sql: str) -> bool"
+  },
+  {
     "stable_id": "bacda44a71bac9c94c8482f3847c46165aa71de4fdb71bc5385cdbc380133248",
     "name": "DatabaseConnection",
     "qualified_name": "DatabaseConnection",
     "kind": "class",
     "parent_name": null,
-    "start_line": 9,
-    "end_line": 28,
+    "start_line": 14,
+    "end_line": 33,
     "start_column": 0,
     "end_column": 19,
     "parameters": [],
@@ -41,8 +65,8 @@
     "qualified_name": "DatabaseConnection.__init__",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 12,
-    "end_line": 13,
+    "start_line": 17,
+    "end_line": 18,
     "start_column": 4,
     "end_column": 22,
     "parameters": [
@@ -70,8 +94,8 @@
     "qualified_name": "DatabaseConnection.connect",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 15,
-    "end_line": 17,
+    "start_line": 20,
+    "end_line": 22,
     "start_column": 4,
     "end_column": 19,
     "parameters": [
@@ -94,8 +118,8 @@
     "qualified_name": "DatabaseConnection.is_connected",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 20,
-    "end_line": 21,
+    "start_line": 24,
+    "end_line": 26,
     "start_column": 4,
     "end_column": 19,
     "parameters": [
@@ -118,8 +142,8 @@
     "qualified_name": "DatabaseConnection.create_default",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 24,
-    "end_line": 25,
+    "start_line": 28,
+    "end_line": 30,
     "start_column": 4,
     "end_column": 12,
     "parameters": [],
@@ -136,8 +160,8 @@
     "qualified_name": "DatabaseConnection._internal_ping",
     "kind": "method",
     "parent_name": "DatabaseConnection",
-    "start_line": 27,
-    "end_line": 28,
+    "start_line": 32,
+    "end_line": 33,
     "start_column": 4,
     "end_column": 19,
     "parameters": [
@@ -160,8 +184,8 @@
     "qualified_name": "fetch_records",
     "kind": "function",
     "parent_name": null,
-    "start_line": 30,
-    "end_line": 35,
+    "start_line": 35,
+    "end_line": 40,
     "start_column": 0,
     "end_column": 13,
     "parameters": [
@@ -173,7 +197,7 @@
       {
         "name": "limit",
         "type_annotation": "int",
-        "default_value": null
+        "default_value": "100"
       }
     ],
     "return_type": "List[dict]",
@@ -181,7 +205,7 @@
     "is_async": true,
     "visibility": "public",
     "docstring": "Fetches records asynchronously.",
-    "signature": "async def fetch_records(query: str, limit: int) -> List[dict]"
+    "signature": "async def fetch_records(query: str, limit: int = 100) -> List[dict]"
   },
   {
     "stable_id": "7b5bc57c5ffa25d234f99d0810172961090f8877feaced2a684500bf134eeb18",
@@ -189,8 +213,8 @@
     "qualified_name": "fetch_records.sanitize",
     "kind": "function",
     "parent_name": "fetch_records",
-    "start_line": 32,
-    "end_line": 33,
+    "start_line": 37,
+    "end_line": 38,
     "start_column": 4,
     "end_column": 28,
     "parameters": [

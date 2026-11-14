@@ -27,25 +27,34 @@ fn test_verify_ts_golden() {
     assert_eq!(result.status, ParseStatus::Full);
     assert!(!result.symbols.is_empty());
     assert!(!result.imports.is_empty());
+    assert!(!result.exports.is_empty());
 
-    let expected_path = dir.join("expected-symbols.json");
+    let symbols_path = dir.join("expected-symbols.json");
+    let imports_path = dir.join("expected-imports.json");
+    let exports_path = dir.join("expected-exports.json");
     let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
 
     if update_golden {
-        let serialized = serde_json::to_string_pretty(&result.symbols).unwrap();
-        fs::write(&expected_path, serialized).expect("Write expected-symbols.json");
+        fs::write(&symbols_path, serde_json::to_string_pretty(&result.symbols).unwrap()).expect("Write expected-symbols.json");
+        fs::write(&imports_path, serde_json::to_string_pretty(&result.imports).unwrap()).expect("Write expected-imports.json");
+        fs::write(&exports_path, serde_json::to_string_pretty(&result.exports).unwrap()).expect("Write expected-exports.json");
     } else {
-        assert!(
-            expected_path.exists(),
-            "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
-        );
+        assert!(symbols_path.exists(), "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(imports_path.exists(), "expected-imports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(exports_path.exists(), "expected-exports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
     }
 
-    let expected_str = fs::read_to_string(&expected_path).expect("Read expected-symbols.json");
     let expected_symbols: Vec<buildbuddy_core::symbols::ExtractedSymbol> =
-        serde_json::from_str(&expected_str).expect("Deserialize expected");
+        serde_json::from_str(&fs::read_to_string(&symbols_path).expect("Read symbols")).expect("Deserialize symbols");
+    assert_eq!(result.symbols, expected_symbols, "Symbols mismatch");
 
-    assert_eq!(result.symbols, expected_symbols);
+    let expected_imports: Vec<buildbuddy_core::symbols::ExtractedImport> =
+        serde_json::from_str(&fs::read_to_string(&imports_path).expect("Read imports")).expect("Deserialize imports");
+    assert_eq!(result.imports, expected_imports, "Imports mismatch");
+
+    let expected_exports: Vec<buildbuddy_core::symbols::ExtractedExport> =
+        serde_json::from_str(&fs::read_to_string(&exports_path).expect("Read exports")).expect("Deserialize exports");
+    assert_eq!(result.exports, expected_exports, "Exports mismatch");
 }
 
 #[test]
@@ -98,25 +107,34 @@ fn test_verify_py_golden() {
     assert_eq!(result.status, ParseStatus::Full);
     assert!(!result.symbols.is_empty());
     assert!(!result.imports.is_empty());
+    assert!(!result.exports.is_empty());
 
-    let expected_path = dir.join("expected-symbols.json");
+    let symbols_path = dir.join("expected-symbols.json");
+    let imports_path = dir.join("expected-imports.json");
+    let exports_path = dir.join("expected-exports.json");
     let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
 
     if update_golden {
-        let serialized = serde_json::to_string_pretty(&result.symbols).unwrap();
-        fs::write(&expected_path, serialized).expect("Write expected-symbols.json");
+        fs::write(&symbols_path, serde_json::to_string_pretty(&result.symbols).unwrap()).expect("Write expected-symbols.json");
+        fs::write(&imports_path, serde_json::to_string_pretty(&result.imports).unwrap()).expect("Write expected-imports.json");
+        fs::write(&exports_path, serde_json::to_string_pretty(&result.exports).unwrap()).expect("Write expected-exports.json");
     } else {
-        assert!(
-            expected_path.exists(),
-            "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
-        );
+        assert!(symbols_path.exists(), "expected-symbols.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(imports_path.exists(), "expected-imports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
+        assert!(exports_path.exists(), "expected-exports.json does not exist. Run with UPDATE_GOLDEN=1 to generate it.");
     }
 
-    let expected_str = fs::read_to_string(&expected_path).expect("Read expected-symbols.json");
     let expected_symbols: Vec<buildbuddy_core::symbols::ExtractedSymbol> =
-        serde_json::from_str(&expected_str).expect("Deserialize expected");
+        serde_json::from_str(&fs::read_to_string(&symbols_path).expect("Read symbols")).expect("Deserialize symbols");
+    assert_eq!(result.symbols, expected_symbols, "Symbols mismatch");
 
-    assert_eq!(result.symbols, expected_symbols);
+    let expected_imports: Vec<buildbuddy_core::symbols::ExtractedImport> =
+        serde_json::from_str(&fs::read_to_string(&imports_path).expect("Read imports")).expect("Deserialize imports");
+    assert_eq!(result.imports, expected_imports, "Imports mismatch");
+
+    let expected_exports: Vec<buildbuddy_core::symbols::ExtractedExport> =
+        serde_json::from_str(&fs::read_to_string(&exports_path).expect("Read exports")).expect("Deserialize exports");
+    assert_eq!(result.exports, expected_exports, "Exports mismatch");
 }
 
 #[test]

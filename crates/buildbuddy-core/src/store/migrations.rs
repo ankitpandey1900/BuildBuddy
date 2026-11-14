@@ -45,7 +45,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             end_column INTEGER NOT NULL,
             snippet TEXT,
             confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
-            evidence_type TEXT CHECK(evidence_type IN ('ast_node', 'manifest_entry', 'import_stmt', 'call_site', 'type_annotation', 'heuristic')) NOT NULL,
+            evidence_type TEXT CHECK(evidence_type IN ('ast_node', 'manifest_entry', 'import_stmt', 'export_stmt', 'call_site', 'type_annotation', 'heuristic')) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
 
@@ -119,6 +119,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_imports_file_id ON imports(file_id);
+
+        CREATE TABLE IF NOT EXISTS exports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            exported_name TEXT NOT NULL,
+            local_name TEXT NOT NULL,
+            is_default INTEGER DEFAULT 0 NOT NULL,
+            line_number INTEGER NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_exports_file_id ON exports(file_id);
 
         CREATE VIRTUAL TABLE IF NOT EXISTS fts_symbols USING fts5(
             name,

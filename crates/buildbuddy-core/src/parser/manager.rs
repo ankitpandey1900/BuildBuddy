@@ -60,6 +60,7 @@ impl ParserManager {
                 status: ParseStatus::Unsupported,
                 symbols: Vec::new(),
                 imports: Vec::new(),
+                exports: Vec::new(),
                 errors: vec!["Unsupported language extension".to_string()],
             }),
         }
@@ -97,22 +98,21 @@ mod tests {
     #[test]
     fn test_parser_timeout_limit() {
         let limits = ParserLimits {
-            max_file_size_bytes: 1024 * 1024,
+            max_file_size_bytes: 5 * 1024 * 1024,
             timeout_ms: 1, // 1 millisecond timeout
         };
         let manager = ParserManager::with_limits(limits);
-        // Deeply nested input that stresses the parser
-        let mut code = String::new();
-        for _ in 0..5000 {
-            code.push_str("if (x) { ");
+        // Deliberately huge pathological input with deep expression nesting
+        let mut code = String::from("const x = 1");
+        for _ in 0..60_000 {
+            code.push_str(" + 1");
         }
-        for _ in 0..5000 {
-            code.push_str(" }");
-        }
+        code.push(';');
 
-        let res = manager.parse_source("nested.ts", Some("ts"), &code).unwrap();
-        // Either completed quickly or caught by timeout
-        assert!(res.status == ParseStatus::Timeout || res.status == ParseStatus::Full || res.status == ParseStatus::Partial);
+        let res = manager.parse_source("pathological.ts", Some("ts"), &code).unwrap();
+        assert_eq!(res.status, ParseStatus::Timeout);
+        assert!(!res.errors.is_empty());
+        assert!(res.errors[0].contains("timed out"));
     }
 }
 

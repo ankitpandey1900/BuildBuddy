@@ -90,6 +90,7 @@ impl ParserWorkerPool {
                                     status: crate::parser::traits::ParseStatus::Error,
                                     symbols: Vec::new(),
                                     imports: Vec::new(),
+                                    exports: Vec::new(),
                                     errors: vec![format!("Failed to read file: {}", e)],
                                 },
                             ));
@@ -108,6 +109,7 @@ impl ParserWorkerPool {
                             status: crate::parser::traits::ParseStatus::Error,
                             symbols: Vec::new(),
                             imports: Vec::new(),
+                            exports: Vec::new(),
                             errors: vec![e.to_string()],
                         },
                     };

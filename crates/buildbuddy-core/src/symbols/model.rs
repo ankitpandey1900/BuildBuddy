@@ -71,6 +71,14 @@ pub struct ExtractedImport {
     pub line_number: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractedExport {
+    pub exported_name: String,
+    pub local_name: String,
+    pub is_default: bool,
+    pub line_number: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

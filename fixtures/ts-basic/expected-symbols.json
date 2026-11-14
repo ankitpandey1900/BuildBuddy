@@ -7,8 +7,8 @@
     "parent_name": null,
     "start_line": 6,
     "end_line": 6,
-    "start_column": 13,
-    "end_column": 31,
+    "start_column": 0,
+    "end_column": 32,
     "parameters": [],
     "return_type": null,
     "is_exported": true,
@@ -25,7 +25,7 @@
     "parent_name": null,
     "start_line": 8,
     "end_line": 12,
-    "start_column": 7,
+    "start_column": 0,
     "end_column": 1,
     "parameters": [],
     "return_type": null,
@@ -43,7 +43,7 @@
     "parent_name": null,
     "start_line": 14,
     "end_line": 14,
-    "start_column": 7,
+    "start_column": 0,
     "end_column": 55,
     "parameters": [],
     "return_type": null,
@@ -61,7 +61,7 @@
     "parent_name": null,
     "start_line": 16,
     "end_line": 31,
-    "start_column": 7,
+    "start_column": 0,
     "end_column": 1,
     "parameters": [],
     "return_type": null,
@@ -93,7 +93,7 @@
     "is_async": false,
     "visibility": null,
     "docstring": null,
-    "signature": "constructor(client: any): void"
+    "signature": "constructor(client: any)"
   },
   {
     "stable_id": "f682945958d32f90cb0f5fdba1893b86ebc1bfb95f0d016cce18f3931a63483e",
@@ -145,13 +145,13 @@
     "parent_name": null,
     "start_line": 33,
     "end_line": 38,
-    "start_column": 7,
+    "start_column": 0,
     "end_column": 1,
     "parameters": [
       {
         "name": "data",
         "type_annotation": "number[]",
-        "default_value": null
+        "default_value": "[]"
       }
     ],
     "return_type": "Promise<number>",
@@ -159,7 +159,7 @@
     "is_async": true,
     "visibility": null,
     "docstring": null,
-    "signature": "async calculateMetrics(data: number[]): Promise<number>"
+    "signature": "async calculateMetrics(data: number[] = []): Promise<number>"
   },
   {
     "stable_id": "c597b0724f6999eac602b5c5fddcce881f49d39145c937d1f431327aaaf8c91d",
@@ -198,13 +198,13 @@
     "parent_name": null,
     "start_line": 40,
     "end_line": 42,
-    "start_column": 13,
-    "end_column": 1,
+    "start_column": 0,
+    "end_column": 2,
     "parameters": [
       {
         "name": "id",
         "type_annotation": "string",
-        "default_value": null
+        "default_value": "'guest'"
       }
     ],
     "return_type": "Promise<string>",
@@ -212,7 +212,7 @@
     "is_async": true,
     "visibility": null,
     "docstring": null,
-    "signature": "const processUser = async (id: string): Promise<string>"
+    "signature": "const processUser = async (id: string = 'guest'): Promise<string>"
   },
   {
     "stable_id": "7f74308e91d105791b3031c136a796ab73f29723ec67c20e0e0011945e9f3542",
@@ -222,8 +222,8 @@
     "parent_name": null,
     "start_line": 44,
     "end_line": 44,
-    "start_column": 6,
-    "end_column": 38,
+    "start_column": 0,
+    "end_column": 39,
     "parameters": [],
     "return_type": null,
     "is_exported": true,
@@ -231,5 +231,23 @@
     "visibility": null,
     "docstring": null,
     "signature": "const INTERNAL_SECRET"
+  },
+  {
+    "stable_id": "f0bc27fbf485cd87465be88401adc0673e3921d877c490515298cffed365f4a5",
+    "name": "getServiceHealth",
+    "qualified_name": "getServiceHealth",
+    "kind": "function",
+    "parent_name": null,
+    "start_line": 48,
+    "end_line": 50,
+    "start_column": 0,
+    "end_column": 1,
+    "parameters": [],
+    "return_type": "string",
+    "is_exported": true,
+    "is_async": false,
+    "visibility": null,
+    "docstring": null,
+    "signature": "getServiceHealth(): string"
   }
 ]

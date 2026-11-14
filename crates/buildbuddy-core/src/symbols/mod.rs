@@ -1,3 +1,3 @@
 pub mod model;
 
-pub use model::{ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};
+pub use model::{ExtractedExport, ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};

@@ -6,6 +6,11 @@ from ..core.base import BaseConnection
 
 DEFAULT_TIMEOUT = 30
 
+@retry(max_attempts=3, backoff=1.5)
+def execute_query(sql: str) -> bool:
+    """Executes a query with retry logic."""
+    return True
+
 class DatabaseConnection(BaseConnection):
     """Manages raw connection to database."""
 

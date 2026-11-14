@@ -1,0 +1,37 @@
+[
+  {
+    "source_module": "react",
+    "imported_name": "useState",
+    "alias": null,
+    "is_type_only": false,
+    "line_number": 1
+  },
+  {
+    "source_module": "react",
+    "imported_name": "useEffect",
+    "alias": null,
+    "is_type_only": false,
+    "line_number": 1
+  },
+  {
+    "source_module": "axios",
+    "imported_name": "axios",
+    "alias": null,
+    "is_type_only": false,
+    "line_number": 2
+  },
+  {
+    "source_module": "./base",
+    "imported_name": "BaseService",
+    "alias": null,
+    "is_type_only": false,
+    "line_number": 3
+  },
+  {
+    "source_module": "./types",
+    "imported_name": "IService",
+    "alias": null,
+    "is_type_only": true,
+    "line_number": 4
+  }
+]

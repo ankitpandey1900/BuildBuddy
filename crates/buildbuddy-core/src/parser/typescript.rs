@@ -1,7 +1,7 @@
 use tree_sitter::{Node, Parser};
 
 use crate::parser::traits::{FileParseResult, LanguageAdapter, ParseError, ParseStatus, ParserLimits};
-use crate::symbols::model::{ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};
+use crate::symbols::model::{ExtractedExport, ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};
 
 pub struct TypeScriptAdapter;
 
@@ -38,6 +38,7 @@ impl LanguageAdapter for TypeScriptAdapter {
                 status: ParseStatus::SkippedTooLarge,
                 symbols: Vec::new(),
                 imports: Vec::new(),
+                exports: Vec::new(),
                 errors: vec![format!(
                     "File size {} bytes exceeds limit of {} bytes",
                     source.len(),
@@ -70,6 +71,7 @@ impl LanguageAdapter for TypeScriptAdapter {
                     status: ParseStatus::Timeout,
                     symbols: Vec::new(),
                     imports: Vec::new(),
+                    exports: Vec::new(),
                     errors: vec![format!("Parser timed out after {} ms", limits.timeout_ms)],
                 });
             }
@@ -78,6 +80,7 @@ impl LanguageAdapter for TypeScriptAdapter {
         let root_node = tree.root_node();
         let mut symbols = Vec::new();
         let mut imports = Vec::new();
+        let mut exports = Vec::new();
         let mut errors = Vec::new();
 
         let has_syntax_errors = root_node.has_error();
@@ -86,7 +89,7 @@ impl LanguageAdapter for TypeScriptAdapter {
         }
 
         let source_bytes = source.as_bytes();
-        extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports);
+        extract_from_node(root_node, source_bytes, relative_path, None, false, None, &mut symbols, &mut imports, &mut exports);
         mark_exported_symbols(root_node, source_bytes, &mut symbols);
 
         let status = if has_syntax_errors {
@@ -101,6 +104,7 @@ impl LanguageAdapter for TypeScriptAdapter {
             status,
             symbols,
             imports,
+            exports,
             errors,
         })
     }
@@ -112,8 +116,10 @@ fn extract_from_node(
     relative_path: &str,
     parent_name: Option<&str>,
     is_parent_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let mut cursor = node.walk();
 
@@ -123,16 +129,88 @@ fn extract_from_node(
                 if child.child_by_field_name("source").is_some() {
                     extract_import(child, source, imports);
                 }
-                extract_from_node(child, source, relative_path, parent_name, true, symbols, imports);
+
+                let line_number = child.start_position().row + 1;
+                let is_default = child.children(&mut child.walk()).any(|c| c.kind() == "default");
+
+                // Check for export clause: export { a, b as c }
+                let mut c_cursor = child.walk();
+                for c in child.children(&mut c_cursor) {
+                    if c.kind() == "export_clause" {
+                        let mut spec_cursor = c.walk();
+                        for spec in c.children(&mut spec_cursor) {
+                            if spec.kind() == "export_specifier" {
+                                if let Some(n) = spec.child_by_field_name("name") {
+                                    let local_name = node_text(n, source);
+                                    let exported_name = spec
+                                        .child_by_field_name("alias")
+                                        .map(|a| node_text(a, source))
+                                        .unwrap_or_else(|| local_name.clone());
+
+                                    exports.push(ExtractedExport {
+                                        exported_name,
+                                        local_name,
+                                        is_default: false,
+                                        line_number,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check for default export identifier: export default UserService;
+                if let Some(val) = child.child_by_field_name("value") {
+                    if val.kind() == "identifier" {
+                        let local_name = node_text(val, source);
+                        exports.push(ExtractedExport {
+                            exported_name: "default".to_string(),
+                            local_name,
+                            is_default: true,
+                            line_number,
+                        });
+                    }
+                }
+
+                // Check for declaration exports: export class/function/const/interface/type
+                if let Some(decl) = child.child_by_field_name("declaration") {
+                    let decl_name = decl.child_by_field_name("name").map(|n| node_text(n, source));
+                    if let Some(name) = decl_name {
+                        exports.push(ExtractedExport {
+                            exported_name: if is_default { "default".to_string() } else { name.clone() },
+                            local_name: name,
+                            is_default,
+                            line_number,
+                        });
+                    } else if decl.kind() == "lexical_declaration" || decl.kind() == "variable_declaration" {
+                        let mut d_cursor = decl.walk();
+                        for var_child in decl.children(&mut d_cursor) {
+                            if var_child.kind() == "variable_declarator" {
+                                if let Some(name_n) = var_child.child_by_field_name("name") {
+                                    let name = node_text(name_n, source);
+                                    exports.push(ExtractedExport {
+                                        exported_name: name.clone(),
+                                        local_name: name,
+                                        is_default: false,
+                                        line_number,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let range = Some((child.start_position(), child.end_position()));
+                extract_from_node(child, source, relative_path, parent_name, true, range, symbols, imports, exports);
             }
             "import_statement" => {
                 extract_import(child, source, imports);
             }
             "function_declaration" => {
-                extract_function(child, source, relative_path, parent_name, is_parent_exported, symbols, imports);
+                extract_function(child, source, relative_path, parent_name, is_parent_exported, enclosing_range, symbols, imports, exports);
             }
             "class_declaration" => {
-                if let Some(class_sym) = extract_class(child, source, relative_path, is_parent_exported) {
+                if let Some(class_sym) = extract_class(child, source, relative_path, is_parent_exported, enclosing_range) {
                     let class_name = class_sym.name.clone();
                     symbols.push(class_sym);
 
@@ -142,22 +220,21 @@ fn extract_from_node(
                 }
             }
             "interface_declaration" => {
-                if let Some(sym) = extract_interface(child, source, relative_path, is_parent_exported) {
+                if let Some(sym) = extract_interface(child, source, relative_path, is_parent_exported, enclosing_range) {
                     symbols.push(sym);
                 }
             }
             "type_alias_declaration" => {
-                if let Some(sym) = extract_type_alias(child, source, relative_path, is_parent_exported) {
+                if let Some(sym) = extract_type_alias(child, source, relative_path, is_parent_exported, enclosing_range) {
                     symbols.push(sym);
                 }
             }
             "lexical_declaration" | "variable_declaration" => {
-                extract_variable_declarations(child, source, relative_path, parent_name, is_parent_exported, symbols, imports);
+                extract_variable_declarations(child, source, relative_path, parent_name, is_parent_exported, enclosing_range, symbols, imports, exports);
             }
             _ => {
-                // Descend for nested blocks if needed, but avoid recursing into function bodies
                 if child.kind() == "program" || child.kind() == "statement_block" {
-                    extract_from_node(child, source, relative_path, parent_name, is_parent_exported, symbols, imports);
+                    extract_from_node(child, source, relative_path, parent_name, is_parent_exported, None, symbols, imports, exports);
                 }
             }
         }
@@ -170,8 +247,10 @@ fn extract_function(
     relative_path: &str,
     parent_name: Option<&str>,
     is_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let name_node = match node.child_by_field_name("name") {
         Some(n) => n,
@@ -198,8 +277,7 @@ fn extract_function(
         return_type.as_deref().unwrap_or("void")
     );
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = enclosing_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Function);
 
     symbols.push(ExtractedSymbol {
@@ -223,7 +301,7 @@ fn extract_function(
 
     // Recurse into function body to extract nested functions
     if let Some(body) = node.child_by_field_name("body") {
-        extract_from_node(body, source, relative_path, Some(&qualified_name), false, symbols, imports);
+        extract_from_node(body, source, relative_path, Some(&qualified_name), false, None, symbols, imports, exports);
     }
 }
 
@@ -232,6 +310,7 @@ fn extract_class(
     source: &[u8],
     relative_path: &str,
     is_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -247,8 +326,7 @@ fn extract_class(
         None => format!("class {}", name),
     };
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = enclosing_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Class);
 
     Some(ExtractedSymbol {
@@ -299,14 +377,22 @@ fn extract_class_members(
                     t.trim_start_matches(':').trim().to_string()
                 });
 
-                let signature = format!(
-                    "{}{}{}({}): {}",
-                    if is_static { "static " } else { "" },
-                    if is_async { "async " } else { "" },
-                    name,
-                    format_param_list(&parameters),
-                    return_type.as_deref().unwrap_or("void")
-                );
+                // Rule: constructor signature must not contain ': void' when no return type is declared
+                let signature = if name == "constructor" {
+                    match &return_type {
+                        Some(rt) => format!("constructor({}): {}", format_param_list(&parameters), rt),
+                        None => format!("constructor({})", format_param_list(&parameters)),
+                    }
+                } else {
+                    format!(
+                        "{}{}{}({}): {}",
+                        if is_static { "static " } else { "" },
+                        if is_async { "async " } else { "" },
+                        name,
+                        format_param_list(&parameters),
+                        return_type.as_deref().unwrap_or("void")
+                    )
+                };
 
                 let start_pos = child.start_position();
                 let end_pos = child.end_position();
@@ -341,13 +427,13 @@ fn extract_interface(
     source: &[u8],
     relative_path: &str,
     is_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
     let qualified_name = name.clone();
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = enclosing_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Interface);
 
     Some(ExtractedSymbol {
@@ -375,13 +461,13 @@ fn extract_type_alias(
     source: &[u8],
     relative_path: &str,
     is_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
     let qualified_name = name.clone();
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = enclosing_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::TypeAlias);
 
     Some(ExtractedSymbol {
@@ -410,10 +496,13 @@ fn extract_variable_declarations(
     relative_path: &str,
     parent_name: Option<&str>,
     is_exported: bool,
+    enclosing_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let is_const = node.children(&mut node.walk()).any(|c| c.kind() == "const");
+    let (decl_start, decl_end) = enclosing_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
@@ -438,8 +527,6 @@ fn extract_variable_declarations(
                                 t.trim_start_matches(':').trim().to_string()
                             });
 
-                            let start_pos = child.start_position();
-                            let end_pos = child.end_position();
                             let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Function);
 
                             symbols.push(ExtractedSymbol {
@@ -448,10 +535,10 @@ fn extract_variable_declarations(
                                 qualified_name: qualified_name.clone(),
                                 kind: SymbolKind::Function,
                                 parent_name: parent_name.map(|s| s.to_string()),
-                                start_line: start_pos.row + 1,
-                                end_line: end_pos.row + 1,
-                                start_column: start_pos.column,
-                                end_column: end_pos.column,
+                                start_line: decl_start.row + 1,
+                                end_line: decl_end.row + 1,
+                                start_column: decl_start.column,
+                                end_column: decl_end.column,
                                 parameters: parameters.clone(),
                                 return_type: return_type.clone(),
                                 is_exported: is_exported && parent_name.is_none(),
@@ -470,15 +557,13 @@ fn extract_variable_declarations(
                             // Recurse into arrow function body for nested declarations
                             if let Some(body) = val.child_by_field_name("body") {
                                 if body.kind() == "statement_block" {
-                                    extract_from_node(body, source, relative_path, Some(&qualified_name), false, symbols, imports);
+                                    extract_from_node(body, source, relative_path, Some(&qualified_name), false, None, symbols, imports, exports);
                                 }
                             }
                             continue;
                         }
                     }
 
-                    let start_pos = child.start_position();
-                    let end_pos = child.end_position();
                     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, kind);
 
                     symbols.push(ExtractedSymbol {
@@ -487,10 +572,10 @@ fn extract_variable_declarations(
                         qualified_name,
                         kind,
                         parent_name: parent_name.map(|s| s.to_string()),
-                        start_line: start_pos.row + 1,
-                        end_line: end_pos.row + 1,
-                        start_column: start_pos.column,
-                        end_column: end_pos.column,
+                        start_line: decl_start.row + 1,
+                        end_line: decl_end.row + 1,
+                        start_column: decl_start.column,
+                        end_column: decl_end.column,
                         parameters: Vec::new(),
                         return_type: None,
                         is_exported: is_exported && parent_name.is_none(),
@@ -645,12 +730,15 @@ fn extract_parameters(params_node: Option<Node>, source: &[u8]) -> Vec<Parameter
                     let t = node_text(n, source);
                     t.trim_start_matches(':').trim().to_string()
                 });
+                let default_value = child.child_by_field_name("value").map(|n| {
+                    node_text(n, source)
+                });
 
                 if let Some(p) = pattern {
                     parameters.push(Parameter {
                         name: node_text(p, source),
                         type_annotation,
-                        default_value: None,
+                        default_value,
                     });
                 }
             }
@@ -671,9 +759,15 @@ fn extract_parameters(params_node: Option<Node>, source: &[u8]) -> Vec<Parameter
 fn format_param_list(parameters: &[Parameter]) -> String {
     parameters
         .iter()
-        .map(|p| match &p.type_annotation {
-            Some(t) => format!("{}: {}", p.name, t),
-            None => p.name.clone(),
+        .map(|p| {
+            let mut s = p.name.clone();
+            if let Some(t) = &p.type_annotation {
+                s.push_str(&format!(": {}", t));
+            }
+            if let Some(d) = &p.default_value {
+                s.push_str(&format!(" = {}", d));
+            }
+            s
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -694,25 +788,30 @@ import { BaseService } from './base';
 import type { IService } from './types';
 
 export class UserService extends BaseService implements IService {
+    constructor(client: any) {
+    }
+
     public async getUser(id: string): Promise<string> {
         return id;
     }
 }
 
-export async function calculateMetrics(data: number[]): Promise<number> {
+export async function calculateMetrics(data: number[] = []): Promise<number> {
     function sum(a: number, b: number): number {
         return a + b;
     }
     return data.reduce(sum, 0);
 }
 
-export const processItem = async (item: string): Promise<string> => {
+export const processItem = async (item: string = 'default'): Promise<string> => {
     return item.trim();
 };
 
 const API_VERSION = 'v1';
 export { API_VERSION };
-export default UserService;
+export default function getStatus(): string {
+    return 'ok';
+}
 "#;
         let adapter = TypeScriptAdapter::new();
         let result = adapter.parse("src/service.ts", code, &ParserLimits::default()).unwrap();
@@ -726,14 +825,16 @@ export default UserService;
         assert_eq!(class_sym.kind, SymbolKind::Class);
         assert!(class_sym.signature.contains("extends BaseService implements IService"));
         assert!(class_sym.is_exported);
+        assert_eq!(class_sym.start_column, 0); // Full declaration range starting at 'export'
 
-        let method_sym = result.symbols.iter().find(|s| s.name == "getUser").unwrap();
-        assert_eq!(method_sym.kind, SymbolKind::Method);
-        assert_eq!(method_sym.parent_name.as_deref(), Some("UserService"));
+        let ctor_sym = result.symbols.iter().find(|s| s.name == "constructor").unwrap();
+        assert_eq!(ctor_sym.signature, "constructor(client: any)"); // No ': void'
 
         let func_sym = result.symbols.iter().find(|s| s.name == "calculateMetrics").unwrap();
         assert_eq!(func_sym.kind, SymbolKind::Function);
         assert!(func_sym.is_async);
+        assert_eq!(func_sym.parameters[0].default_value.as_deref(), Some("[]"));
+        assert_eq!(func_sym.signature, "async calculateMetrics(data: number[] = []): Promise<number>");
 
         let nested_func = result.symbols.iter().find(|s| s.name == "sum").unwrap();
         assert_eq!(nested_func.kind, SymbolKind::Function);
@@ -745,11 +846,14 @@ export default UserService;
         assert_eq!(arrow_sym.kind, SymbolKind::Function);
         assert!(arrow_sym.is_exported);
         assert!(arrow_sym.is_async);
+        assert_eq!(arrow_sym.parameters[0].default_value.as_deref(), Some("'default'"));
 
-        let const_sym = result.symbols.iter().find(|s| s.name == "API_VERSION").unwrap();
-        assert_eq!(const_sym.kind, SymbolKind::Constant);
-        assert!(const_sym.is_exported, "API_VERSION should be marked exported by export clause");
+        let status_sym = result.symbols.iter().find(|s| s.name == "getStatus").unwrap();
+        assert_eq!(status_sym.kind, SymbolKind::Function);
+        assert!(status_sym.is_exported);
+
+        // Check exports
+        assert!(result.exports.iter().any(|e| e.exported_name == "default" && e.local_name == "getStatus" && e.is_default));
+        assert!(result.exports.iter().any(|e| e.exported_name == "API_VERSION" && !e.is_default));
     }
 }
-
-

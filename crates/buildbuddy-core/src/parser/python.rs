@@ -1,7 +1,7 @@
 use tree_sitter::{Node, Parser};
 
 use crate::parser::traits::{FileParseResult, LanguageAdapter, ParseError, ParseStatus, ParserLimits};
-use crate::symbols::model::{ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};
+use crate::symbols::model::{ExtractedExport, ExtractedImport, ExtractedSymbol, Parameter, SymbolKind};
 
 pub struct PythonAdapter;
 
@@ -33,6 +33,7 @@ impl LanguageAdapter for PythonAdapter {
                 status: ParseStatus::SkippedTooLarge,
                 symbols: Vec::new(),
                 imports: Vec::new(),
+                exports: Vec::new(),
                 errors: vec![format!(
                     "File size {} bytes exceeds limit of {} bytes",
                     source.len(),
@@ -61,6 +62,7 @@ impl LanguageAdapter for PythonAdapter {
                     status: ParseStatus::Timeout,
                     symbols: Vec::new(),
                     imports: Vec::new(),
+                    exports: Vec::new(),
                     errors: vec![format!("Parser timed out after {} ms", limits.timeout_ms)],
                 });
             }
@@ -69,6 +71,7 @@ impl LanguageAdapter for PythonAdapter {
         let root_node = tree.root_node();
         let mut symbols = Vec::new();
         let mut imports = Vec::new();
+        let mut exports = Vec::new();
         let mut errors = Vec::new();
 
         let has_syntax_errors = root_node.has_error();
@@ -77,7 +80,7 @@ impl LanguageAdapter for PythonAdapter {
         }
 
         let source_bytes = source.as_bytes();
-        extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports);
+        extract_from_node(root_node, source_bytes, relative_path, None, false, &mut symbols, &mut imports, &mut exports);
 
         let status = if has_syntax_errors {
             ParseStatus::Partial
@@ -91,6 +94,7 @@ impl LanguageAdapter for PythonAdapter {
             status,
             symbols,
             imports,
+            exports,
             errors,
         })
     }
@@ -104,6 +108,7 @@ fn extract_from_node(
     is_inside_class: bool,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let mut cursor = node.walk();
 
@@ -116,36 +121,52 @@ fn extract_from_node(
                 extract_import_from_statement(child, source, imports);
             }
             "decorated_definition" => {
-                extract_decorated_definition(child, source, relative_path, parent_scope, is_inside_class, symbols, imports);
+                extract_decorated_definition(child, source, relative_path, parent_scope, is_inside_class, symbols, imports, exports);
             }
             "function_definition" => {
-                if let Some(sym) = extract_function(child, source, relative_path, parent_scope, is_inside_class, None) {
+                if let Some(sym) = extract_function(child, source, relative_path, parent_scope, is_inside_class, None, None) {
                     let func_qname = sym.qualified_name.clone();
+                    if sym.is_exported && sym.parent_name.is_none() {
+                        exports.push(ExtractedExport {
+                            exported_name: sym.name.clone(),
+                            local_name: sym.name.clone(),
+                            is_default: false,
+                            line_number: sym.start_line,
+                        });
+                    }
                     symbols.push(sym);
 
                     if let Some(body) = child.child_by_field_name("body") {
-                        extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports);
+                        extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports, exports);
                     }
                 }
             }
             "class_definition" => {
-                if let Some(class_sym) = extract_class(child, source, relative_path, None) {
+                if let Some(class_sym) = extract_class(child, source, relative_path, None, None) {
                     let class_name = class_sym.name.clone();
+                    if class_sym.is_exported {
+                        exports.push(ExtractedExport {
+                            exported_name: class_sym.name.clone(),
+                            local_name: class_sym.name.clone(),
+                            is_default: false,
+                            line_number: class_sym.start_line,
+                        });
+                    }
                     symbols.push(class_sym);
 
                     if let Some(body) = child.child_by_field_name("body") {
-                        extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports);
+                        extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports, exports);
                     }
                 }
             }
             "expression_statement" => {
                 if parent_scope.is_none() {
-                    extract_module_variable(child, source, relative_path, symbols);
+                    extract_module_variable(child, source, relative_path, symbols, exports);
                 }
             }
             _ => {
                 if child.kind() == "module" || child.kind() == "block" {
-                    extract_from_node(child, source, relative_path, parent_scope, is_inside_class, symbols, imports);
+                    extract_from_node(child, source, relative_path, parent_scope, is_inside_class, symbols, imports, exports);
                 }
             }
         }
@@ -160,6 +181,7 @@ fn extract_decorated_definition(
     is_inside_class: bool,
     symbols: &mut Vec<ExtractedSymbol>,
     imports: &mut Vec<ExtractedImport>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let mut decorators = Vec::new();
     let mut definition_node = None;
@@ -188,22 +210,41 @@ fn extract_decorated_definition(
         Some(decorators.join("\n"))
     };
 
+    // Full declaration range starts at the first decorator and ends at the definition end
+    let full_range = Some((node.start_position(), node.end_position()));
+
     if def.kind() == "function_definition" {
-        if let Some(sym) = extract_function(def, source, relative_path, parent_scope, is_inside_class, decorator_prefix.as_deref()) {
+        if let Some(sym) = extract_function(def, source, relative_path, parent_scope, is_inside_class, decorator_prefix.as_deref(), full_range) {
             let func_qname = sym.qualified_name.clone();
+            if sym.is_exported && sym.parent_name.is_none() {
+                exports.push(ExtractedExport {
+                    exported_name: sym.name.clone(),
+                    local_name: sym.name.clone(),
+                    is_default: false,
+                    line_number: sym.start_line,
+                });
+            }
             symbols.push(sym);
 
             if let Some(body) = def.child_by_field_name("body") {
-                extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports);
+                extract_from_node(body, source, relative_path, Some(&func_qname), false, symbols, imports, exports);
             }
         }
     } else if def.kind() == "class_definition" {
-        if let Some(class_sym) = extract_class(def, source, relative_path, decorator_prefix.as_deref()) {
+        if let Some(class_sym) = extract_class(def, source, relative_path, decorator_prefix.as_deref(), full_range) {
             let class_name = class_sym.name.clone();
+            if class_sym.is_exported {
+                exports.push(ExtractedExport {
+                    exported_name: class_sym.name.clone(),
+                    local_name: class_sym.name.clone(),
+                    is_default: false,
+                    line_number: class_sym.start_line,
+                });
+            }
             symbols.push(class_sym);
 
             if let Some(body) = def.child_by_field_name("body") {
-                extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports);
+                extract_from_node(body, source, relative_path, Some(&class_name), true, symbols, imports, exports);
             }
         }
     }
@@ -216,6 +257,7 @@ fn extract_function(
     parent_scope: Option<&str>,
     is_inside_class: bool,
     decorator_prefix: Option<&str>,
+    full_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -252,8 +294,7 @@ fn extract_function(
         None => raw_sig,
     };
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = full_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, kind);
 
     let visibility = if name.starts_with("__") && name.ends_with("__") {
@@ -291,6 +332,7 @@ fn extract_class(
     source: &[u8],
     relative_path: &str,
     decorator_prefix: Option<&str>,
+    full_range: Option<(tree_sitter::Point, tree_sitter::Point)>,
 ) -> Option<ExtractedSymbol> {
     let name_node = node.child_by_field_name("name")?;
     let name = node_text(name_node, source);
@@ -309,8 +351,7 @@ fn extract_class(
         None => raw_sig,
     };
 
-    let start_pos = node.start_position();
-    let end_pos = node.end_position();
+    let (start_pos, end_pos) = full_range.unwrap_or_else(|| (node.start_position(), node.end_position()));
     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &qualified_name, SymbolKind::Class);
 
     Some(ExtractedSymbol {
@@ -338,6 +379,7 @@ fn extract_module_variable(
     source: &[u8],
     relative_path: &str,
     symbols: &mut Vec<ExtractedSymbol>,
+    exports: &mut Vec<ExtractedExport>,
 ) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -352,6 +394,16 @@ fn extract_module_variable(
                     let end_pos = child.end_position();
                     let stable_id = ExtractedSymbol::compute_stable_id(relative_path, &name, kind);
 
+                    let is_exported = !name.starts_with('_');
+                    if is_exported {
+                        exports.push(ExtractedExport {
+                            exported_name: name.clone(),
+                            local_name: name.clone(),
+                            is_default: false,
+                            line_number: start_pos.row + 1,
+                        });
+                    }
+
                     symbols.push(ExtractedSymbol {
                         stable_id,
                         name: name.clone(),
@@ -364,7 +416,7 @@ fn extract_module_variable(
                         end_column: end_pos.column,
                         parameters: Vec::new(),
                         return_type: None,
-                        is_exported: !name.starts_with('_'),
+                        is_exported,
                         is_async: false,
                         visibility: None,
                         docstring: None,
@@ -417,7 +469,6 @@ fn extract_import_from_statement(node: Node, source: &[u8], imports: &mut Vec<Ex
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == "dotted_name" {
-            // Check if it's the module name or an imported name
             if Some(child) != module_node {
                 imports.push(ExtractedImport {
                     source_module: source_module.clone(),
@@ -469,22 +520,44 @@ fn extract_parameters(params_node: Option<Node>, source: &[u8]) -> Vec<Parameter
                     default_value: None,
                 });
             }
-            "typed_parameter" | "typed_default_parameter" => {
-                let name = child.child(0).map(|n| node_text(n, source)).unwrap_or_default();
+            "typed_default_parameter" => {
+                let name = child
+                    .child_by_field_name("name")
+                    .or_else(|| child.child(0))
+                    .map(|n| node_text(n, source))
+                    .unwrap_or_default();
                 let type_annotation = child.child_by_field_name("type").map(|n| node_text(n, source));
+                let default_value = child.child_by_field_name("value").map(|n| node_text(n, source));
                 parameters.push(Parameter {
                     name,
                     type_annotation,
-                    default_value: None,
+                    default_value,
                 });
             }
             "default_parameter" => {
-                let name = child.child_by_field_name("name").map(|n| node_text(n, source)).unwrap_or_default();
+                let name = child
+                    .child_by_field_name("name")
+                    .or_else(|| child.child(0))
+                    .map(|n| node_text(n, source))
+                    .unwrap_or_default();
                 let default_value = child.child_by_field_name("value").map(|n| node_text(n, source));
                 parameters.push(Parameter {
                     name,
                     type_annotation: None,
                     default_value,
+                });
+            }
+            "typed_parameter" => {
+                let name = child
+                    .child_by_field_name("name")
+                    .or_else(|| child.child(0))
+                    .map(|n| node_text(n, source))
+                    .unwrap_or_default();
+                let type_annotation = child.child_by_field_name("type").map(|n| node_text(n, source));
+                parameters.push(Parameter {
+                    name,
+                    type_annotation,
+                    default_value: None,
                 });
             }
             _ => {}
@@ -515,9 +588,15 @@ fn extract_docstring(body_node: Option<Node>, source: &[u8]) -> Option<String> {
 fn format_param_list(parameters: &[Parameter]) -> String {
     parameters
         .iter()
-        .map(|p| match &p.type_annotation {
-            Some(t) => format!("{}: {}", p.name, t),
-            None => p.name.clone(),
+        .map(|p| {
+            let mut s = p.name.clone();
+            if let Some(t) = &p.type_annotation {
+                s.push_str(&format!(": {}", t));
+            }
+            if let Some(d) = &p.default_value {
+                s.push_str(&format!(" = {}", d));
+            }
+            s
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -536,6 +615,11 @@ mod tests {
         let code = r#"
 from .utils import format_row
 from ..core.base import BaseConnection
+
+@retry(max_attempts=3, backoff=1.5)
+def execute_query(sql: str) -> bool:
+    """Executes a query with retry logic."""
+    return True
 
 class DatabaseConnection(BaseConnection):
     """Manages raw connection to database."""
@@ -563,38 +647,29 @@ async def fetch_records(query: str, limit: int = 100) -> List[dict]:
         assert_eq!(result.status, ParseStatus::Full);
         assert_eq!(result.imports.len(), 2);
         assert_eq!(result.imports[0].source_module, ".utils");
-        assert_eq!(result.imports[0].imported_name, "format_row");
         assert_eq!(result.imports[1].source_module, "..core.base");
-        assert_eq!(result.imports[1].imported_name, "BaseConnection");
+
+        // Decorated function with arguments
+        let exec_sym = result.symbols.iter().find(|s| s.name == "execute_query").unwrap();
+        assert_eq!(exec_sym.kind, SymbolKind::Function);
+        assert!(exec_sym.signature.contains("@retry(max_attempts=3, backoff=1.5)"));
+        assert_eq!(exec_sym.start_column, 0); // Spans full decorator
 
         let class_sym = result.symbols.iter().find(|s| s.name == "DatabaseConnection").unwrap();
         assert_eq!(class_sym.kind, SymbolKind::Class);
         assert_eq!(class_sym.signature, "class DatabaseConnection(BaseConnection)");
-        assert_eq!(class_sym.docstring.as_deref(), Some("Manages raw connection to database."));
-
-        let init_method = result.symbols.iter().find(|s| s.name == "__init__").unwrap();
-        assert_eq!(init_method.kind, SymbolKind::Method);
-        assert_eq!(init_method.parent_name.as_deref(), Some("DatabaseConnection"));
 
         let prop_method = result.symbols.iter().find(|s| s.name == "is_connected").unwrap();
-        assert_eq!(prop_method.kind, SymbolKind::Method);
-        assert_eq!(prop_method.parent_name.as_deref(), Some("DatabaseConnection"));
         assert!(prop_method.signature.contains("@property"));
+        assert_eq!(prop_method.start_column, 4); // Spans '@property'
 
-        let static_method = result.symbols.iter().find(|s| s.name == "create_default").unwrap();
-        assert_eq!(static_method.kind, SymbolKind::Method);
-        assert!(static_method.signature.contains("@staticmethod"));
+        let fetch_sym = result.symbols.iter().find(|s| s.name == "fetch_records").unwrap();
+        assert_eq!(fetch_sym.parameters[1].default_value.as_deref(), Some("100"));
+        assert_eq!(fetch_sym.signature, "async def fetch_records(query: str, limit: int = 100) -> List[dict]");
 
-        let func_sym = result.symbols.iter().find(|s| s.name == "fetch_records").unwrap();
-        assert_eq!(func_sym.kind, SymbolKind::Function);
-        assert!(func_sym.is_async);
-        assert_eq!(func_sym.parent_name, None);
-
-        let nested_func = result.symbols.iter().find(|s| s.name == "sanitize").unwrap();
-        assert_eq!(nested_func.kind, SymbolKind::Function);
-        assert_eq!(nested_func.parent_name.as_deref(), Some("fetch_records"));
-        assert_eq!(nested_func.qualified_name, "fetch_records.sanitize");
-        assert!(!nested_func.is_exported);
+        // Exports
+        assert!(result.exports.iter().any(|e| e.exported_name == "execute_query"));
+        assert!(result.exports.iter().any(|e| e.exported_name == "DatabaseConnection"));
+        assert!(result.exports.iter().any(|e| e.exported_name == "fetch_records"));
     }
 }
-

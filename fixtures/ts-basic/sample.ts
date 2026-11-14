@@ -30,17 +30,21 @@ export class UserService extends BaseService implements IService {
     }
 }
 
-export async function calculateMetrics(data: number[]): Promise<number> {
+export async function calculateMetrics(data: number[] = []): Promise<number> {
     function sum(a: number, b: number): number {
         return a + b;
     }
     return data.reduce(sum, 0);
 }
 
-export const processUser = async (id: string): Promise<string> => {
+export const processUser = async (id: string = 'guest'): Promise<string> => {
     return `user:${id}`;
 };
 
 const INTERNAL_SECRET = 'secret_token';
 export { INTERNAL_SECRET };
 export default UserService;
+
+export default function getServiceHealth(): string {
+    return 'healthy';
+}
