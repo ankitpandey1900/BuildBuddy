@@ -153,6 +153,7 @@ pub async fn analyze_architecture(
         &mut conn,
         project_id,
         &report.frameworks,
+        &report.declared_only,
         &report.entry_points,
         &report.modules,
         &report.architecture_model,
@@ -161,3 +162,4 @@ pub async fn analyze_architecture(
 
     Ok(report)
 }
+

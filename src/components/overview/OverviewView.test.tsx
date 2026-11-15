@@ -35,7 +35,7 @@ const mockOverviewData: OverviewDataDto = {
     {
       name: "React",
       version: "^18.3.1",
-      confidence: "confirmed",
+      confidence: "static",
       evidence: [
         {
           file_path: "package.json",
@@ -58,7 +58,7 @@ const mockOverviewData: OverviewDataDto = {
     {
       name: "Express",
       version: "^4.19.2",
-      confidence: "confirmed",
+      confidence: "static",
       evidence: [
         {
           file_path: "package.json",
@@ -79,15 +79,24 @@ const mockOverviewData: OverviewDataDto = {
       ],
     },
   ],
+  declared_only: [
+    {
+      name: "Vue",
+      version: "^3.4.0",
+      dependency_type: "dev",
+      file_path: "package.json",
+      line_number: 16,
+    },
+  ],
   entry_points: [
     {
       name: "package.json main",
-      entry_type: "package_manifest",
+      entry_type: "main",
       file_path: "package.json",
       start_line: 5,
       end_line: 5,
       snippet: '"main": "src/server/index.ts"',
-      confidence: "confirmed",
+      confidence: "static",
     },
     {
       name: "Express HTTP Server Entry",
@@ -96,7 +105,7 @@ const mockOverviewData: OverviewDataDto = {
       start_line: 10,
       end_line: 10,
       snippet: "app.listen(port, () => {",
-      confidence: "confirmed",
+      confidence: "static",
     },
     {
       name: "React DOM Root Entry",
@@ -105,7 +114,7 @@ const mockOverviewData: OverviewDataDto = {
       start_line: 7,
       end_line: 7,
       snippet: "const root = createRoot(container);",
-      confidence: "confirmed",
+      confidence: "static",
     },
   ],
   modules: [
@@ -336,5 +345,35 @@ describe("OverviewView Component", () => {
     expect(screen.getByText("Scan Time: 2.15s")).toBeInTheDocument();
     expect(screen.getByText("Parsed: 39/42 files")).toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
+  });
+
+  it("renders declared-only frameworks in a separate section", () => {
+    render(
+      <OverviewView
+        currentProject={mockProject}
+        initialData={mockOverviewData}
+        onNavigateToView={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("declared-only-section")).toBeInTheDocument();
+    expect(screen.getByTestId("declared-framework-vue")).toBeInTheDocument();
+    expect(screen.getByText("Declared in Manifest (No Import Usage Detected)")).toBeInTheDocument();
+  });
+
+  it("confirms no composite health score exists anywhere in Overview UI", () => {
+    const { container } = render(
+      <OverviewView
+        currentProject={mockProject}
+        initialData={mockOverviewData}
+        onNavigateToView={vi.fn()}
+      />
+    );
+
+    // Rule compliance: Professional engineering workbench. No composite health score.
+    const textContent = container.textContent || "";
+    expect(textContent).not.toMatch(/health score/i);
+    expect(textContent).not.toMatch(/grade/i);
+    expect(textContent).not.toMatch(/overall rating/i);
   });
 });

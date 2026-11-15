@@ -3,7 +3,7 @@
     {
       "name": "FastAPI",
       "version": "==0.111.0",
-      "confidence": "Confirmed",
+      "confidence": "Static",
       "evidence": [
         {
           "file_path": "requirements.txt",
@@ -48,6 +48,7 @@
       ]
     }
   ],
+  "declared_only": [],
   "entry_points": [
     {
       "name": "FastAPI Application Factory / Instance",
@@ -56,7 +57,7 @@
       "start_line": 4,
       "end_line": 4,
       "snippet": "app = FastAPI(title=\"Sample API\")",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "Python __main__ Entry",
@@ -65,7 +66,7 @@
       "start_line": 7,
       "end_line": 7,
       "snippet": "if __name__ == \"__main__\":",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     }
   ],
   "modules": [

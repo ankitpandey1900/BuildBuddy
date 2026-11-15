@@ -114,6 +114,7 @@ fn analyze_fixture_arch(dir: &Path) -> (ProjectArchReport, Connection) {
         &mut conn,
         1,
         &report.frameworks,
+        &report.declared_only,
         &report.entry_points,
         &report.modules,
         &report.architecture_model,
@@ -151,10 +152,12 @@ fn test_verify_arch_react_express_golden() {
     assert_eq!(report, expected);
 
     // Verify key elements
-    assert!(report.frameworks.iter().any(|f| f.name == "React" && f.confidence == buildbuddy_core::arch::model::Confidence::Confirmed));
-    assert!(report.frameworks.iter().any(|f| f.name == "Express" && f.confidence == buildbuddy_core::arch::model::Confidence::Confirmed));
-    assert!(report.entry_points.iter().any(|e| e.name == "Express HTTP Server Entry"));
-    assert!(report.entry_points.iter().any(|e| e.name == "React DOM Root Entry"));
+    assert!(report.frameworks.iter().any(|f| f.name == "React" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.frameworks.iter().any(|f| f.name == "Express" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Express HTTP Server Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "React DOM Root Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("script: dev") && e.entry_type == "script"));
+    assert!(!report.entry_points.iter().any(|e| e.name.contains("build")), "build script must NOT be an entry point");
 }
 
 #[test]
@@ -185,9 +188,141 @@ fn test_verify_arch_fastapi_golden() {
     assert_eq!(report, expected);
 
     // Verify key elements
-    assert!(report.frameworks.iter().any(|f| f.name == "FastAPI" && f.confidence == buildbuddy_core::arch::model::Confidence::Confirmed));
-    assert!(report.entry_points.iter().any(|e| e.name == "Python __main__ Entry"));
-    assert!(report.entry_points.iter().any(|e| e.name.contains("FastAPI Application")));
+    assert!(report.frameworks.iter().any(|f| f.name == "FastAPI" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Python __main__ Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("FastAPI Application") && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+}
+
+#[test]
+fn test_verify_arch_nextjs_golden() {
+    let dir = fixtures_dir().join("arch-nextjs");
+    let (report, _conn) = analyze_fixture_arch(&dir);
+
+    let expected_path = dir.join("expected-arch.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("Write expected-arch.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-arch.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
+    }
+
+    let expected: ProjectArchReport =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+
+    assert_eq!(report, expected);
+
+    assert!(report.frameworks.iter().any(|f| f.name == "Next.js" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.frameworks.iter().any(|f| f.name == "React" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("Next.js Route Entry")));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("script: dev") && e.entry_type == "script"));
+    assert!(!report.entry_points.iter().any(|e| e.name.contains("build")));
+}
+
+#[test]
+fn test_verify_arch_vue_golden() {
+    let dir = fixtures_dir().join("arch-vue");
+    let (report, _conn) = analyze_fixture_arch(&dir);
+
+    let expected_path = dir.join("expected-arch.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("Write expected-arch.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-arch.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
+    }
+
+    let expected: ProjectArchReport =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+
+    assert_eq!(report, expected);
+
+    assert!(report.frameworks.iter().any(|f| f.name == "Vue" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Vue Application Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("script: dev") && e.entry_type == "script"));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("script: serve") && e.entry_type == "script"));
+    assert!(!report.entry_points.iter().any(|e| e.name.contains("build")));
+}
+
+#[test]
+fn test_verify_arch_flask_golden() {
+    let dir = fixtures_dir().join("arch-flask");
+    let (report, _conn) = analyze_fixture_arch(&dir);
+
+    let expected_path = dir.join("expected-arch.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("Write expected-arch.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-arch.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
+    }
+
+    let expected: ProjectArchReport =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+
+    assert_eq!(report, expected);
+
+    assert!(report.frameworks.iter().any(|f| f.name == "Flask" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Python __main__ Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Flask Application Factory / Instance" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+}
+
+#[test]
+fn test_verify_arch_django_golden() {
+    let dir = fixtures_dir().join("arch-django");
+    let (report, _conn) = analyze_fixture_arch(&dir);
+
+    let expected_path = dir.join("expected-arch.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("Write expected-arch.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-arch.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
+    }
+
+    let expected: ProjectArchReport =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+
+    assert_eq!(report, expected);
+
+    assert!(report.frameworks.iter().any(|f| f.name == "Django" && f.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name.contains("Django System Entry") && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
+    assert!(report.entry_points.iter().any(|e| e.name == "Python __main__ Entry" && e.confidence == buildbuddy_core::arch::model::Confidence::Static));
 }
 
 #[test]
@@ -223,6 +358,42 @@ fn test_negative_arch_golden_and_assertions() {
         "React must NOT be detected when only in devDependencies and comment string"
     );
     assert_eq!(report.frameworks.len(), 0, "No frameworks should be detected in negative fixture");
+
+    // But it MUST be reported in declared_only
+    assert!(
+        report.declared_only.iter().any(|d| d.name == "React"),
+        "React must be listed under declared_only when in manifest without code usage"
+    );
+}
+
+#[test]
+fn test_architecture_graph_stored_edges_have_evidence_references() {
+    let dir = fixtures_dir().join("arch-react-express");
+    let (_report, conn) = analyze_fixture_arch(&dir);
+
+    let model = ArchStore::get_architecture_model(&conn, 1)
+        .expect("query architecture model")
+        .expect("architecture model must exist");
+
+    assert!(!model.edges.is_empty(), "Architecture model must have edges");
+    for edge in &model.edges {
+        assert!(
+            edge.evidence_id.is_some(),
+            "Stored edge {} ({} -> {}) must have an evidence_id reference",
+            edge.id,
+            edge.source,
+            edge.target
+        );
+        let ev_id = edge.evidence_id.unwrap();
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM source_evidence WHERE id = ?1)",
+                rusqlite::params![ev_id],
+                |r| r.get(0),
+            )
+            .expect("verify source evidence exists");
+        assert!(exists, "Evidence ID {} for edge {} must exist in source_evidence table", ev_id, edge.id);
+    }
 }
 
 #[test]

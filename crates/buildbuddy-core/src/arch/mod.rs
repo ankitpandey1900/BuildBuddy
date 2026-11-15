@@ -26,7 +26,7 @@ impl ArchitectureAnalyzer {
         let all_paths: Vec<String> = all_files.iter().map(|(p, _)| p.clone()).collect();
 
         // 1. Framework detection
-        let frameworks = FrameworkDetector::detect(manifest_deps, parsed_files, &all_paths);
+        let (frameworks, declared_only) = FrameworkDetector::detect(manifest_deps, parsed_files, &all_paths);
 
         // 2. Entry points
         let entry_points = EntryPointDetector::detect(all_files, parsed_files);
@@ -70,6 +70,7 @@ impl ArchitectureAnalyzer {
                     source: file_id,
                     target: mod_id.clone(),
                     edge_type: "belongs_to".to_string(),
+                    evidence_id: None,
                 });
             }
 
@@ -89,6 +90,7 @@ impl ArchitectureAnalyzer {
                     source: format!("file:{}", edge.source_file_path),
                     target: format!("file:{}", target_path),
                     edge_type: "imports".to_string(),
+                    evidence_id: edge.source_evidence_id,
                 });
             }
         }
@@ -109,11 +111,13 @@ impl ArchitectureAnalyzer {
                 source: entry_id,
                 target: format!("file:{}", entry.file_path),
                 edge_type: "starts".to_string(),
+                evidence_id: None,
             });
         }
 
         ProjectArchReport {
             frameworks,
+            declared_only,
             entry_points,
             modules,
             architecture_model: ArchitectureModel {

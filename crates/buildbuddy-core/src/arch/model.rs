@@ -47,6 +47,15 @@ pub struct FrameworkDetection {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeclaredFramework {
+    pub name: String,
+    pub version: Option<String>,
+    pub dependency_type: String, // "direct" | "dev"
+    pub file_path: String,
+    pub line_number: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryPoint {
     pub name: String,
     pub entry_type: String, // "package_manifest" | "framework_entry" | "main_block" | "app_factory"
@@ -115,7 +124,9 @@ pub struct ArchitectureEdge {
     pub id: String,
     pub source: String,
     pub target: String,
-    pub edge_type: String, // "imports" | "calls" | "belongs_to"
+    pub edge_type: String, // "imports" | "calls" | "belongs_to" | "starts"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,6 +147,7 @@ pub struct ArchitectureModel {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProjectArchReport {
     pub frameworks: Vec<FrameworkDetection>,
+    pub declared_only: Vec<DeclaredFramework>,
     pub entry_points: Vec<EntryPoint>,
     pub modules: Vec<ModuleGroup>,
     pub architecture_model: ArchitectureModel,
@@ -179,6 +191,7 @@ pub struct OverviewDataDto {
     pub metrics: OverviewMetrics,
     pub languages: Vec<LanguageMetric>,
     pub frameworks: Vec<FrameworkDetection>,
+    pub declared_only: Vec<DeclaredFramework>,
     pub entry_points: Vec<EntryPoint>,
     pub modules: Vec<ModuleGroup>,
     pub completion: Option<AnalysisCompletionDto>,

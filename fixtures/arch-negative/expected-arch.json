@@ -1,23 +1,32 @@
 {
   "frameworks": [],
+  "declared_only": [
+    {
+      "name": "React",
+      "version": "^18.2.0",
+      "dependency_type": "dev",
+      "file_path": "package.json",
+      "line_number": 9
+    }
+  ],
   "entry_points": [
     {
       "name": "package.json main",
-      "entry_type": "package_manifest",
+      "entry_type": "main",
       "file_path": "package.json",
       "start_line": 4,
       "end_line": 4,
       "snippet": "\"main\": \"index.js\"",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "package.json script: start",
-      "entry_type": "package_manifest",
+      "entry_type": "script",
       "file_path": "package.json",
       "start_line": 6,
       "end_line": 6,
       "snippet": "\"start\": \"node index.js\"",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     }
   ],
   "modules": [

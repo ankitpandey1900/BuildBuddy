@@ -182,6 +182,7 @@ pub async fn resolve_and_persist_project_graph(
         &mut conn,
         project_id,
         &arch_report.frameworks,
+        &arch_report.declared_only,
         &arch_report.entry_points,
         &arch_report.modules,
         &arch_report.architecture_model,

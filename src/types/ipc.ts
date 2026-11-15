@@ -356,12 +356,21 @@ export interface AnalysisCompletionDto {
   files_parsed: number;
 }
 
+export interface DeclaredFramework {
+  name: string;
+  version: string | null;
+  dependency_type: string;
+  file_path: string;
+  line_number: number;
+}
+
 export interface OverviewDataDto {
   project_name: string;
   root_path: string;
   metrics: OverviewMetrics;
   languages: LanguageMetric[];
   frameworks: FrameworkDetection[];
+  declared_only?: DeclaredFramework[];
   entry_points: EntryPoint[];
   modules: ModuleGroup[];
   completion: AnalysisCompletionDto | null;
@@ -380,6 +389,7 @@ export interface ArchitectureEdge {
   source: string;
   target: string;
   edge_type: string;
+  evidence_id?: number | null;
 }
 
 export interface ArchitectureGroup {

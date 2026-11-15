@@ -30,7 +30,7 @@ impl EntryPointDetector {
                         start_line: idx + 1,
                         end_line: idx + 1,
                         snippet: trimmed.to_string(),
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                     break;
                 }
@@ -47,7 +47,7 @@ impl EntryPointDetector {
                         start_line: idx + 1,
                         end_line: idx + 1,
                         snippet: trimmed.to_string(),
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                     break;
                 }
@@ -63,7 +63,7 @@ impl EntryPointDetector {
                     start_line: 1,
                     end_line: 1,
                     snippet,
-                    confidence: Confidence::Confirmed,
+                    confidence: Confidence::Static,
                 });
             }
 
@@ -78,7 +78,7 @@ impl EntryPointDetector {
                         start_line: idx + 1,
                         end_line: idx + 1,
                         snippet: trimmed.to_string(),
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                     break;
                 }
@@ -94,7 +94,7 @@ impl EntryPointDetector {
                     start_line: 1,
                     end_line: 1,
                     snippet,
-                    confidence: Confidence::Confirmed,
+                    confidence: Confidence::Static,
                 });
             }
         }
@@ -113,7 +113,7 @@ impl EntryPointDetector {
                             start_line: idx + 1,
                             end_line: idx + 1,
                             snippet: trimmed.to_string(),
-                            confidence: Confidence::Confirmed,
+                            confidence: Confidence::Static,
                         });
                     }
                 }
@@ -140,7 +140,7 @@ impl EntryPointDetector {
                         } else {
                             snippet
                         },
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                 }
             }
@@ -162,7 +162,7 @@ impl EntryPointDetector {
                             start_line: idx + 1,
                             end_line: idx + 1,
                             snippet: trimmed.to_string(),
-                            confidence: Confidence::Confirmed,
+                            confidence: Confidence::Static,
                         });
                         break;
                     }
@@ -193,12 +193,12 @@ impl EntryPointDetector {
             let line_no = Self::find_line(&lines, "\"main\"");
             entries.push(EntryPoint {
                 name: "package.json main".to_string(),
-                entry_type: "package_manifest".to_string(),
+                entry_type: "main".to_string(),
                 file_path: rel_path.to_string(),
                 start_line: line_no,
                 end_line: line_no,
                 snippet: format!("\"main\": \"{}\"", main_val),
-                confidence: Confidence::Confirmed,
+                confidence: Confidence::Static,
             });
         }
 
@@ -208,12 +208,12 @@ impl EntryPointDetector {
                 let line_no = Self::find_line(&lines, "\"bin\"");
                 entries.push(EntryPoint {
                     name: "package.json bin".to_string(),
-                    entry_type: "package_manifest".to_string(),
+                    entry_type: "bin".to_string(),
                     file_path: rel_path.to_string(),
                     start_line: line_no,
                     end_line: line_no,
                     snippet: format!("\"bin\": \"{}\"", bin_str),
-                    confidence: Confidence::Confirmed,
+                    confidence: Confidence::Static,
                 });
             } else if let Some(bin_map) = bin_obj.as_object() {
                 for (bin_name, bin_val) in bin_map {
@@ -221,31 +221,31 @@ impl EntryPointDetector {
                     let line_no = Self::find_line(&lines, &pattern);
                     entries.push(EntryPoint {
                         name: format!("package.json bin: {}", bin_name),
-                        entry_type: "package_manifest".to_string(),
+                        entry_type: "bin".to_string(),
                         file_path: rel_path.to_string(),
                         start_line: line_no,
                         end_line: line_no,
                         snippet: format!("\"{}\": \"{}\"", bin_name, bin_val.as_str().unwrap_or("")),
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                 }
             }
         }
 
-        // 3. "scripts" field (start, dev, serve, build)
+        // 3. "scripts" field: keep only start/dev/serve scripts, label as "script"
         if let Some(scripts) = json.get("scripts").and_then(|v| v.as_object()) {
-            for script_name in ["start", "dev", "serve", "build"] {
+            for script_name in ["start", "dev", "serve"] {
                 if let Some(script_val) = scripts.get(script_name).and_then(|v| v.as_str()) {
                     let pattern = format!("\"{}\"", script_name);
                     let line_no = Self::find_line(&lines, &pattern);
                     entries.push(EntryPoint {
                         name: format!("package.json script: {}", script_name),
-                        entry_type: "package_manifest".to_string(),
+                        entry_type: "script".to_string(),
                         file_path: rel_path.to_string(),
                         start_line: line_no,
                         end_line: line_no,
                         snippet: format!("\"{}\": \"{}\"", script_name, script_val),
-                        confidence: Confidence::Confirmed,
+                        confidence: Confidence::Static,
                     });
                 }
             }

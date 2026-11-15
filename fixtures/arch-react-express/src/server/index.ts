@@ -10,3 +10,4 @@ app.get('/api/health', (req, res) => {
 app.listen(port, () => {
   console.log(`Server listening on ${port}`);
 });
+

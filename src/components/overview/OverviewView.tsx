@@ -327,6 +327,38 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             ))}
           </div>
         )}
+
+        {/* Declared Only Frameworks (Manifest only, no code usage) */}
+        {data.declared_only && data.declared_only.length > 0 && (
+          <div className="mt-4 p-3 bg-surface border border-border-subtle rounded-sm" data-testid="declared-only-section">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-caption font-semibold text-text-secondary uppercase tracking-wider">
+                Declared in Manifest (No Import Usage Detected)
+              </span>
+              <span
+                className="text-text-muted"
+                title="Packages declared in package.json or requirements.txt with no AST import statements or runtime code usage detected."
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {data.declared_only.map((decl) => (
+                <span
+                  key={decl.name}
+                  data-testid={`declared-framework-${decl.name.toLowerCase()}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-caption font-mono bg-bg-subtle border border-border-default text-text-muted"
+                >
+                  <span className="font-medium text-text-secondary">{decl.name}</span>
+                  {decl.version && <span className="text-micro text-text-muted">({decl.version})</span>}
+                  <span className="text-micro px-1 py-0.5 rounded bg-bg-canvas border border-border-subtle text-text-muted">
+                    {decl.dependency_type}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Languages & Modules Split Row */}

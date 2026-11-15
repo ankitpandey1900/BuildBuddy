@@ -3,7 +3,7 @@
     {
       "name": "Express",
       "version": "^4.19.2",
-      "confidence": "Confirmed",
+      "confidence": "Static",
       "evidence": [
         {
           "file_path": "package.json",
@@ -34,7 +34,7 @@
     {
       "name": "React",
       "version": "^18.3.1",
-      "confidence": "Confirmed",
+      "confidence": "Static",
       "evidence": [
         {
           "file_path": "package.json",
@@ -103,33 +103,34 @@
       ]
     }
   ],
+  "declared_only": [],
   "entry_points": [
     {
       "name": "package.json main",
-      "entry_type": "package_manifest",
+      "entry_type": "main",
       "file_path": "package.json",
       "start_line": 4,
       "end_line": 4,
       "snippet": "\"main\": \"src/server/index.ts\"",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "package.json script: start",
-      "entry_type": "package_manifest",
+      "entry_type": "script",
       "file_path": "package.json",
       "start_line": 6,
       "end_line": 6,
       "snippet": "\"start\": \"node dist/server.js\"",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "package.json script: dev",
-      "entry_type": "package_manifest",
+      "entry_type": "script",
       "file_path": "package.json",
       "start_line": 7,
       "end_line": 7,
       "snippet": "\"dev\": \"vite\"",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "React DOM Root Entry",
@@ -138,7 +139,7 @@
       "start_line": 7,
       "end_line": 7,
       "snippet": "const root = createRoot(container);",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     },
     {
       "name": "Express HTTP Server Entry",
@@ -147,7 +148,7 @@
       "start_line": 10,
       "end_line": 10,
       "snippet": "app.listen(port, () => {",
-      "confidence": "Confirmed"
+      "confidence": "Static"
     }
   ],
   "modules": [

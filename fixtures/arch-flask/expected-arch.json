@@ -1,0 +1,145 @@
+{
+  "frameworks": [
+    {
+      "name": "Flask",
+      "version": "==3.0.0",
+      "confidence": "Static",
+      "evidence": [
+        {
+          "file_path": "requirements.txt",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "flask==3.0.0",
+          "signal_type": "manifest_dependency",
+          "description": "Declared Flask manifest dependency"
+        },
+        {
+          "file_path": "app.py",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "from flask import Flask",
+          "signal_type": "import_usage",
+          "description": "AST import of Flask module"
+        },
+        {
+          "file_path": "app.py",
+          "start_line": 3,
+          "end_line": 3,
+          "snippet": "app = Flask(__name__)",
+          "signal_type": "source_pattern",
+          "description": "Flask application or route definition"
+        }
+      ]
+    }
+  ],
+  "declared_only": [],
+  "entry_points": [
+    {
+      "name": "Flask Application Factory / Instance",
+      "entry_type": "app_factory",
+      "file_path": "app.py",
+      "start_line": 3,
+      "end_line": 3,
+      "snippet": "app = Flask(__name__)",
+      "confidence": "Static"
+    },
+    {
+      "name": "Python __main__ Entry",
+      "entry_type": "main_block",
+      "file_path": "app.py",
+      "start_line": 9,
+      "end_line": 9,
+      "snippet": "if __name__ == \"__main__\":",
+      "confidence": "Static"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "app.py",
+        "requirements.txt"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "."
+      },
+      {
+        "id": "file:app.py",
+        "label": "app.py",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "app.py"
+      },
+      {
+        "id": "file:requirements.txt",
+        "label": "requirements.txt",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "requirements.txt"
+      },
+      {
+        "id": "entry:app.py:3",
+        "label": "Flask Application Factory / Instance",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "app.py"
+      },
+      {
+        "id": "entry:app.py:9",
+        "label": "Python __main__ Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "app.py"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:app.py:.",
+        "source": "file:app.py",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:requirements.txt:.",
+        "source": "file:requirements.txt",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "starts:Flask Application Factory / Instance:app.py",
+        "source": "entry:app.py:3",
+        "target": "file:app.py",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Python __main__ Entry:app.py",
+        "source": "entry:app.py:9",
+        "target": "file:app.py",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:app.py",
+          "file:requirements.txt"
+        ]
+      }
+    ]
+  }
+}

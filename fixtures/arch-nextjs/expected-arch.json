@@ -1,0 +1,297 @@
+{
+  "frameworks": [
+    {
+      "name": "Next.js",
+      "version": "^14.0.0",
+      "confidence": "Static",
+      "evidence": [
+        {
+          "file_path": "package.json",
+          "start_line": 10,
+          "end_line": 10,
+          "snippet": "\"next\": \"^14.0.0\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared Next.js manifest dependency"
+        },
+        {
+          "file_path": "next.config.mjs",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "next.config.mjs",
+          "signal_type": "config_file",
+          "description": "Next.js configuration file"
+        },
+        {
+          "file_path": "app/layout.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "app/layout.tsx",
+          "signal_type": "source_pattern",
+          "description": "Next.js routing convention directory"
+        },
+        {
+          "file_path": "app/page.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "app/page.tsx",
+          "signal_type": "source_pattern",
+          "description": "Next.js routing convention directory"
+        }
+      ]
+    },
+    {
+      "name": "React",
+      "version": "^18.2.0",
+      "confidence": "Static",
+      "evidence": [
+        {
+          "file_path": "package.json",
+          "start_line": 11,
+          "end_line": 11,
+          "snippet": "\"react\": \"^18.2.0\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared manifest dependency 'react' (Direct)"
+        },
+        {
+          "file_path": "package.json",
+          "start_line": 12,
+          "end_line": 12,
+          "snippet": "\"react-dom\": \"^18.2.0\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared manifest dependency 'react-dom' (Direct)"
+        },
+        {
+          "file_path": "next.config.mjs",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "next.config.mjs",
+          "signal_type": "config_file",
+          "description": "Next.js configuration implying React framework"
+        },
+        {
+          "file_path": "app/layout.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import React from \"react\";",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react'"
+        },
+        {
+          "file_path": "app/page.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import React from \"react\";",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react'"
+        }
+      ]
+    }
+  ],
+  "declared_only": [],
+  "entry_points": [
+    {
+      "name": "Next.js Route Entry: app/layout.tsx",
+      "entry_type": "framework_entry",
+      "file_path": "app/layout.tsx",
+      "start_line": 1,
+      "end_line": 1,
+      "snippet": "import React from \"react\";",
+      "confidence": "Static"
+    },
+    {
+      "name": "Next.js Route Entry: app/page.tsx",
+      "entry_type": "framework_entry",
+      "file_path": "app/page.tsx",
+      "start_line": 1,
+      "end_line": 1,
+      "snippet": "import React from \"react\";",
+      "confidence": "Static"
+    },
+    {
+      "name": "package.json script: dev",
+      "entry_type": "script",
+      "file_path": "package.json",
+      "start_line": 5,
+      "end_line": 5,
+      "snippet": "\"dev\": \"next dev\"",
+      "confidence": "Static"
+    },
+    {
+      "name": "package.json script: start",
+      "entry_type": "script",
+      "file_path": "package.json",
+      "start_line": 7,
+      "end_line": 7,
+      "snippet": "\"start\": \"next start\"",
+      "confidence": "Static"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "next.config.mjs",
+        "package.json"
+      ]
+    },
+    {
+      "name": "app",
+      "root_directory": "app",
+      "layer": "Frontend",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "app/layout.tsx",
+        "app/page.tsx"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "."
+      },
+      {
+        "id": "file:next.config.mjs",
+        "label": "next.config.mjs",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "next.config.mjs"
+      },
+      {
+        "id": "file:package.json",
+        "label": "package.json",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "package.json"
+      },
+      {
+        "id": "module:app",
+        "label": "app",
+        "kind": "module",
+        "layer": "frontend",
+        "file_path": "app"
+      },
+      {
+        "id": "file:app/layout.tsx",
+        "label": "layout.tsx",
+        "kind": "file",
+        "layer": "frontend",
+        "file_path": "app/layout.tsx"
+      },
+      {
+        "id": "file:app/page.tsx",
+        "label": "page.tsx",
+        "kind": "file",
+        "layer": "frontend",
+        "file_path": "app/page.tsx"
+      },
+      {
+        "id": "entry:app/layout.tsx:1",
+        "label": "Next.js Route Entry: app/layout.tsx",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "app/layout.tsx"
+      },
+      {
+        "id": "entry:app/page.tsx:1",
+        "label": "Next.js Route Entry: app/page.tsx",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "app/page.tsx"
+      },
+      {
+        "id": "entry:package.json:5",
+        "label": "package.json script: dev",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:7",
+        "label": "package.json script: start",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:next.config.mjs:.",
+        "source": "file:next.config.mjs",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:package.json:.",
+        "source": "file:package.json",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:app/layout.tsx:app",
+        "source": "file:app/layout.tsx",
+        "target": "module:app",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:app/page.tsx:app",
+        "source": "file:app/page.tsx",
+        "target": "module:app",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "starts:Next.js Route Entry: app/layout.tsx:app/layout.tsx",
+        "source": "entry:app/layout.tsx:1",
+        "target": "file:app/layout.tsx",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Next.js Route Entry: app/page.tsx:app/page.tsx",
+        "source": "entry:app/page.tsx:1",
+        "target": "file:app/page.tsx",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: dev:package.json",
+        "source": "entry:package.json:5",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: start:package.json",
+        "source": "entry:package.json:7",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:next.config.mjs",
+          "file:package.json"
+        ]
+      },
+      {
+        "id": "group:app",
+        "label": "app",
+        "layer": "frontend",
+        "node_ids": [
+          "file:app/layout.tsx",
+          "file:app/page.tsx"
+        ]
+      }
+    ]
+  }
+}

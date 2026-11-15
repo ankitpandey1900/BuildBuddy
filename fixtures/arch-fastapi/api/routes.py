@@ -6,3 +6,4 @@ router = APIRouter()
 @router.get("/users")
 def list_users():
     return get_users()
+

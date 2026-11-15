@@ -1,5 +1,5 @@
-use crate::arch::model::{Confidence, EvidenceItem, FrameworkDetection};
-use crate::manifest::{DependencyType, ManifestDependency};
+use crate::arch::model::{Confidence, DeclaredFramework, EvidenceItem, FrameworkDetection};
+use crate::manifest::ManifestDependency;
 use crate::parser::FileParseResult;
 
 pub struct FrameworkDetector;
@@ -9,67 +9,88 @@ impl FrameworkDetector {
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)], // (relative_path, parsed, file_content)
         all_relative_paths: &[String],
-    ) -> Vec<FrameworkDetection> {
+    ) -> (Vec<FrameworkDetection>, Vec<DeclaredFramework>) {
         let mut detections = Vec::new();
+        let mut declared_only = Vec::new();
 
         // 1. React
-        if let Some(detection) = Self::detect_react(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (react_det, react_decl) = Self::detect_react(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = react_det {
+            detections.push(d);
+        } else if let Some(decl) = react_decl {
+            declared_only.push(decl);
         }
 
         // 2. Next.js
-        if let Some(detection) = Self::detect_nextjs(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (next_det, next_decl) = Self::detect_nextjs(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = next_det {
+            detections.push(d);
+        } else if let Some(decl) = next_decl {
+            declared_only.push(decl);
         }
 
         // 3. Express
-        if let Some(detection) = Self::detect_express(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (exp_det, exp_decl) = Self::detect_express(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = exp_det {
+            detections.push(d);
+        } else if let Some(decl) = exp_decl {
+            declared_only.push(decl);
         }
 
         // 4. Vue
-        if let Some(detection) = Self::detect_vue(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (vue_det, vue_decl) = Self::detect_vue(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = vue_det {
+            detections.push(d);
+        } else if let Some(decl) = vue_decl {
+            declared_only.push(decl);
         }
 
         // 5. FastAPI
-        if let Some(detection) = Self::detect_fastapi(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (fastapi_det, fastapi_decl) = Self::detect_fastapi(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = fastapi_det {
+            detections.push(d);
+        } else if let Some(decl) = fastapi_decl {
+            declared_only.push(decl);
         }
 
         // 6. Flask
-        if let Some(detection) = Self::detect_flask(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (flask_det, flask_decl) = Self::detect_flask(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = flask_det {
+            detections.push(d);
+        } else if let Some(decl) = flask_decl {
+            declared_only.push(decl);
         }
 
         // 7. Django
-        if let Some(detection) = Self::detect_django(manifest_deps, parsed_files, all_relative_paths) {
-            detections.push(detection);
+        let (django_det, django_decl) = Self::detect_django(manifest_deps, parsed_files, all_relative_paths);
+        if let Some(d) = django_det {
+            detections.push(d);
+        } else if let Some(decl) = django_decl {
+            declared_only.push(decl);
         }
 
-        // Sort detections by name for deterministic output
         detections.sort_by(|a, b| a.name.cmp(&b.name));
-        detections
+        declared_only.sort_by(|a, b| a.name.cmp(&b.name));
+
+        (detections, declared_only)
     }
 
     fn detect_react(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         // Signal 1: Manifest dependency
         for dep in manifest_deps {
             if dep.name == "react" || dep.name == "react-dom" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 if version.is_none() && dep.name == "react" {
                     version = dep.version_spec.clone();
+                    manifest_dep_record = Some(dep);
                 }
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
@@ -82,7 +103,7 @@ impl FrameworkDetector {
             }
         }
 
-        // Signal 2: Config file (e.g. vite.config with react or next.config)
+        // Signal 2: Config file (e.g. next.config.*)
         for path in all_relative_paths {
             if path.contains("next.config") {
                 evidence.push(EvidenceItem {
@@ -100,7 +121,11 @@ impl FrameworkDetector {
         // Signal 3: Import usage from AST
         for (rel_path, parsed, content) in parsed_files {
             for imp in &parsed.imports {
-                if imp.source_module == "react" || imp.source_module.starts_with("react/") || imp.source_module == "react-dom" || imp.source_module.starts_with("react-dom/") {
+                if imp.source_module == "react"
+                    || imp.source_module.starts_with("react/")
+                    || imp.source_module == "react-dom"
+                    || imp.source_module.starts_with("react-dom/")
+                {
                     has_code_usage = true;
                     let line = imp.line_number;
                     let snippet = content.lines().nth(line.saturating_sub(1)).unwrap_or("").trim().to_string();
@@ -119,10 +144,13 @@ impl FrameworkDetector {
         // Signal 4: Source pattern (e.g. JSX or createRoot)
         for (rel_path, _parsed, content) in parsed_files {
             if rel_path.ends_with(".tsx") || rel_path.ends_with(".jsx") {
-                // Find line with createRoot or useState or JSX element
                 for (idx, line) in content.lines().enumerate() {
                     let trimmed = line.trim();
-                    if trimmed.contains("createRoot(") || trimmed.contains("useState(") || trimmed.contains("useEffect(") || trimmed.contains("React.FC") {
+                    if trimmed.contains("createRoot(")
+                        || trimmed.contains("useState(")
+                        || trimmed.contains("useEffect(")
+                        || trimmed.contains("React.FC")
+                    {
                         has_code_usage = true;
                         evidence.push(EvidenceItem {
                             file_path: rel_path.clone(),
@@ -132,54 +160,52 @@ impl FrameworkDetector {
                             signal_type: "source_pattern".to_string(),
                             description: "React hook or rendering pattern".to_string(),
                         });
-                        break; // 1 pattern evidence per file is sufficient
+                        break;
                     }
                 }
             }
         }
 
-        // Negative check rule:
-        // If there is NO code usage (no import, no source pattern, no config):
-        // Even if declared as devDependency, it is NOT detected as active React framework!
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "React".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "React".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "React".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_nextjs(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name == "next" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -221,47 +247,60 @@ impl FrameworkDetector {
                     });
                 }
             }
+
+            if rel_path.starts_with("app/") || rel_path.starts_with("pages/") {
+                has_code_usage = true;
+                evidence.push(EvidenceItem {
+                    file_path: rel_path.clone(),
+                    start_line: 1,
+                    end_line: 1,
+                    snippet: rel_path.clone(),
+                    signal_type: "source_pattern".to_string(),
+                    description: "Next.js routing convention directory".to_string(),
+                });
+            }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "Next.js".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "Next.js".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "Next.js".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_express(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         _all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name == "express" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -292,7 +331,10 @@ impl FrameworkDetector {
 
             for (idx, line) in content.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.contains("express()") || trimmed.contains("app.listen(") || trimmed.contains("router = express.Router()") {
+                if trimmed.contains("express()")
+                    || trimmed.contains("app.listen(")
+                    || trimmed.contains("router = express.Router()")
+                {
                     has_code_usage = true;
                     evidence.push(EvidenceItem {
                         file_path: rel_path.clone(),
@@ -307,45 +349,46 @@ impl FrameworkDetector {
             }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "Express".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "Express".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "Express".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_vue(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name == "vue" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -417,45 +460,46 @@ impl FrameworkDetector {
             }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "Vue".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "Vue".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "Vue".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_fastapi(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         _all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name.to_lowercase() == "fastapi" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -501,45 +545,46 @@ impl FrameworkDetector {
             }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "FastAPI".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "FastAPI".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "FastAPI".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_flask(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         _all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name.to_lowercase() == "flask" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -570,7 +615,10 @@ impl FrameworkDetector {
 
             for (idx, line) in content.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.contains("Flask(__name__)") || trimmed.contains("Flask(") || trimmed.contains("@app.route(") {
+                if trimmed.contains("Flask(__name__)")
+                    || trimmed.contains("Flask(")
+                    || trimmed.contains("@app.route(")
+                {
                     has_code_usage = true;
                     evidence.push(EvidenceItem {
                         file_path: rel_path.clone(),
@@ -585,45 +633,46 @@ impl FrameworkDetector {
             }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "Flask".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "Flask".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "Flask".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 
     fn detect_django(
         manifest_deps: &[ManifestDependency],
         parsed_files: &[(String, &FileParseResult, &str)],
         all_relative_paths: &[String],
-    ) -> Option<FrameworkDetection> {
+    ) -> (Option<FrameworkDetection>, Option<DeclaredFramework>) {
         let mut evidence = Vec::new();
-        let mut has_direct_runtime_dep = false;
         let mut has_code_usage = false;
         let mut version = None;
+        let mut manifest_dep_record = None;
 
         for dep in manifest_deps {
             if dep.name.to_lowercase() == "django" {
-                if dep.dep_type == DependencyType::Direct {
-                    has_direct_runtime_dep = true;
-                }
                 version = dep.version_spec.clone();
+                manifest_dep_record = Some(dep);
                 evidence.push(EvidenceItem {
                     file_path: dep.source_file.clone(),
                     start_line: dep.line_number.unwrap_or(1),
@@ -668,7 +717,10 @@ impl FrameworkDetector {
 
             for (idx, line) in content.lines().enumerate() {
                 let trimmed = line.trim();
-                if trimmed.contains("models.Model") || trimmed.contains("admin.site.register") || trimmed.contains("urlpatterns =") {
+                if trimmed.contains("models.Model")
+                    || trimmed.contains("admin.site.register")
+                    || trimmed.contains("urlpatterns =")
+                {
                     has_code_usage = true;
                     evidence.push(EvidenceItem {
                         file_path: rel_path.clone(),
@@ -683,26 +735,29 @@ impl FrameworkDetector {
             }
         }
 
-        if !has_code_usage && !has_direct_runtime_dep {
-            return None;
-        }
-        if evidence.is_empty() {
-            return None;
-        }
-
-        let confidence = if has_direct_runtime_dep && has_code_usage {
-            Confidence::Confirmed
-        } else if has_code_usage {
-            Confidence::Static
+        if has_code_usage {
+            (
+                Some(FrameworkDetection {
+                    name: "Django".to_string(),
+                    version,
+                    confidence: Confidence::Static,
+                    evidence,
+                }),
+                None,
+            )
+        } else if let Some(dep) = manifest_dep_record {
+            (
+                None,
+                Some(DeclaredFramework {
+                    name: "Django".to_string(),
+                    version,
+                    dependency_type: dep.dep_type.as_str().to_string(),
+                    file_path: dep.source_file.clone(),
+                    line_number: dep.line_number.unwrap_or(1),
+                }),
+            )
         } else {
-            Confidence::Inferred
-        };
-
-        Some(FrameworkDetection {
-            name: "Django".to_string(),
-            version,
-            confidence,
-            evidence,
-        })
+            (None, None)
+        }
     }
 }

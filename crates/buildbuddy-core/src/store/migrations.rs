@@ -292,6 +292,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_frameworks_project ON frameworks(project_id);
 
+        CREATE TABLE IF NOT EXISTS declared_frameworks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            version TEXT,
+            dependency_type TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            line_number INTEGER NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_declared_frameworks_project ON declared_frameworks(project_id);
+
         CREATE TABLE IF NOT EXISTS entry_points (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -377,6 +391,7 @@ mod tests {
         assert!(tables.contains(&"call_relationships".to_string()));
         assert!(tables.contains(&"class_instantiations".to_string()));
         assert!(tables.contains(&"frameworks".to_string()));
+        assert!(tables.contains(&"declared_frameworks".to_string()));
         assert!(tables.contains(&"entry_points".to_string()));
         assert!(tables.contains(&"modules".to_string()));
         assert!(tables.contains(&"diagrams".to_string()));

@@ -247,39 +247,46 @@ We evaluate four distinct physical signals for supported ecosystems (React, Next
 3. **AST Import Statement (`import_usage`)**: Direct syntax node import of framework modules (e.g. `import React from 'react'`, `from fastapi import FastAPI`, `import express from 'express'`).
 4. **Source Pattern (`source_pattern`)**: Concrete framework idioms (e.g. `createRoot(container)`, `app.listen(port)`, `app = FastAPI()`, `app = Flask(__name__)`, `createApp()`, `models.Model`).
 
-### Confidence Assignment Rules:
-- **`confirmed`**: Direct runtime manifest dependency + verified code usage (import, config, or source pattern).
-- **`static`**: Verified code usage (import or source pattern) present without a corresponding manifest entry.
-- **`inferred`**: Direct runtime dependency declared in manifest, but without verified AST import usage.
-- **Negative Detection Rule**: If a framework appears only in `devDependencies` and has no import, no config, and no source pattern, it is not detected as an active framework (0 detections). Package names appearing only in source comments or string literals are filtered out by AST token inspection and never counted as detections.
+### Confidence Assignment & Declared-Only Frameworks:
+- **`static`**: Manifest dependency plus AST import statement, configuration file, or concrete source pattern. Static analysis cannot prove dynamic runtime execution, so verified code usage with manifest presence is classified strictly as `"static"`, never `"confirmed"`.
+- **Declared-Only (Not a Framework Detection)**: A manifest dependency with no import usage or code usage is NOT a framework detection. It is reported separately in `declared_only` (`name`, `version`, `dependency_type`, `file_path`, `line_number`) and persisted to the `declared_frameworks` table.
+- **Negative Detection Rule**: If a framework appears only in comments or string literals, it is rejected by AST inspection. Package names appearing only in devDependencies without code usage are reported only in `declared_only`, never in detected frameworks.
 
 ### 2. Application Entry Points
-Entry points represent physical starting locations for application execution and are categorized into:
-- **`package_manifest`**: `package.json` fields (`main`, `bin`, and standard lifecycle scripts `start`, `dev`, `serve`, `build`).
+Entry points represent verified startup locations for application execution:
+- **`main`**: `package.json` `"main"` field.
+- **`bin`**: `package.json` `"bin"` executable definitions.
+- **`script`**: `package.json` startup scripts strictly limited to `"start"`, `"dev"`, and `"serve"`. Build, test, and lint scripts (e.g. `npm run build`, `npm test`) are build tooling and are NOT entry points.
 - **`framework_entry`**: Conventional framework startup locations (e.g. `Express HTTP Server Entry` for `app.listen()`, `React DOM Root Entry` for `createRoot()`, Next.js route entry files, Vue `createApp()`, Django `manage.py`/`wsgi.py`).
 - **`main_block`**: Python `if __name__ == "__main__":` blocks.
 - **`app_factory`**: Application factory functions (e.g. `create_app()`, `app = FastAPI()`, `app = Flask()`).
 
-Every entry point is recorded with file path, line range, source snippet, and an explicit `source_evidence` foreign key.
+All entry points detected statically are assigned `confidence: "static"`. Every entry point is recorded with file path, line range, source snippet, and an explicit `source_evidence` foreign key.
 
 ### 3. Module Grouping & Layer Labeling
 - **Directory Grouping**: Modules are grouped by logical root directories (subdirectories of `src/` or top-level project directories).
-- **Layer Classification**: Modules are classified into layers strictly when evidence supports them:
-  - `frontend`: Contains UI components, TSX/JSX/Vue/HTML/CSS files, or directory name matches `client`, `frontend`, `ui`, `pages`, `components`.
-  - `backend`: Contains HTTP routers, controllers, API handlers, or directory name matches `server`, `backend`, `api`, `routes`, `services`.
-  - `data`: Contains ORM entities, schemas, database migrations, SQL, or directory name matches `models`, `entities`, `data`, `db`.
-  - `config`: Contains configuration files (`tsconfig.json`, `package.json`, `.config.*`, `settings.py`) or directory `config`.
-  - `shared`: Modules imported by both frontend and backend modules, or matching `shared`, `common`, `utils`, `lib`.
+- **Exact Layer Classification Evidence Rules**:
+  - `frontend`: Requires an import of React, Vue, Next or Single File Component `.vue`, or all files in module are `.tsx`/`.jsx`/`.vue`/`.css`/`.html`, or directory name contains `client`, `frontend`, `ui`, `pages`, `components`, `views`.
+  - `backend`: Requires import of Express, FastAPI, Flask, Django or server listener calls (`.listen()`), or directory name contains `server`, `backend`, `api`, `controllers`, `routes`, `services`, `handlers`.
+  - `data`: Contains ORM entities, schemas, database migrations, SQL, or directory name contains `models`, `entities`, `data`, `db`, `migrations`, `schemas`, `repositories`.
+  - `config`: Contains configuration files (`tsconfig.json`, `package.json`, `.config.*`, `settings.py`) or directory `config`/`settings`. Root directory `.` is labeled `config` if all files are config files.
+  - `shared`: Modules imported by both a frontend and backend module, or directory matching `shared`, `common`, `utils`, `lib`.
   - `unclassified`: Any module lacking conclusive physical evidence.
 - **Strict Rule**: Speculative architectural paradigms (e.g. "MVC", "Microservices", "Clean Architecture", "Hexagonal Architecture") must never be applied without explicit structural proof.
 - **Import Cohesion Metric**: Computed deterministically as:
   $$\text{Cohesion} = \frac{E_{\text{internal}}}{E_{\text{internal}} + E_{\text{outgoing}}}$$
   (evaluated to 1.0 if the module has no internal or outgoing dependencies).
 
-### 4. Overview UI Constraints (PRD 8.3 & Agents.md Rule 4)
-- No composite health scores (e.g. arbitrary "85/100" health scores).
+### 4. Architecture Graph Persistence & Edge Provenance
+- Architecture nodes, groups, and edges are persisted to the SQLite `diagrams` table (`diagram_type = 'architecture'`, `layout_engine = 'elk'`).
+- Every edge stored in the architecture graph stores a reference to a valid `source_evidence` record (`evidence_id`).
+- **Interactive Canvas Rendering**: The interactive graph diagram canvas rendering (React Flow + ELK layout) is currently **stubbed**; architecture data is persisted and summarized tabularly in Overview, but visual node-link rendering on canvas is not yet implemented.
+
+### 5. Overview UI Constraints (PRD 8.3 & Agents.md Rule 4)
+- **No Composite Health Score**: No composite, synthetic, or graded health scores exist in the UI. Every displayed metric represents a countable, verifiable repository property.
 - Every metric provides a tooltip definition and provides interactive drill-down to underlying database records.
 - Clicking any framework opens the `FrameworkEvidenceModal` displaying the complete evidence provenance list.
+- Declared-only packages (dependencies without import usage) are presented in a dedicated section separate from detected frameworks.
 
 
 

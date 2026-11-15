@@ -1,0 +1,236 @@
+{
+  "frameworks": [
+    {
+      "name": "Django",
+      "version": "==5.0.0",
+      "confidence": "Static",
+      "evidence": [
+        {
+          "file_path": "requirements.txt",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "django==5.0.0",
+          "signal_type": "manifest_dependency",
+          "description": "Declared Django manifest dependency"
+        },
+        {
+          "file_path": "manage.py",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "manage.py",
+          "signal_type": "config_file",
+          "description": "Django core management or configuration script"
+        },
+        {
+          "file_path": "myproject/settings.py",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "myproject/settings.py",
+          "signal_type": "config_file",
+          "description": "Django core management or configuration script"
+        },
+        {
+          "file_path": "manage.py",
+          "start_line": 7,
+          "end_line": 7,
+          "snippet": "from django.core.management import execute_from_command_line",
+          "signal_type": "import_usage",
+          "description": "AST import of Django module"
+        },
+        {
+          "file_path": "myproject/wsgi.py",
+          "start_line": 2,
+          "end_line": 2,
+          "snippet": "from django.core.wsgi import get_wsgi_application",
+          "signal_type": "import_usage",
+          "description": "AST import of Django module"
+        }
+      ]
+    }
+  ],
+  "declared_only": [],
+  "entry_points": [
+    {
+      "name": "Django System Entry: manage.py",
+      "entry_type": "framework_entry",
+      "file_path": "manage.py",
+      "start_line": 1,
+      "end_line": 1,
+      "snippet": "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')",
+      "confidence": "Static"
+    },
+    {
+      "name": "Python __main__ Entry",
+      "entry_type": "main_block",
+      "file_path": "manage.py",
+      "start_line": 10,
+      "end_line": 10,
+      "snippet": "if __name__ == '__main__':",
+      "confidence": "Static"
+    },
+    {
+      "name": "Django System Entry: myproject/wsgi.py",
+      "entry_type": "framework_entry",
+      "file_path": "myproject/wsgi.py",
+      "start_line": 1,
+      "end_line": 1,
+      "snippet": "os.environ.setdefault(\"DJANGO_SETTINGS_MODULE\", \"myproject.settings\")",
+      "confidence": "Static"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "manage.py",
+        "requirements.txt"
+      ]
+    },
+    {
+      "name": "myproject",
+      "root_directory": "myproject",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "myproject/settings.py",
+        "myproject/wsgi.py"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "."
+      },
+      {
+        "id": "file:manage.py",
+        "label": "manage.py",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "manage.py"
+      },
+      {
+        "id": "file:requirements.txt",
+        "label": "requirements.txt",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "requirements.txt"
+      },
+      {
+        "id": "module:myproject",
+        "label": "myproject",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "myproject"
+      },
+      {
+        "id": "file:myproject/settings.py",
+        "label": "settings.py",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "myproject/settings.py"
+      },
+      {
+        "id": "file:myproject/wsgi.py",
+        "label": "wsgi.py",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "myproject/wsgi.py"
+      },
+      {
+        "id": "entry:manage.py:1",
+        "label": "Django System Entry: manage.py",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "manage.py"
+      },
+      {
+        "id": "entry:manage.py:10",
+        "label": "Python __main__ Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "manage.py"
+      },
+      {
+        "id": "entry:myproject/wsgi.py:1",
+        "label": "Django System Entry: myproject/wsgi.py",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "myproject/wsgi.py"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:manage.py:.",
+        "source": "file:manage.py",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:requirements.txt:.",
+        "source": "file:requirements.txt",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:myproject/settings.py:myproject",
+        "source": "file:myproject/settings.py",
+        "target": "module:myproject",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:myproject/wsgi.py:myproject",
+        "source": "file:myproject/wsgi.py",
+        "target": "module:myproject",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "starts:Django System Entry: manage.py:manage.py",
+        "source": "entry:manage.py:1",
+        "target": "file:manage.py",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Python __main__ Entry:manage.py",
+        "source": "entry:manage.py:10",
+        "target": "file:manage.py",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Django System Entry: myproject/wsgi.py:myproject/wsgi.py",
+        "source": "entry:myproject/wsgi.py:1",
+        "target": "file:myproject/wsgi.py",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:manage.py",
+          "file:requirements.txt"
+        ]
+      },
+      {
+        "id": "group:myproject",
+        "label": "myproject",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:myproject/settings.py",
+          "file:myproject/wsgi.py"
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection, Result};
 use crate::arch::model::{
-    AnalysisCompletionDto, ArchitectureModel, Confidence, EntryPoint, EvidenceItem,
+    AnalysisCompletionDto, ArchitectureModel, Confidence, DeclaredFramework, EntryPoint, EvidenceItem,
     FrameworkDetection, LanguageMetric, LayerLabel, ModuleGroup, OverviewDataDto, OverviewMetrics,
 };
 
@@ -11,6 +11,7 @@ impl ArchStore {
         conn: &mut Connection,
         project_id: i64,
         frameworks: &[FrameworkDetection],
+        declared_only: &[DeclaredFramework],
         entry_points: &[EntryPoint],
         modules: &[ModuleGroup],
         architecture_model: &ArchitectureModel,
@@ -19,6 +20,7 @@ impl ArchStore {
 
         // Clean previous records for this project
         tx.execute("DELETE FROM frameworks WHERE project_id = ?1", params![project_id])?;
+        tx.execute("DELETE FROM declared_frameworks WHERE project_id = ?1", params![project_id])?;
         tx.execute("DELETE FROM entry_points WHERE project_id = ?1", params![project_id])?;
         tx.execute("DELETE FROM modules WHERE project_id = ?1", params![project_id])?;
         tx.execute(
@@ -79,7 +81,40 @@ impl ArchStore {
             )?;
         }
 
-        // 2. Entry points
+        // 2. Declared-only frameworks
+        for decl in declared_only {
+            let eid: i64 = tx.query_row(
+                "INSERT INTO source_evidence (
+                    project_id, file_path, start_line, end_line,
+                    start_column, end_column, snippet, confidence, evidence_type
+                ) VALUES (?1, ?2, ?3, ?3, 0, 0, ?4, 'static', 'manifest_entry')
+                RETURNING id",
+                params![
+                    project_id,
+                    decl.file_path,
+                    decl.line_number as i64,
+                    format!("\"{}\": \"{}\"", decl.name.to_lowercase(), decl.version.as_deref().unwrap_or("*")),
+                ],
+                |row| row.get(0),
+            )?;
+
+            tx.execute(
+                "INSERT INTO declared_frameworks (
+                    project_id, name, version, dependency_type, file_path, line_number, source_evidence_id
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    project_id,
+                    decl.name,
+                    decl.version,
+                    decl.dependency_type,
+                    decl.file_path,
+                    decl.line_number as i64,
+                    eid,
+                ],
+            )?;
+        }
+
+        // 3. Entry points
         for ep in entry_points {
             let eid: i64 = tx.query_row(
                 "INSERT INTO source_evidence (
@@ -117,7 +152,7 @@ impl ArchStore {
             )?;
         }
 
-        // 3. Modules
+        // 4. Modules
         for m in modules {
             let eid: i64 = tx.query_row(
                 "INSERT INTO source_evidence (
@@ -149,8 +184,44 @@ impl ArchStore {
             )?;
         }
 
-        // 4. Architecture Diagram
-        let model_json = serde_json::to_string(architecture_model).unwrap_or_else(|_| "{}".to_string());
+        // 5. Architecture Diagram
+        // Clone model and guarantee every edge has an evidence reference
+        let mut stored_model = architecture_model.clone();
+        for edge in &mut stored_model.edges {
+            if edge.evidence_id.is_none() {
+                let (file_path, snippet, ev_type) = match edge.edge_type.as_str() {
+                    "belongs_to" => {
+                        let f = edge.source.strip_prefix("file:").unwrap_or(&edge.source);
+                        (f.to_string(), format!("Edge: {} belongs to {}", edge.source, edge.target), "heuristic")
+                    }
+                    "starts" => {
+                        let f = edge.target.strip_prefix("file:").unwrap_or(&edge.target);
+                        (f.to_string(), format!("Entry starts execution at {}", edge.target), "heuristic")
+                    }
+                    "imports" => {
+                        let f = edge.source.strip_prefix("file:").unwrap_or(&edge.source);
+                        (f.to_string(), format!("Import edge: {} -> {}", edge.source, edge.target), "import_stmt")
+                    }
+                    _ => {
+                        let f = edge.source.strip_prefix("file:").unwrap_or(&edge.source);
+                        (f.to_string(), format!("Edge: {} -> {}", edge.source, edge.target), "heuristic")
+                    }
+                };
+
+                let eid: i64 = tx.query_row(
+                    "INSERT INTO source_evidence (
+                        project_id, file_path, start_line, end_line,
+                        start_column, end_column, snippet, confidence, evidence_type
+                    ) VALUES (?1, ?2, 1, 1, 0, 0, ?3, 'static', ?4)
+                    RETURNING id",
+                    params![project_id, file_path, snippet, ev_type],
+                    |row| row.get(0),
+                )?;
+                edge.evidence_id = Some(eid);
+            }
+        }
+
+        let model_json = serde_json::to_string(&stored_model).unwrap_or_else(|_| "{}".to_string());
         tx.execute(
             "INSERT INTO diagrams (
                 project_id, diagram_type, title, model_json, layout_engine
@@ -178,6 +249,28 @@ impl ArchStore {
                 version,
                 confidence: Confidence::from_str(&conf_str),
                 evidence,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_declared_frameworks(conn: &Connection, project_id: i64) -> Result<Vec<DeclaredFramework>> {
+        let mut stmt = conn.prepare(
+            "SELECT name, version, dependency_type, file_path, line_number
+             FROM declared_frameworks WHERE project_id = ?1 ORDER BY name ASC",
+        )?;
+        let rows = stmt.query_map(params![project_id], |row| {
+            Ok(DeclaredFramework {
+                name: row.get(0)?,
+                version: row.get(1)?,
+                dependency_type: row.get(2)?,
+                file_path: row.get(3)?,
+                line_number: row.get::<_, i64>(4)? as usize,
             })
         })?;
 
@@ -387,6 +480,7 @@ impl ArchStore {
         languages.sort_by(|a, b| b.line_count.cmp(&a.line_count));
 
         let frameworks = Self::get_frameworks(conn, project_id)?;
+        let declared_only = Self::get_declared_frameworks(conn, project_id)?;
         let entry_points = Self::get_entry_points(conn, project_id)?;
         let modules = Self::get_modules(conn, project_id)?;
 
@@ -416,6 +510,7 @@ impl ArchStore {
             metrics,
             languages,
             frameworks,
+            declared_only,
             entry_points,
             modules,
             completion,

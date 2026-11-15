@@ -1,0 +1,211 @@
+{
+  "frameworks": [
+    {
+      "name": "Vue",
+      "version": "^3.4.0",
+      "confidence": "Static",
+      "evidence": [
+        {
+          "file_path": "package.json",
+          "start_line": 10,
+          "end_line": 10,
+          "snippet": "\"vue\": \"^3.4.0\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared Vue manifest dependency"
+        },
+        {
+          "file_path": "src/main.ts",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import { createApp } from \"vue\";",
+          "signal_type": "import_usage",
+          "description": "AST import of Vue module 'vue'"
+        },
+        {
+          "file_path": "src/main.ts",
+          "start_line": 4,
+          "end_line": 4,
+          "snippet": "const app = createApp(App);",
+          "signal_type": "source_pattern",
+          "description": "Vue application or component definition"
+        }
+      ]
+    }
+  ],
+  "declared_only": [],
+  "entry_points": [
+    {
+      "name": "package.json script: dev",
+      "entry_type": "script",
+      "file_path": "package.json",
+      "start_line": 5,
+      "end_line": 5,
+      "snippet": "\"dev\": \"vite\"",
+      "confidence": "Static"
+    },
+    {
+      "name": "package.json script: serve",
+      "entry_type": "script",
+      "file_path": "package.json",
+      "start_line": 7,
+      "end_line": 7,
+      "snippet": "\"serve\": \"vite preview\"",
+      "confidence": "Static"
+    },
+    {
+      "name": "Vue Application Entry",
+      "entry_type": "framework_entry",
+      "file_path": "src/main.ts",
+      "start_line": 4,
+      "end_line": 4,
+      "snippet": "const app = createApp(App);",
+      "confidence": "Static"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Config",
+      "file_count": 1,
+      "cohesion_score": 1.0,
+      "files": [
+        "package.json"
+      ]
+    },
+    {
+      "name": "src",
+      "root_directory": "src",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "src/App.vue",
+        "src/main.ts"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "config",
+        "file_path": "."
+      },
+      {
+        "id": "file:package.json",
+        "label": "package.json",
+        "kind": "file",
+        "layer": "config",
+        "file_path": "package.json"
+      },
+      {
+        "id": "module:src",
+        "label": "src",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "src"
+      },
+      {
+        "id": "file:src/App.vue",
+        "label": "App.vue",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "src/App.vue"
+      },
+      {
+        "id": "file:src/main.ts",
+        "label": "main.ts",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "src/main.ts"
+      },
+      {
+        "id": "entry:package.json:5",
+        "label": "package.json script: dev",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:7",
+        "label": "package.json script: serve",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:src/main.ts:4",
+        "label": "Vue Application Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "src/main.ts"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:package.json:.",
+        "source": "file:package.json",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:src/App.vue:src",
+        "source": "file:src/App.vue",
+        "target": "module:src",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:src/main.ts:src",
+        "source": "file:src/main.ts",
+        "target": "module:src",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "import:src/main.ts:src/App.vue:2",
+        "source": "file:src/main.ts",
+        "target": "file:src/App.vue",
+        "edge_type": "imports"
+      },
+      {
+        "id": "starts:package.json script: dev:package.json",
+        "source": "entry:package.json:5",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: serve:package.json",
+        "source": "entry:package.json:7",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Vue Application Entry:src/main.ts",
+        "source": "entry:src/main.ts:4",
+        "target": "file:src/main.ts",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "config",
+        "node_ids": [
+          "file:package.json"
+        ]
+      },
+      {
+        "id": "group:src",
+        "label": "src",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:src/App.vue",
+          "file:src/main.ts"
+        ]
+      }
+    ]
+  }
+}
