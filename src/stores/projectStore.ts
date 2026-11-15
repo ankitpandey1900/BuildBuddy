@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { FileContentDto, FileRecord, Project, ScanCompletePayload, ScanProgressPayload } from "@/types/ipc";
+import type { FileContentDto, FileRecord, Project, ScanCompletePayload, ScanProgressPayload, SymbolRecord } from "@/types/ipc";
 import {
   cancelScan,
   getFiles,
@@ -17,6 +17,8 @@ export function useProjectState() {
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileRecord | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<SymbolRecord | null>(null);
+  const [targetLine, setTargetLine] = useState<number | null>(null);
   const [fileContent, setFileContent] = useState<FileContentDto | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -155,11 +157,24 @@ export function useProjectState() {
     }
   }, [currentProject, searchQuery, languageFilter, refreshFiles]);
 
+  const openFileAtLine = useCallback(async (filePath: string, line: number) => {
+    const match = files.find((f) => f.relative_path === filePath);
+    if (match) {
+      setTargetLine(line);
+      await selectFile(match);
+    }
+  }, [files, selectFile]);
+
   return {
     currentProject,
     recentProjects,
     files,
     selectedFile,
+    selectedSymbol,
+    setSelectedSymbol,
+    targetLine,
+    setTargetLine,
+    openFileAtLine,
     fileContent,
     isLoadingContent,
     isScanning,

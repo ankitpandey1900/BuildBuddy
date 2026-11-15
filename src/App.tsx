@@ -2,10 +2,11 @@ import React from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ExplorerView } from "@/components/explorer/ExplorerView";
 import { DependenciesView } from "@/components/dependencies/DependenciesView";
+import { CodeIntelligenceView } from "@/components/intelligence/CodeIntelligenceView";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
-import { LayoutDashboard, GitGraph, Network, Database, Code2, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
+import { LayoutDashboard, GitGraph, Network, Database, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
 
 export const App: React.FC = () => {
   const project = useProjectState();
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
             onSelectFile={project.selectFile}
             onOpenFolder={project.openFolder}
             theme={ui.theme}
+            targetLine={project.targetLine}
           />
         );
       case "overview":
@@ -80,11 +82,14 @@ export const App: React.FC = () => {
         );
       case "intelligence":
         return (
-          <PlaceholderView
-            title="Code Intelligence"
-            icon={<Code2 className="w-8 h-8 text-accent" />}
-            description="Deep symbol index, function signatures, caller/callee trees, and complexity indicators."
-            badge="Phase 2 / Task 4"
+          <CodeIntelligenceView
+            projectId={project.currentProject?.id}
+            selectedSymbol={project.selectedSymbol}
+            onSelectSymbol={project.setSelectedSymbol}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
           />
         );
       case "security":
@@ -126,6 +131,7 @@ export const App: React.FC = () => {
         recentProjects={project.recentProjects}
         files={project.files}
         selectedFile={project.selectedFile}
+        selectedSymbol={project.selectedSymbol}
         isScanning={project.isScanning}
         scanProgress={project.scanProgress}
         activeView={ui.activeView}
@@ -140,6 +146,11 @@ export const App: React.FC = () => {
         onToggleTheme={ui.toggleTheme}
         onToggleInspector={ui.toggleInspector}
         onOpenCommandPalette={() => ui.setCommandPaletteOpen(true)}
+        onSelectSymbol={project.setSelectedSymbol}
+        onNavigateToSource={(filePath, line) => {
+          project.openFileAtLine(filePath, line);
+          ui.setActiveView("explorer");
+        }}
       >
         {renderActiveView()}
       </AppShell>

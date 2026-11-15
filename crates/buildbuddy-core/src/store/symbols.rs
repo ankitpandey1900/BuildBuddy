@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::parser::traits::FileParseResult;
@@ -7,7 +7,9 @@ use crate::store::calls::{
     get_instantiations_for_symbol, get_outgoing_calls_for_symbol, CallDetailItem,
     InstantiationDetailItem, StoredClass, StoredFunction,
 };
-use crate::symbols::model::{ExtractedImport, ExtractedSymbol, SymbolKind};
+use crate::symbols::model::{
+    ClassConstructor, ClassMethod, ClassProperty, ExtractedImport, ExtractedSymbol, SymbolKind,
+};
 
 pub fn persist_file_parse_result(
     conn: &mut Connection,
@@ -332,6 +334,11 @@ pub struct SymbolRecord {
     pub start_column: usize,
     pub end_column: usize,
     pub confidence: String,
+    pub complexity: Option<usize>,
+    pub has_error_handling: bool,
+    pub has_side_effects: bool,
+    pub callers: Vec<String>,
+    pub callees: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -345,14 +352,110 @@ pub struct SymbolDetail {
     pub instantiations: Vec<InstantiationDetailItem>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClassDetailResponse {
+    pub symbol: SymbolRecord,
+    pub superclass_name: Option<String>,
+    pub base_classes: Vec<String>,
+    pub interfaces: Vec<String>,
+    pub properties: Vec<ClassProperty>,
+    pub methods: Vec<ClassMethod>,
+    pub constructors: Vec<ClassConstructor>,
+    pub instantiations: Vec<InstantiationDetailItem>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListSymbolsFilter {
+    pub file_id: Option<i64>,
+    pub kind: Option<String>,
+    pub language: Option<String>,
+    pub path_prefix: Option<String>,
+    pub is_exported: Option<bool>,
+    pub min_complexity: Option<usize>,
+    pub has_error_handling: Option<bool>,
+    pub has_side_effects: Option<bool>,
+    pub fts_query: Option<String>,
+    pub sort_by: Option<String>,
+    pub sort_direction: Option<String>,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+pub fn sanitize_fts5_query(input: &str) -> String {
+    let cleaned: String = input
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { ' ' })
+        .collect();
+    let words: Vec<&str> = cleaned.split_whitespace().collect();
+    if words.is_empty() {
+        return String::new();
+    }
+    words.iter().map(|w| format!("{}*", w)).collect::<Vec<_>>().join(" ")
+}
+
+pub fn get_symbol_by_id(conn: &Connection, symbol_id: i64) -> Result<Option<SymbolRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT s.id, s.project_id, s.file_id, f.relative_path, s.stable_id, s.name, s.qualified_name,
+                s.kind, s.parent_name, s.signature, s.return_type, s.visibility,
+                s.is_exported, s.is_async, s.docstring,
+                COALESCE(e.start_line, 0), COALESCE(e.end_line, 0),
+                COALESCE(e.start_column, 0), COALESCE(e.end_column, 0),
+                COALESCE(e.confidence, 'confirmed'),
+                func.cyclomatic_complexity,
+                CASE WHEN func.has_error_handling = 1 THEN 1 ELSE 0 END,
+                CASE WHEN func.side_effects_json IS NOT NULL AND func.side_effects_json != '[]' THEN 1 ELSE 0 END,
+                COALESCE(func.callers_json, '[]'),
+                COALESCE(func.callees_json, '[]')
+         FROM symbols s
+         JOIN files f ON s.file_id = f.id
+         LEFT JOIN source_evidence e ON s.source_evidence_id = e.id
+         LEFT JOIN functions func ON func.symbol_id = s.id
+         WHERE s.id = ?1",
+    )?;
+
+    let mut rows = stmt.query(params![symbol_id])?;
+    if let Some(row) = rows.next()? {
+        let callers_json: String = row.get(23)?;
+        let callers: Vec<String> = serde_json::from_str(&callers_json).unwrap_or_default();
+        let callees_json: String = row.get(24)?;
+        let callees: Vec<String> = serde_json::from_str(&callees_json).unwrap_or_default();
+
+        Ok(Some(SymbolRecord {
+            id: row.get(0)?,
+            project_id: row.get(1)?,
+            file_id: row.get(2)?,
+            file_path: row.get(3)?,
+            stable_id: row.get(4)?,
+            name: row.get(5)?,
+            qualified_name: row.get(6)?,
+            kind: row.get(7)?,
+            parent_name: row.get(8)?,
+            signature: row.get(9)?,
+            return_type: row.get(10)?,
+            visibility: row.get(11)?,
+            is_exported: row.get::<_, i64>(12)? == 1,
+            is_async: row.get::<_, i64>(13)? == 1,
+            docstring: row.get(14)?,
+            start_line: row.get::<_, i64>(15)? as usize,
+            end_line: row.get::<_, i64>(16)? as usize,
+            start_column: row.get::<_, i64>(17)? as usize,
+            end_column: row.get::<_, i64>(18)? as usize,
+            confidence: row.get(19)?,
+            complexity: row.get::<_, Option<i64>>(20)?.map(|c| c as usize),
+            has_error_handling: row.get::<_, i64>(21)? == 1,
+            has_side_effects: row.get::<_, i64>(22)? == 1,
+            callers,
+            callees,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn list_symbols(
     conn: &Connection,
     project_id: i64,
-    file_id: Option<i64>,
-    kind: Option<&str>,
-    search: Option<&str>,
-    limit: usize,
-    offset: usize,
+    filter: &ListSymbolsFilter,
 ) -> Result<Vec<SymbolRecord>> {
     let mut sql = String::from(
         "SELECT s.id, s.project_id, s.file_id, f.relative_path, s.stable_id, s.name, s.qualified_name,
@@ -360,49 +463,133 @@ pub fn list_symbols(
                 s.is_exported, s.is_async, s.docstring,
                 COALESCE(e.start_line, 0), COALESCE(e.end_line, 0),
                 COALESCE(e.start_column, 0), COALESCE(e.end_column, 0),
-                COALESCE(e.confidence, 'confirmed')
+                COALESCE(e.confidence, 'confirmed'),
+                func.cyclomatic_complexity,
+                CASE WHEN func.has_error_handling = 1 THEN 1 ELSE 0 END,
+                CASE WHEN func.side_effects_json IS NOT NULL AND func.side_effects_json != '[]' THEN 1 ELSE 0 END,
+                COALESCE(func.callers_json, '[]'),
+                COALESCE(func.callees_json, '[]')
          FROM symbols s
          JOIN files f ON s.file_id = f.id
          LEFT JOIN source_evidence e ON s.source_evidence_id = e.id
-         WHERE s.project_id = ?1",
+         LEFT JOIN functions func ON func.symbol_id = s.id",
     );
 
+    let fts_sanitized = filter.fts_query.as_ref().map(|q| sanitize_fts5_query(q)).unwrap_or_default();
+    let has_fts = !fts_sanitized.is_empty();
+
+    if has_fts {
+        sql.push_str(" JOIN fts_symbols fts ON fts.rowid = s.id");
+    }
+
+    sql.push_str(" WHERE s.project_id = ?1");
     let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(project_id)];
     let mut idx = 2;
 
-    if let Some(fid) = file_id {
+    if has_fts {
+        sql.push_str(&format!(" AND fts_symbols MATCH ?{}", idx));
+        param_values.push(Box::new(fts_sanitized));
+        idx += 1;
+    }
+
+    if let Some(fid) = filter.file_id {
         sql.push_str(&format!(" AND s.file_id = ?{}", idx));
         param_values.push(Box::new(fid));
         idx += 1;
     }
 
-    if let Some(k) = kind {
-        sql.push_str(&format!(" AND s.kind = ?{}", idx));
-        param_values.push(Box::new(k.to_string()));
-        idx += 1;
+    if let Some(ref k) = filter.kind {
+        if !k.is_empty() && k != "all" {
+            sql.push_str(&format!(" AND s.kind = ?{}", idx));
+            param_values.push(Box::new(k.clone()));
+            idx += 1;
+        }
     }
 
-    if let Some(s) = search {
-        if !s.is_empty() {
-            sql.push_str(&format!(" AND (s.name LIKE ?{} OR s.qualified_name LIKE ?{})", idx, idx));
-            let pattern = format!("%{}%", s);
+    if let Some(ref prefix) = filter.path_prefix {
+        if !prefix.is_empty() {
+            sql.push_str(&format!(" AND f.relative_path LIKE ?{}", idx));
+            let pattern = format!("{}%", prefix);
             param_values.push(Box::new(pattern));
             idx += 1;
         }
     }
 
-    sql.push_str(&format!(
-        " ORDER BY f.relative_path ASC, COALESCE(e.start_line, 0) ASC, COALESCE(e.start_column, 0) ASC LIMIT ?{} OFFSET ?{}",
-        idx,
-        idx + 1
-    ));
-    param_values.push(Box::new(limit as i64));
-    param_values.push(Box::new(offset as i64));
+    if let Some(exp) = filter.is_exported {
+        sql.push_str(&format!(" AND s.is_exported = ?{}", idx));
+        param_values.push(Box::new(if exp { 1i64 } else { 0i64 }));
+        idx += 1;
+    }
+
+    if let Some(ref lang) = filter.language {
+        let l = lang.trim().to_lowercase();
+        if !l.is_empty() && l != "all" {
+            match l.as_str() {
+                "typescript" | "ts" => {
+                    sql.push_str(" AND f.extension IN ('ts', 'tsx', 'mts', 'cts')");
+                }
+                "javascript" | "js" => {
+                    sql.push_str(" AND f.extension IN ('js', 'jsx', 'mjs', 'cjs')");
+                }
+                "python" | "py" => {
+                    sql.push_str(" AND f.extension IN ('py', 'pyw', 'pyi')");
+                }
+                _ => {
+                    sql.push_str(&format!(" AND LOWER(f.extension) = LOWER(?{})", idx));
+                    param_values.push(Box::new(l));
+                    idx += 1;
+                }
+            }
+        }
+    }
+
+    if let Some(min_cc) = filter.min_complexity {
+        sql.push_str(&format!(" AND COALESCE(func.cyclomatic_complexity, 0) >= ?{}", idx));
+        param_values.push(Box::new(min_cc as i64));
+        idx += 1;
+    }
+
+    if let Some(has_err) = filter.has_error_handling {
+        sql.push_str(&format!(" AND COALESCE(func.has_error_handling, 0) = ?{}", idx));
+        param_values.push(Box::new(if has_err { 1i64 } else { 0i64 }));
+        idx += 1;
+    }
+
+    if let Some(has_se) = filter.has_side_effects {
+        if has_se {
+            sql.push_str(" AND (func.side_effects_json IS NOT NULL AND func.side_effects_json != '[]')");
+        } else {
+            sql.push_str(" AND (func.side_effects_json IS NULL OR func.side_effects_json = '[]')");
+        }
+    }
+
+    // Sort column and direction
+    let dir = match filter.sort_direction.as_deref() {
+        Some(d) if d.eq_ignore_ascii_case("desc") => "DESC",
+        _ => "ASC",
+    };
+
+    let order_clause = match filter.sort_by.as_deref() {
+        Some("name") => format!("s.name {}", dir),
+        Some("kind") => format!("s.kind {}", dir),
+        Some("file") | Some("path") => format!("f.relative_path {}, COALESCE(e.start_line, 0) {}", dir, dir),
+        Some("line") => format!("COALESCE(e.start_line, 0) {}", dir),
+        Some("complexity") => format!("COALESCE(func.cyclomatic_complexity, 0) {}", dir),
+        _ => format!("f.relative_path ASC, COALESCE(e.start_line, 0) ASC, COALESCE(e.start_column, 0) ASC"),
+    };
+    sql.push_str(&format!(" ORDER BY {} LIMIT ?{} OFFSET ?{}", order_clause, idx, idx + 1));
+    param_values.push(Box::new(filter.limit as i64));
+    param_values.push(Box::new(filter.offset as i64));
 
     let mut stmt = conn.prepare(&sql)?;
     let params_refs: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt.query_map(params_refs.as_slice(), |row| {
+        let callers_json: String = row.get(23)?;
+        let callers: Vec<String> = serde_json::from_str(&callers_json).unwrap_or_default();
+        let callees_json: String = row.get(24)?;
+        let callees: Vec<String> = serde_json::from_str(&callees_json).unwrap_or_default();
+
         Ok(SymbolRecord {
             id: row.get(0)?,
             project_id: row.get(1)?,
@@ -424,6 +611,11 @@ pub fn list_symbols(
             start_column: row.get::<_, i64>(17)? as usize,
             end_column: row.get::<_, i64>(18)? as usize,
             confidence: row.get(19)?,
+            complexity: row.get::<_, Option<i64>>(20)?.map(|c| c as usize),
+            has_error_handling: row.get::<_, i64>(21)? == 1,
+            has_side_effects: row.get::<_, i64>(22)? == 1,
+            callers,
+            callees,
         })
     })?;
 
@@ -435,64 +627,68 @@ pub fn list_symbols(
 }
 
 pub fn get_symbol_detail(conn: &Connection, symbol_id: i64) -> Result<Option<SymbolDetail>> {
-    let mut stmt = conn.prepare(
-        "SELECT s.id, s.project_id, s.file_id, f.relative_path, s.stable_id, s.name, s.qualified_name,
-                s.kind, s.parent_name, s.signature, s.return_type, s.visibility,
-                s.is_exported, s.is_async, s.docstring,
-                COALESCE(e.start_line, 0), COALESCE(e.end_line, 0),
-                COALESCE(e.start_column, 0), COALESCE(e.end_column, 0),
-                COALESCE(e.confidence, 'confirmed'),
-                e.snippet
-         FROM symbols s
-         JOIN files f ON s.file_id = f.id
-         LEFT JOIN source_evidence e ON s.source_evidence_id = e.id
-         WHERE s.id = ?1",
-    )?;
+    let symbol = match get_symbol_by_id(conn, symbol_id)? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
 
-    let mut rows = stmt.query(params![symbol_id])?;
-    if let Some(row) = rows.next()? {
-        let symbol = SymbolRecord {
-            id: row.get(0)?,
-            project_id: row.get(1)?,
-            file_id: row.get(2)?,
-            file_path: row.get(3)?,
-            stable_id: row.get(4)?,
-            name: row.get(5)?,
-            qualified_name: row.get(6)?,
-            kind: row.get(7)?,
-            parent_name: row.get(8)?,
-            signature: row.get(9)?,
-            return_type: row.get(10)?,
-            visibility: row.get(11)?,
-            is_exported: row.get::<_, i64>(12)? == 1,
-            is_async: row.get::<_, i64>(13)? == 1,
-            docstring: row.get(14)?,
-            start_line: row.get::<_, i64>(15)? as usize,
-            end_line: row.get::<_, i64>(16)? as usize,
-            start_column: row.get::<_, i64>(17)? as usize,
-            end_column: row.get::<_, i64>(18)? as usize,
-            confidence: row.get(19)?,
-        };
-        let snippet: Option<String> = row.get(20)?;
+    let snippet: Option<String> = conn
+        .query_row(
+            "SELECT e.snippet FROM symbols s JOIN source_evidence e ON s.source_evidence_id = e.id WHERE s.id = ?1",
+            params![symbol_id],
+            |r| r.get(0),
+        )
+        .optional()?;
 
-        let function_metrics = get_function_by_symbol_id(conn, symbol_id)?;
-        let class_details = get_class_by_symbol_id(conn, symbol_id)?;
-        let incoming_calls = get_incoming_calls_for_symbol(conn, symbol_id)?;
-        let outgoing_calls = get_outgoing_calls_for_symbol(conn, symbol_id)?;
-        let instantiations = get_instantiations_for_symbol(conn, symbol_id)?;
+    let function_metrics = get_function_by_symbol_id(conn, symbol_id)?;
+    let class_details = get_class_by_symbol_id(conn, symbol_id)?;
+    let incoming_calls = get_incoming_calls_for_symbol(conn, symbol_id)?;
+    let outgoing_calls = get_outgoing_calls_for_symbol(conn, symbol_id)?;
+    let instantiations = get_instantiations_for_symbol(conn, symbol_id)?;
 
-        Ok(Some(SymbolDetail {
-            symbol,
-            snippet,
-            function_metrics,
-            class_details,
-            incoming_calls,
-            outgoing_calls,
-            instantiations,
-        }))
+    Ok(Some(SymbolDetail {
+        symbol,
+        snippet,
+        function_metrics,
+        class_details,
+        incoming_calls,
+        outgoing_calls,
+        instantiations,
+    }))
+}
+
+pub fn get_class_detail(conn: &Connection, symbol_id: i64) -> Result<Option<ClassDetailResponse>> {
+    let symbol = match get_symbol_by_id(conn, symbol_id)? {
+        Some(s) if s.kind == "class" => s,
+        _ => return Ok(None),
+    };
+
+    let class_data = match get_class_by_symbol_id(conn, symbol_id)? {
+        Some(c) => c,
+        None => return Ok(None),
+    };
+
+    let instantiations = get_instantiations_for_symbol(conn, symbol_id)?;
+    let base_classes = if let Some(base) = &class_data.superclass_name {
+        if !base.trim().is_empty() {
+            vec![base.clone()]
+        } else {
+            Vec::new()
+        }
     } else {
-        Ok(None)
-    }
+        Vec::new()
+    };
+
+    Ok(Some(ClassDetailResponse {
+        symbol,
+        superclass_name: class_data.superclass_name,
+        base_classes,
+        interfaces: class_data.interfaces,
+        properties: class_data.properties,
+        methods: class_data.methods,
+        constructors: class_data.constructors,
+        instantiations,
+    }))
 }
 
 #[cfg(test)]
@@ -759,7 +955,7 @@ mod tests {
         persist_file_parse_result(&mut conn, proj.id, file_b_id, &res_b).unwrap();
 
         // 1. All symbols
-        let all = list_symbols(&conn, proj.id, None, None, None, 10, 0).unwrap();
+        let all = list_symbols(&conn, proj.id, &ListSymbolsFilter { limit: 10, offset: 0, ..Default::default() }).unwrap();
         assert_eq!(all.len(), 2);
         assert_eq!(all[0].name, "alphaFn");
         assert_eq!(all[0].file_path, "src/a.ts");
@@ -767,32 +963,475 @@ mod tests {
         assert_eq!(all[1].file_path, "src/b.ts");
 
         // 2. Filter by file_id
-        let file_b_symbols = list_symbols(&conn, proj.id, Some(file_b_id), None, None, 10, 0).unwrap();
+        let file_b_symbols = list_symbols(&conn, proj.id, &ListSymbolsFilter { file_id: Some(file_b_id), limit: 10, offset: 0, ..Default::default() }).unwrap();
         assert_eq!(file_b_symbols.len(), 1);
         assert_eq!(file_b_symbols[0].name, "BetaClass");
 
         // 3. Filter by kind
-        let fn_symbols = list_symbols(&conn, proj.id, None, Some("function"), None, 10, 0).unwrap();
+        let fn_symbols = list_symbols(&conn, proj.id, &ListSymbolsFilter { kind: Some("function".to_string()), limit: 10, offset: 0, ..Default::default() }).unwrap();
         assert_eq!(fn_symbols.len(), 1);
         assert_eq!(fn_symbols[0].name, "alphaFn");
 
-        let cls_symbols = list_symbols(&conn, proj.id, None, Some("class"), None, 10, 0).unwrap();
+        let cls_symbols = list_symbols(&conn, proj.id, &ListSymbolsFilter { kind: Some("class".to_string()), limit: 10, offset: 0, ..Default::default() }).unwrap();
         assert_eq!(cls_symbols.len(), 1);
         assert_eq!(cls_symbols[0].name, "BetaClass");
 
-        // 4. Filter by search
-        let searched = list_symbols(&conn, proj.id, None, None, Some("alpha"), 10, 0).unwrap();
-        assert_eq!(searched.len(), 1);
-        assert_eq!(searched[0].name, "alphaFn");
-
-        // 5. Pagination
-        let page_1 = list_symbols(&conn, proj.id, None, None, None, 1, 0).unwrap();
+        // 4. Pagination
+        let page_1 = list_symbols(&conn, proj.id, &ListSymbolsFilter { limit: 1, offset: 0, ..Default::default() }).unwrap();
         assert_eq!(page_1.len(), 1);
         assert_eq!(page_1[0].name, "alphaFn");
 
-        let page_2 = list_symbols(&conn, proj.id, None, None, None, 1, 1).unwrap();
+        let page_2 = list_symbols(&conn, proj.id, &ListSymbolsFilter { limit: 1, offset: 1, ..Default::default() }).unwrap();
         assert_eq!(page_2.len(), 1);
         assert_eq!(page_2[0].name, "BetaClass");
+    }
+
+    #[test]
+    fn test_list_symbols_advanced_filters_and_sorting() {
+        use crate::symbols::model::{ExtractedFunction, FunctionMetrics, SideEffectMarker};
+
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let proj = create_or_get_project(&conn, "/test/path", "test").unwrap();
+
+        // File 1: TypeScript file under src/core/
+        conn.execute(
+            "INSERT INTO files (project_id, relative_path, file_name, extension, size_bytes, content_hash, status)
+             VALUES (?1, 'src/core/engine.ts', 'engine.ts', 'ts', 500, 'hash1', 'pending')",
+            params![proj.id],
+        ).unwrap();
+        let f1_id = conn.last_insert_rowid();
+
+        // File 2: Python file under scripts/
+        conn.execute(
+            "INSERT INTO files (project_id, relative_path, file_name, extension, size_bytes, content_hash, status)
+             VALUES (?1, 'scripts/run.py', 'run.py', 'py', 400, 'hash2', 'pending')",
+            params![proj.id],
+        ).unwrap();
+        let f2_id = conn.last_insert_rowid();
+
+        let sym_ts_high = ExtractedSymbol {
+            stable_id: "sym-ts-high".to_string(),
+            name: "executePlan".to_string(),
+            qualified_name: "executePlan".to_string(),
+            kind: SymbolKind::Function,
+            parent_name: None,
+            start_line: 10,
+            end_line: 40,
+            start_column: 0,
+            end_column: 1,
+            parameters: Vec::new(),
+            return_type: Some("boolean".to_string()),
+            is_exported: true,
+            is_async: true,
+            visibility: Some("public".to_string()),
+            docstring: Some("Executes engine workflow plan".to_string()),
+            signature: "async function executePlan(): Promise<boolean>".to_string(),
+        };
+
+        let func_ts_high = ExtractedFunction {
+            symbol_stable_id: "sym-ts-high".to_string(),
+            name: "executePlan".to_string(),
+            qualified_name: "executePlan".to_string(),
+            start_line: 10,
+            end_line: 40,
+            start_column: 0,
+            end_column: 1,
+            metrics: FunctionMetrics {
+                parameters: Vec::new(),
+                return_type: Some("boolean".to_string()),
+                branch_count: 5,
+                loop_count: 2,
+                cyclomatic_complexity: 8,
+                has_error_handling: true,
+                side_effects: vec![SideEffectMarker {
+                    category: "fs".to_string(),
+                    pattern: "writeFileSync".to_string(),
+                    confidence: "static".to_string(),
+                    line_number: 15,
+                }],
+                imports_used: vec!["fs".to_string()],
+                callers: vec!["main".to_string()],
+                callees: vec!["parse".to_string(), "compile".to_string()],
+            },
+        };
+
+        let sym_ts_low = ExtractedSymbol {
+            stable_id: "sym-ts-low".to_string(),
+            name: "initHelper".to_string(),
+            qualified_name: "initHelper".to_string(),
+            kind: SymbolKind::Function,
+            parent_name: None,
+            start_line: 50,
+            end_line: 60,
+            start_column: 0,
+            end_column: 1,
+            parameters: Vec::new(),
+            return_type: Some("void".to_string()),
+            is_exported: false,
+            is_async: false,
+            visibility: Some("private".to_string()),
+            docstring: None,
+            signature: "function initHelper(): void".to_string(),
+        };
+
+        let func_ts_low = ExtractedFunction {
+            symbol_stable_id: "sym-ts-low".to_string(),
+            name: "initHelper".to_string(),
+            qualified_name: "initHelper".to_string(),
+            start_line: 50,
+            end_line: 60,
+            start_column: 0,
+            end_column: 1,
+            metrics: FunctionMetrics {
+                parameters: Vec::new(),
+                return_type: Some("void".to_string()),
+                branch_count: 0,
+                loop_count: 0,
+                cyclomatic_complexity: 1,
+                has_error_handling: false,
+                side_effects: Vec::new(),
+                imports_used: Vec::new(),
+                callers: Vec::new(),
+                callees: Vec::new(),
+            },
+        };
+
+        let res_ts = FileParseResult {
+            relative_path: "src/core/engine.ts".to_string(),
+            language: "typescript".to_string(),
+            status: ParseStatus::Full,
+            symbols: vec![sym_ts_high, sym_ts_low],
+            imports: Vec::new(),
+            exports: Vec::new(),
+            functions: vec![func_ts_high, func_ts_low],
+            classes: Vec::new(),
+            calls: Vec::new(),
+            errors: Vec::new(),
+        };
+        persist_file_parse_result(&mut conn, proj.id, f1_id, &res_ts).unwrap();
+
+        let sym_py = ExtractedSymbol {
+            stable_id: "sym-py-runner".to_string(),
+            name: "run_pipeline".to_string(),
+            qualified_name: "run_pipeline".to_string(),
+            kind: SymbolKind::Function,
+            parent_name: None,
+            start_line: 5,
+            end_line: 25,
+            start_column: 0,
+            end_column: 1,
+            parameters: Vec::new(),
+            return_type: None,
+            is_exported: true,
+            is_async: false,
+            visibility: Some("public".to_string()),
+            docstring: Some("Runs python scripts pipeline".to_string()),
+            signature: "def run_pipeline():".to_string(),
+        };
+
+        let func_py = ExtractedFunction {
+            symbol_stable_id: "sym-py-runner".to_string(),
+            name: "run_pipeline".to_string(),
+            qualified_name: "run_pipeline".to_string(),
+            start_line: 5,
+            end_line: 25,
+            start_column: 0,
+            end_column: 1,
+            metrics: FunctionMetrics {
+                parameters: Vec::new(),
+                return_type: None,
+                branch_count: 2,
+                loop_count: 1,
+                cyclomatic_complexity: 4,
+                has_error_handling: false,
+                side_effects: Vec::new(),
+                imports_used: Vec::new(),
+                callers: Vec::new(),
+                callees: Vec::new(),
+            },
+        };
+
+        let res_py = FileParseResult {
+            relative_path: "scripts/run.py".to_string(),
+            language: "python".to_string(),
+            status: ParseStatus::Full,
+            symbols: vec![sym_py],
+            imports: Vec::new(),
+            exports: Vec::new(),
+            functions: vec![func_py],
+            classes: Vec::new(),
+            calls: Vec::new(),
+            errors: Vec::new(),
+        };
+        persist_file_parse_result(&mut conn, proj.id, f2_id, &res_py).unwrap();
+
+        // 1. Language filter: typescript
+        let ts_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            language: Some("typescript".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let ts_names: Vec<&str> = ts_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(ts_names, vec!["executePlan", "initHelper"]);
+
+        // 2. Language filter: python
+        let py_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            language: Some("python".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let py_names: Vec<&str> = py_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(py_names, vec!["run_pipeline"]);
+
+        // 3. File path prefix filter
+        let prefix_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            path_prefix: Some("src/core".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let prefix_names: Vec<&str> = prefix_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(prefix_names, vec!["executePlan", "initHelper"]);
+
+        // 4. is_exported filter: true
+        let exported_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            is_exported: Some(true),
+            sort_by: Some("name".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let exp_names: Vec<&str> = exported_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(exp_names, vec!["executePlan", "run_pipeline"]);
+
+        // 5. is_exported filter: false
+        let unexported_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            is_exported: Some(false),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let unexp_names: Vec<&str> = unexported_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(unexp_names, vec!["initHelper"]);
+
+        // 6. min_complexity filter: >= 4
+        let cc_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            min_complexity: Some(4),
+            sort_by: Some("complexity".to_string()),
+            sort_direction: Some("desc".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let cc_names: Vec<(&str, usize)> = cc_res.iter().map(|s| (s.name.as_str(), s.complexity.unwrap_or(0))).collect();
+        assert_eq!(cc_names, vec![("executePlan", 8), ("run_pipeline", 4)]);
+
+        // 7. has_error_handling: true
+        let err_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            has_error_handling: Some(true),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let err_names: Vec<&str> = err_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(err_names, vec!["executePlan"]);
+
+        // 8. has_side_effects: true
+        let se_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            has_side_effects: Some(true),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let se_names: Vec<&str> = se_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(se_names, vec!["executePlan"]);
+
+        // 9. FTS query via fts_symbols table
+        let fts_res = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            fts_query: Some("executePlan".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let fts_names: Vec<&str> = fts_res.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(fts_names, vec!["executePlan"]);
+
+        // 10. Sorting by name DESC
+        let sort_name_desc = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            sort_by: Some("name".to_string()),
+            sort_direction: Some("desc".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let sorted_names: Vec<&str> = sort_name_desc.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(sorted_names, vec!["run_pipeline", "initHelper", "executePlan"]);
+
+        // 11. Sorting by complexity ASC
+        let sort_cc_asc = list_symbols(&conn, proj.id, &ListSymbolsFilter {
+            sort_by: Some("complexity".to_string()),
+            sort_direction: Some("asc".to_string()),
+            limit: 10,
+            ..Default::default()
+        }).unwrap();
+        let sorted_cc_names: Vec<(&str, usize)> = sort_cc_asc.iter().map(|s| (s.name.as_str(), s.complexity.unwrap_or(0))).collect();
+        assert_eq!(sorted_cc_names, vec![("initHelper", 1), ("run_pipeline", 4), ("executePlan", 8)]);
+    }
+
+    #[test]
+    fn test_get_class_detail_exact_fields() {
+        use crate::symbols::model::{CallResolutionStatus, ClassConstructor, ClassInstantiation, ClassMethod, ClassProperty, ExtractedClass, Parameter};
+
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let proj = create_or_get_project(&conn, "/test/path", "test").unwrap();
+
+        conn.execute(
+            "INSERT INTO files (project_id, relative_path, file_name, extension, size_bytes, content_hash, status)
+             VALUES (?1, 'src/models.ts', 'models.ts', 'ts', 500, 'hash1', 'pending')",
+            params![proj.id],
+        ).unwrap();
+        let file_id = conn.last_insert_rowid();
+
+        let sym_cls = ExtractedSymbol {
+            stable_id: "sym-cls-admin".to_string(),
+            name: "AdminUser".to_string(),
+            qualified_name: "AdminUser".to_string(),
+            kind: SymbolKind::Class,
+            parent_name: None,
+            start_line: 10,
+            end_line: 50,
+            start_column: 0,
+            end_column: 1,
+            parameters: Vec::new(),
+            return_type: None,
+            is_exported: true,
+            is_async: false,
+            visibility: Some("public".to_string()),
+            docstring: Some("Admin user model with elevated privileges".to_string()),
+            signature: "class AdminUser extends BaseUser implements IAuditable, IAuth".to_string(),
+        };
+
+        let extracted_class = ExtractedClass {
+            symbol_stable_id: "sym-cls-admin".to_string(),
+            name: "AdminUser".to_string(),
+            superclass: Some("BaseUser".to_string()),
+            interfaces: vec!["IAuditable".to_string(), "IAuth".to_string()],
+            properties: vec![
+                ClassProperty {
+                    name: "role".to_string(),
+                    type_annotation: Some("string".to_string()),
+                    visibility: Some("public".to_string()),
+                    is_static: false,
+                },
+                ClassProperty {
+                    name: "secretKey".to_string(),
+                    type_annotation: Some("string".to_string()),
+                    visibility: Some("private".to_string()),
+                    is_static: true,
+                },
+            ],
+            methods: vec![
+                ClassMethod {
+                    name: "hasPermission".to_string(),
+                    signature: "hasPermission(perm: string): boolean".to_string(),
+                    visibility: Some("public".to_string()),
+                    is_static: false,
+                },
+            ],
+            constructors: vec![
+                ClassConstructor {
+                    signature: "constructor(name: string, role: string)".to_string(),
+                    parameters: vec![
+                        Parameter {
+                            name: "name".to_string(),
+                            type_annotation: Some("string".to_string()),
+                            default_value: None,
+                        },
+                        Parameter {
+                            name: "role".to_string(),
+                            type_annotation: Some("string".to_string()),
+                            default_value: None,
+                        },
+                    ],
+                    start_line: 12,
+                    end_line: 16,
+                },
+            ],
+            instantiations: vec![
+                ClassInstantiation {
+                    caller_symbol_id: None,
+                    class_name: "AdminUser".to_string(),
+                    class_symbol_id: Some("sym-cls-admin".to_string()),
+                    start_line: 65,
+                    end_line: 65,
+                    start_column: 4,
+                    end_column: 28,
+                    snippet: "new AdminUser(\"alice\", \"root\")".to_string(),
+                    resolution_status: CallResolutionStatus::Confirmed,
+                },
+            ],
+            start_line: 10,
+            end_line: 50,
+            start_column: 0,
+            end_column: 1,
+        };
+
+        let result = FileParseResult {
+            relative_path: "src/models.ts".to_string(),
+            language: "typescript".to_string(),
+            status: ParseStatus::Full,
+            symbols: vec![sym_cls],
+            imports: Vec::new(),
+            exports: Vec::new(),
+            functions: Vec::new(),
+            classes: vec![extracted_class],
+            calls: Vec::new(),
+            errors: Vec::new(),
+        };
+
+        persist_file_parse_result(&mut conn, proj.id, file_id, &result).unwrap();
+
+        let class_sym_id: i64 = conn.query_row(
+            "SELECT id FROM symbols WHERE stable_id = 'sym-cls-admin'",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+
+        let class_detail = get_class_detail(&conn, class_sym_id).unwrap().expect("Class detail must exist");
+
+        // Assert exact base classes and superclass
+        assert_eq!(class_detail.superclass_name, Some("BaseUser".to_string()));
+        assert_eq!(class_detail.base_classes, vec!["BaseUser".to_string()]);
+
+        // Assert exact interfaces
+        assert_eq!(class_detail.interfaces, vec!["IAuditable".to_string(), "IAuth".to_string()]);
+
+        // Assert exact properties
+        assert_eq!(class_detail.properties.len(), 2);
+        assert_eq!(class_detail.properties[0].name, "role");
+        assert_eq!(class_detail.properties[0].type_annotation, Some("string".to_string()));
+        assert_eq!(class_detail.properties[0].visibility, Some("public".to_string()));
+        assert!(!class_detail.properties[0].is_static);
+        assert_eq!(class_detail.properties[1].name, "secretKey");
+        assert!(class_detail.properties[1].is_static);
+
+        // Assert exact methods
+        assert_eq!(class_detail.methods.len(), 1);
+        assert_eq!(class_detail.methods[0].name, "hasPermission");
+        assert_eq!(class_detail.methods[0].signature, "hasPermission(perm: string): boolean");
+        assert_eq!(class_detail.methods[0].visibility, Some("public".to_string()));
+
+        // Assert exact constructors
+        assert_eq!(class_detail.constructors.len(), 1);
+        assert_eq!(class_detail.constructors[0].signature, "constructor(name: string, role: string)");
+        assert_eq!(class_detail.constructors[0].parameters.len(), 2);
+        assert_eq!(class_detail.constructors[0].parameters[0].name, "name");
+        assert_eq!(class_detail.constructors[0].parameters[1].name, "role");
+
+        // Assert exact instantiation site with confirmed resolution status
+        assert_eq!(class_detail.instantiations.len(), 1);
+        assert_eq!(class_detail.instantiations[0].class_name, "AdminUser");
+        assert_eq!(class_detail.instantiations[0].resolution_status, "confirmed");
+        assert_eq!(class_detail.instantiations[0].start_line, 65);
+        assert_eq!(class_detail.instantiations[0].snippet, Some("new AdminUser(\"alice\", \"root\")".to_string()));
+
+        // Non-existent symbol returns None
+        let missing = get_class_detail(&conn, 99999).unwrap();
+        assert!(missing.is_none());
     }
 
     #[test]

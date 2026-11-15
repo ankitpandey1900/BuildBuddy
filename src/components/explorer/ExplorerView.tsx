@@ -15,6 +15,7 @@ interface ExplorerViewProps {
   onSelectFile: (file: FileRecord) => void;
   onOpenFolder: () => void;
   theme: "dark" | "light";
+  targetLine?: number | null;
 }
 
 export const ExplorerView: React.FC<ExplorerViewProps> = ({
@@ -29,6 +30,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   onSelectFile,
   onOpenFolder,
   theme,
+  targetLine,
 }) => {
   return (
     <div className="flex-1 flex h-full overflow-hidden">
@@ -48,6 +50,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         fileContent={fileContent}
         isLoading={isLoadingContent}
         theme={theme}
+        targetLine={targetLine}
       />
     </div>
   );

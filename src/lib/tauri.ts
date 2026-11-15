@@ -1,9 +1,11 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ClassDetailResponse,
   FileContentDto,
   FileRecord,
   ImportDto,
+  ListSymbolsFilter,
   ParseCompletePayload,
   ParseProgressPayload,
   Project,
@@ -135,26 +137,35 @@ export async function getFileSymbols(fileId: number): Promise<SymbolDto[]> {
 
 export async function listSymbols(
   projectId: number,
-  fileId?: number,
-  kind?: string,
-  search?: string,
-  limit?: number,
-  offset?: number,
+  filter?: ListSymbolsFilter,
 ): Promise<SymbolRecord[]> {
   if (!isTauri()) return [];
   return await tauriInvoke<SymbolRecord[]>("list_symbols", {
     projectId,
-    fileId: fileId ?? null,
-    kind: kind ?? null,
-    search: search ?? null,
-    limit: limit ?? null,
-    offset: offset ?? null,
+    fileId: filter?.file_id ?? null,
+    kind: filter?.kind ?? null,
+    language: filter?.language ?? null,
+    pathPrefix: filter?.path_prefix ?? null,
+    isExported: filter?.is_exported ?? null,
+    minComplexity: filter?.min_complexity ?? null,
+    hasErrorHandling: filter?.has_error_handling ?? null,
+    hasSideEffects: filter?.has_side_effects ?? null,
+    ftsQuery: filter?.fts_query ?? null,
+    sortBy: filter?.sort_by ?? null,
+    sortDirection: filter?.sort_direction ?? null,
+    limit: filter?.limit ?? null,
+    offset: filter?.offset ?? null,
   });
 }
 
 export async function getSymbolDetail(symbolId: number): Promise<SymbolDetail | null> {
   if (!isTauri()) return null;
   return await tauriInvoke<SymbolDetail | null>("get_symbol_detail", { symbolId });
+}
+
+export async function getClassDetail(symbolId: number): Promise<ClassDetailResponse | null> {
+  if (!isTauri()) return null;
+  return await tauriInvoke<ClassDetailResponse | null>("get_class_detail", { symbolId });
 }
 
 export async function getFileImports(fileId: number): Promise<ImportDto[]> {

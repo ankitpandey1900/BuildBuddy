@@ -58,10 +58,10 @@ export interface Parameter {
 }
 
 export interface SideEffectMarker {
-  category: "filesystem" | "network" | "database" | "process" | "environment";
-  api_name: string;
-  matched_pattern: string;
-  description: string;
+  category: string;
+  pattern: string;
+  confidence: "confirmed" | "static" | "inferred" | "unknown" | string;
+  line_number: number;
 }
 
 export interface ClassProperty {
@@ -76,13 +76,13 @@ export interface ClassMethod {
   signature: string;
   visibility: string | null;
   is_static: boolean;
-  is_async: boolean;
 }
 
 export interface ClassConstructor {
   signature: string;
   parameters: Parameter[];
-  visibility: string | null;
+  start_line: number;
+  end_line: number;
 }
 
 export interface StoredFunction {
@@ -137,6 +137,38 @@ export interface SymbolRecord {
   start_column: number;
   end_column: number;
   confidence: "confirmed" | "static" | "inferred" | "unknown";
+  complexity: number | null;
+  has_error_handling: boolean;
+  has_side_effects: boolean;
+  callers: string[];
+  callees: string[];
+}
+
+export interface ListSymbolsFilter {
+  file_id?: number | null;
+  kind?: string | null;
+  language?: string | null;
+  path_prefix?: string | null;
+  is_exported?: boolean | null;
+  min_complexity?: number | null;
+  has_error_handling?: boolean | null;
+  has_side_effects?: boolean | null;
+  fts_query?: string | null;
+  sort_by?: string | null;
+  sort_direction?: "asc" | "desc" | string | null;
+  limit?: number | null;
+  offset?: number | null;
+}
+
+export interface ClassDetailResponse {
+  symbol: SymbolRecord;
+  superclass_name: string | null;
+  base_classes: string[];
+  interfaces: string[];
+  properties: ClassProperty[];
+  methods: ClassMethod[];
+  constructors: ClassConstructor[];
+  instantiations: InstantiationDetailItem[];
 }
 
 export interface CallDetailItem {

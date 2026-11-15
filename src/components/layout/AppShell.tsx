@@ -3,13 +3,14 @@ import { TopBar } from "./TopBar";
 import { NavRail } from "./NavRail";
 import { InspectorPanel } from "./InspectorPanel";
 import { StatusBar } from "./StatusBar";
-import type { FileRecord, Project, ScanProgressPayload, ViewType } from "@/types/ipc";
+import type { FileRecord, Project, ScanProgressPayload, SymbolRecord, ViewType } from "@/types/ipc";
 
 interface AppShellProps {
   currentProject: Project | null;
   recentProjects: Project[];
   files: FileRecord[];
   selectedFile: FileRecord | null;
+  selectedSymbol?: SymbolRecord | null;
   isScanning: boolean;
   scanProgress: ScanProgressPayload | null;
   activeView: ViewType;
@@ -24,6 +25,8 @@ interface AppShellProps {
   onToggleTheme: () => void;
   onToggleInspector: () => void;
   onOpenCommandPalette: () => void;
+  onSelectSymbol?: (symbol: SymbolRecord | null) => void;
+  onNavigateToSource?: (filePath: string, line: number) => void;
   children: React.ReactNode;
 }
 
@@ -32,6 +35,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   recentProjects,
   files,
   selectedFile,
+  selectedSymbol,
   isScanning,
   scanProgress,
   activeView,
@@ -46,6 +50,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   onToggleTheme,
   onToggleInspector,
   onOpenCommandPalette,
+  onSelectSymbol,
+  onNavigateToSource,
   children,
 }) => {
   return (
@@ -76,6 +82,9 @@ export const AppShell: React.FC<AppShellProps> = ({
           onToggle={onToggleInspector}
           width={inspectorWidth}
           selectedFile={selectedFile}
+          selectedSymbol={selectedSymbol}
+          onSelectSymbol={onSelectSymbol}
+          onNavigateToSource={onNavigateToSource}
         />
       </div>
 

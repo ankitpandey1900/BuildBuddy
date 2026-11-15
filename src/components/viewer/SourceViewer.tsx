@@ -16,6 +16,7 @@ interface SourceViewerProps {
   fileContent: FileContentDto | null;
   isLoading: boolean;
   theme: "dark" | "light";
+  targetLine?: number | null;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -23,6 +24,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   fileContent,
   isLoading,
   theme,
+  targetLine,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -128,6 +130,12 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       viewRef.current = null;
     };
   }, [fileContent, theme]);
+
+  useEffect(() => {
+    if (targetLine && viewRef.current) {
+      jumpToLine(targetLine);
+    }
+  }, [targetLine, fileContent]);
 
   const jumpToLine = (lineNumber: number) => {
     if (!viewRef.current) return;

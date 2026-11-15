@@ -23,6 +23,7 @@ pub use graph::GraphStore;
 pub use migrations::run_migrations;
 pub use projects::{create_or_get_project, get_project_by_id, list_projects, Project};
 pub use symbols::{
-    get_imports_for_file, get_symbol_detail, get_symbols_for_file, list_symbols,
-    persist_file_parse_result, search_symbols_fts, SymbolDetail, SymbolRecord,
+    get_class_detail, get_imports_for_file, get_symbol_detail, get_symbols_for_file, list_symbols,
+    persist_file_parse_result, search_symbols_fts, ClassDetailResponse, ListSymbolsFilter,
+    SymbolDetail, SymbolRecord,
 };
