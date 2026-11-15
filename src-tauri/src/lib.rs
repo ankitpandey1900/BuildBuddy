@@ -70,6 +70,8 @@ pub fn run() {
             commands::arch::get_overview_data,
             commands::arch::get_architecture_model,
             commands::arch::analyze_architecture,
+            commands::diagram::get_diagram,
+            commands::diagram::drill_down,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");

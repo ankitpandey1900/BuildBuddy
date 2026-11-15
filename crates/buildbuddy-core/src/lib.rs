@@ -6,6 +6,7 @@ pub mod manifest;
 pub mod graph;
 pub mod vcs;
 pub mod arch;
+pub mod diagram;
 
 pub fn verify_tree_sitter_compatibility() -> bool {
     let mut parser = tree_sitter::Parser::new();

@@ -1,4 +1,5 @@
 pub mod arch;
+pub mod diagram;
 pub mod explorer;
 pub mod graph;
 pub mod parser;

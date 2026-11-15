@@ -1,0 +1,268 @@
+{
+  "diagram_type": "file_dependency",
+  "nodes": [
+    {
+      "id": "external:./missing_submodule",
+      "kind": "external",
+      "label": "./missing_submodule",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:react",
+      "kind": "external",
+      "label": "react",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "file:package.json",
+      "kind": "file",
+      "label": "package.json",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "package.json",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 0
+      }
+    },
+    {
+      "id": "file:src/barrel.ts",
+      "kind": "file",
+      "label": "barrel.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/barrel.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/components/button.ts",
+      "kind": "file",
+      "label": "button.ts",
+      "group_id": "group:dir:src/components",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/components/button.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 0
+      }
+    },
+    {
+      "id": "file:src/cycle_a.ts",
+      "kind": "file",
+      "label": "cycle_a.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/cycle_a.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/cycle_b.ts",
+      "kind": "file",
+      "label": "cycle_b.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/cycle_b.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/index.ts",
+      "kind": "file",
+      "label": "index.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/index.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 1,
+        "class_count": 0,
+        "import_count": 6
+      }
+    },
+    {
+      "id": "file:src/utils/index.ts",
+      "kind": "file",
+      "label": "index.ts",
+      "group_id": "group:dir:src/utils",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/utils/index.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 1,
+        "class_count": 0,
+        "import_count": 0
+      }
+    },
+    {
+      "id": "file:tsconfig.json",
+      "kind": "file",
+      "label": "tsconfig.json",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "tsconfig.json",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:import:file:src/barrel.ts:file:src/components/button.ts::1",
+      "from": "file:src/barrel.ts",
+      "to": "file:src/components/button.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 23
+    },
+    {
+      "id": "edge:import:file:src/cycle_a.ts:file:src/cycle_b.ts:b:1",
+      "from": "file:src/cycle_a.ts",
+      "to": "file:src/cycle_b.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 24,
+      "label": "import b"
+    },
+    {
+      "id": "edge:import:file:src/cycle_b.ts:file:src/cycle_a.ts:a:1",
+      "from": "file:src/cycle_b.ts",
+      "to": "file:src/cycle_a.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 25,
+      "label": "import a"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:external:./missing_submodule:missingHelper:6",
+      "from": "file:src/index.ts",
+      "to": "external:./missing_submodule",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 31,
+      "label": "import missingHelper"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:external:react:React:1",
+      "from": "file:src/index.ts",
+      "to": "external:react",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 26,
+      "label": "import React"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:file:src/barrel.ts:Button:2",
+      "from": "file:src/index.ts",
+      "to": "file:src/barrel.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 27,
+      "label": "import Button"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:file:src/components/button.ts:Button:4",
+      "from": "file:src/index.ts",
+      "to": "file:src/components/button.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 29,
+      "label": "import Button"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:file:src/cycle_a.ts:a:5",
+      "from": "file:src/index.ts",
+      "to": "file:src/cycle_a.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 30,
+      "label": "import a"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:file:src/utils/index.ts:formatData:3",
+      "from": "file:src/index.ts",
+      "to": "file:src/utils/index.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 28,
+      "label": "import formatData"
+    }
+  ],
+  "groups": [
+    {
+      "id": "group:dir:src",
+      "label": "src",
+      "collapsed": false
+    },
+    {
+      "id": "group:dir:src/components",
+      "label": "src/components",
+      "collapsed": false
+    },
+    {
+      "id": "group:dir:src/utils",
+      "label": "src/utils",
+      "collapsed": false
+    }
+  ]
+}

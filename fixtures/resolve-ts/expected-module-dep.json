@@ -1,0 +1,159 @@
+{
+  "diagram_type": "module_dependency",
+  "nodes": [
+    {
+      "id": "external:./missing_submodule",
+      "kind": "external",
+      "label": "./missing_submodule",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:react",
+      "kind": "external",
+      "label": "react",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "module:.",
+      "kind": "module",
+      "label": "root (config)",
+      "group_id": "layer:config",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    },
+    {
+      "id": "module:src",
+      "kind": "module",
+      "label": "src (unclassified)",
+      "group_id": "layer:unclassified",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    },
+    {
+      "id": "module:src/components",
+      "kind": "module",
+      "label": "src::components (frontend)",
+      "group_id": "layer:frontend",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    },
+    {
+      "id": "module:src/utils",
+      "kind": "module",
+      "label": "src::utils (shared)",
+      "group_id": "layer:shared",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:module_import:module:src:external:./missing_submodule:missingHelper:6",
+      "from": "module:src",
+      "to": "external:./missing_submodule",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 31,
+      "label": "import missingHelper"
+    },
+    {
+      "id": "edge:module_import:module:src:external:react:React:1",
+      "from": "module:src",
+      "to": "external:react",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 26,
+      "label": "import React"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src/components::1",
+      "from": "module:src",
+      "to": "module:src/components",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 23
+    },
+    {
+      "id": "edge:module_import:module:src:module:src/components:Button:4",
+      "from": "module:src",
+      "to": "module:src/components",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 29,
+      "label": "import Button"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src/utils:formatData:3",
+      "from": "module:src",
+      "to": "module:src/utils",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 28,
+      "label": "import formatData"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src:Button:2",
+      "from": "module:src",
+      "to": "module:src",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 27,
+      "label": "import Button"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src:a:1",
+      "from": "module:src",
+      "to": "module:src",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 25,
+      "label": "import a"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src:a:5",
+      "from": "module:src",
+      "to": "module:src",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 30,
+      "label": "import a"
+    },
+    {
+      "id": "edge:module_import:module:src:module:src:b:1",
+      "from": "module:src",
+      "to": "module:src",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 24,
+      "label": "import b"
+    }
+  ],
+  "groups": [
+    {
+      "id": "layer:config",
+      "label": "config Layer",
+      "collapsed": false
+    },
+    {
+      "id": "layer:frontend",
+      "label": "frontend Layer",
+      "collapsed": false
+    },
+    {
+      "id": "layer:shared",
+      "label": "shared Layer",
+      "collapsed": false
+    },
+    {
+      "id": "layer:unclassified",
+      "label": "unclassified Layer",
+      "collapsed": false
+    }
+  ]
+}

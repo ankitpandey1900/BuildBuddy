@@ -1,0 +1,302 @@
+{
+  "diagram_type": "architecture_overview",
+  "nodes": [
+    {
+      "id": "entry_point:package.json",
+      "kind": "component",
+      "label": "main: package.json main",
+      "width": 200.0,
+      "height": 50.0,
+      "source_ref": {
+        "file_path": "package.json",
+        "start_line": 4,
+        "end_line": 4
+      }
+    },
+    {
+      "id": "entry_point:src/client/main.tsx",
+      "kind": "component",
+      "label": "framework_entry: React DOM Root Entry",
+      "width": 200.0,
+      "height": 50.0,
+      "source_ref": {
+        "file_path": "src/client/main.tsx",
+        "start_line": 7,
+        "end_line": 7
+      }
+    },
+    {
+      "id": "entry_point:src/server/index.ts",
+      "kind": "component",
+      "label": "framework_entry: Express HTTP Server Entry",
+      "width": 200.0,
+      "height": 50.0,
+      "source_ref": {
+        "file_path": "src/server/index.ts",
+        "start_line": 10,
+        "end_line": 10
+      }
+    },
+    {
+      "id": "external:express",
+      "kind": "external",
+      "label": "express (^4.19.2)",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:react",
+      "kind": "external",
+      "label": "react (^18.3.1)",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:react-dom",
+      "kind": "external",
+      "label": "react-dom (^18.3.1)",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:typescript",
+      "kind": "external",
+      "label": "typescript (^5.0.0)",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "external:vite",
+      "kind": "external",
+      "label": "vite (^5.0.0)",
+      "width": 160.0,
+      "height": 40.0
+    },
+    {
+      "id": "module:.",
+      "kind": "module",
+      "label": "root (2 files)",
+      "group_id": "group:layer:config",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    },
+    {
+      "id": "module:src/client",
+      "kind": "module",
+      "label": "src::client (2 files)",
+      "group_id": "group:layer:frontend",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    },
+    {
+      "id": "module:src/server",
+      "kind": "module",
+      "label": "src::server (1 files)",
+      "group_id": "group:layer:backend",
+      "width": 200.0,
+      "height": 50.0,
+      "metrics": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:call:10:defineConfig",
+      "from": "module:.",
+      "to": "external:defineConfig",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 22,
+      "label": "calls defineConfig"
+    },
+    {
+      "id": "edge:call:1:useState",
+      "from": "module:.",
+      "to": "external:useState",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 5,
+      "label": "calls useState"
+    },
+    {
+      "id": "edge:call:2:document.getElementById",
+      "from": "module:.",
+      "to": "external:document.getElementById",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 10,
+      "label": "calls document.getElementById"
+    },
+    {
+      "id": "edge:call:3:createRoot",
+      "from": "module:.",
+      "to": "external:createRoot",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 11,
+      "label": "calls createRoot"
+    },
+    {
+      "id": "edge:call:4:root.render",
+      "from": "module:.",
+      "to": "external:root.render",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 12,
+      "label": "calls root.render"
+    },
+    {
+      "id": "edge:call:5:express",
+      "from": "module:.",
+      "to": "external:express",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 16,
+      "label": "calls express"
+    },
+    {
+      "id": "edge:call:6:app.get",
+      "from": "module:.",
+      "to": "external:app.get",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 17,
+      "label": "calls app.get"
+    },
+    {
+      "id": "edge:call:7:res.json",
+      "from": "module:.",
+      "to": "external:res.json",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 18,
+      "label": "calls res.json"
+    },
+    {
+      "id": "edge:call:8:app.listen",
+      "from": "module:.",
+      "to": "external:app.listen",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 19,
+      "label": "calls app.listen"
+    },
+    {
+      "id": "edge:call:9:console.log",
+      "from": "module:.",
+      "to": "external:console.log",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 20,
+      "label": "calls console.log"
+    },
+    {
+      "id": "edge:declared:express:direct",
+      "from": "module:root",
+      "to": "external:express",
+      "relationship": "declared_dependency",
+      "confidence": "confirmed",
+      "evidence_id": 30,
+      "label": "declared (direct)"
+    },
+    {
+      "id": "edge:declared:react-dom:direct",
+      "from": "module:root",
+      "to": "external:react-dom",
+      "relationship": "declared_dependency",
+      "confidence": "confirmed",
+      "evidence_id": 32,
+      "label": "declared (direct)"
+    },
+    {
+      "id": "edge:declared:react:direct",
+      "from": "module:root",
+      "to": "external:react",
+      "relationship": "declared_dependency",
+      "confidence": "confirmed",
+      "evidence_id": 31,
+      "label": "declared (direct)"
+    },
+    {
+      "id": "edge:declared:typescript:dev",
+      "from": "module:root",
+      "to": "external:typescript",
+      "relationship": "declared_dependency",
+      "confidence": "confirmed",
+      "evidence_id": 33,
+      "label": "declared (dev)"
+    },
+    {
+      "id": "edge:declared:vite:dev",
+      "from": "module:root",
+      "to": "external:vite",
+      "relationship": "declared_dependency",
+      "confidence": "confirmed",
+      "evidence_id": 34,
+      "label": "declared (dev)"
+    },
+    {
+      "id": "edge:ep:entry_point:package.json:module:.",
+      "from": "entry_point:package.json",
+      "to": "module:.",
+      "relationship": "call",
+      "confidence": "static",
+      "evidence_id": 46,
+      "label": "starts package.json main"
+    },
+    {
+      "id": "edge:ep:entry_point:package.json:module:.",
+      "from": "entry_point:package.json",
+      "to": "module:.",
+      "relationship": "call",
+      "confidence": "static",
+      "evidence_id": 47,
+      "label": "starts package.json script: start"
+    },
+    {
+      "id": "edge:ep:entry_point:package.json:module:.",
+      "from": "entry_point:package.json",
+      "to": "module:.",
+      "relationship": "call",
+      "confidence": "static",
+      "evidence_id": 48,
+      "label": "starts package.json script: dev"
+    },
+    {
+      "id": "edge:ep:entry_point:src/client/main.tsx:module:.",
+      "from": "entry_point:src/client/main.tsx",
+      "to": "module:.",
+      "relationship": "call",
+      "confidence": "static",
+      "evidence_id": 49,
+      "label": "starts React DOM Root Entry"
+    },
+    {
+      "id": "edge:ep:entry_point:src/server/index.ts:module:.",
+      "from": "entry_point:src/server/index.ts",
+      "to": "module:.",
+      "relationship": "call",
+      "confidence": "static",
+      "evidence_id": 50,
+      "label": "starts Express HTTP Server Entry"
+    }
+  ],
+  "groups": [
+    {
+      "id": "group:layer:backend",
+      "label": "backend Layer",
+      "collapsed": false
+    },
+    {
+      "id": "group:layer:config",
+      "label": "config Layer",
+      "collapsed": false
+    },
+    {
+      "id": "group:layer:frontend",
+      "label": "frontend Layer",
+      "collapsed": false
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "diagram_type": "class_diagram",
+  "nodes": [
+    {
+      "id": "class:AdvancedCalculator",
+      "kind": "class",
+      "label": "AdvancedCalculator",
+      "width": 220.0,
+      "height": 60.0,
+      "source_ref": {
+        "file_path": "sample.ts",
+        "start_line": 100,
+        "end_line": 118
+      },
+      "metrics": {
+        "function_count": 2,
+        "complexity": 1
+      }
+    },
+    {
+      "id": "class:BaseService",
+      "kind": "class",
+      "label": "BaseService",
+      "width": 220.0,
+      "height": 60.0,
+      "source_ref": {
+        "file_path": "utils.ts",
+        "start_line": 5,
+        "end_line": 15
+      },
+      "metrics": {
+        "function_count": 1,
+        "complexity": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:inheritance:class:AdvancedCalculator:class:BaseService",
+      "from": "class:AdvancedCalculator",
+      "to": "class:BaseService",
+      "relationship": "inheritance",
+      "confidence": "confirmed",
+      "evidence_id": 12,
+      "label": "extends"
+    },
+    {
+      "id": "edge:instantiation:1:AdvancedCalculator",
+      "from": "class:runDemo",
+      "to": "class:AdvancedCalculator",
+      "relationship": "instantiation",
+      "confidence": "confirmed",
+      "evidence_id": 45,
+      "label": "new AdvancedCalculator"
+    }
+  ],
+  "groups": []
+}

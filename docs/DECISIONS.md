@@ -288,6 +288,58 @@ All entry points detected statically are assigned `confidence: "static"`. Every 
 - Clicking any framework opens the `FrameworkEvidenceModal` displaying the complete evidence provenance list.
 - Declared-only packages (dependencies without import usage) are presented in a dedicated section separate from detected frameworks.
 
+## 11. Diagram Data Pipeline, Progressive Disclosure & Layout Engine
+
+### Context
+PRD Section 7 requires diagrams to be first-class engineering blueprints rather than decorative report visuals. The pipeline must normalize data from the SQLite database into a typed `DiagramModel`, enforce strict provenance, progressively disclose large repositories, and compute orthogonal layered layouts deterministically offline using ELK.js in a cancellable Web Worker.
+
+### 1. Relationship Vocabulary
+Edges strictly use the following 5 semantic relationship types:
+- **`import`**: Syntactic import statement (file-to-file or module-to-module).
+- **`call`**: Direct, imported, or receiver function/method invocation.
+- **`inheritance`**: OOP superclass / interface inheritance (`class Child extends Parent`).
+- **`instantiation`**: Object construction / class instantiation (`new Service()`).
+- **`declared_dependency`**: Package manifest dependency declared in `package.json`, `requirements.txt`, etc.
+
+**Rule**: Different relationship types are NEVER merged into a single edge. Each edge represents an atomic, verifiable relationship.
+
+### 2. Edge Confidence Rules
+Every edge records its confidence classification:
+- **`confirmed`**: Direct AST declaration, same-file symbol resolution, or direct class instantiation.
+- **`static`**: Resolved cross-file imports, parent method calls, and declared manifest dependencies.
+- **`inferred`**: Calls on unverified receivers (e.g. `client.fetchData()`, callback invocations, dynamic property calls). Inferred edges NEVER merge with confirmed or static edges and retain explicit `inferred` confidence.
+- **`unknown`**: Call targets that cannot be statically resolved to any known symbol.
+
+### 3. Node Sizing Standards (Width x Height)
+To guarantee predictable hierarchy and avoid overlapping labels:
+- **`file`**: 180 x 40 px
+- **`module`**: 200 x 50 px
+- **`class`**: 220 x 60 px
+- **`component`**: 200 x 50 px
+- **`external`**: 160 x 40 px
+
+### 4. Progressive Disclosure & Threshold
+- **Threshold**: **150 nodes**. When any diagram model exceeds 150 nodes, the builder returns a module-level overview with collapsed groups (`collapsed: true`).
+- **Aggregated Edges**: Inter-module edges summarize connections while maintaining full traceability: each `AggregatedEdge` preserves the complete list of underlying edge IDs and source evidence IDs (`underlying_edge_ids`, `evidence_ids`).
+- **Drill-Down**: The `drill_down(group_id)` function isolates the selected group, returning exactly the member nodes and internal/incident edges for detailed inspection.
+
+### 5. ELK.js Layout Options & Justification
+- **`elk.algorithm: "layered"`**: Sugiyama layered layout enforces directional visual flow and minimizes edge crossings.
+- **`elk.direction: "DOWN"` (TB) or `"RIGHT"` (LR)**: Default top-to-bottom hierarchy standard for architecture and dependency graphs.
+- **`elk.edgeRouting: "ORTHOGONAL"`**: Enforces clean 90-degree rectilinear routes and bend points, avoiding diagonal clutter.
+- **Spacing presets**:
+  - Layered (default): 40px node-to-node, 50px between layers, 30px group padding.
+  - Compact: 24px node-to-node, 36px between layers, 20px group padding.
+  - Spacious: 60px node-to-node, 80px between layers, 40px group padding.
+- **`org.eclipse.elk.randomSeed: "1"`**: Guarantees deterministic layout output across multiple runs with identical input.
+- **Web Worker Architecture**: All ELK calculations execute in a dedicated, cancellable Web Worker (`src/diagram/layout/worker.ts`), preventing main thread freezing during heavy layout computations.
+
+### 6. Intentionally Not Supported in this Phase
+- **React Flow Canvas UI Rendering**: Visual interactive rendering on the React Flow canvas is NOT implemented in this task and is scheduled for the next task.
+- **Custom User Node Positioning Persistence**: Saving manual drag-and-drop coordinates to the database is not supported; layouts are computed deterministically.
+- **Interactive Edge Editing / Rerouting**: Users cannot manually drag edge bend points.
+
+
 
 
 
