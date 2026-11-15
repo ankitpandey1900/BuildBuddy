@@ -346,6 +346,7 @@
         "return_type": "number",
         "callers": [],
         "callees": [
+          "this.getBaseName",
           "this.internalCompute"
         ],
         "imports_used": [],
@@ -356,7 +357,7 @@
         "side_effects": []
       },
       "start_line": 112,
-      "end_line": 115,
+      "end_line": 117,
       "start_column": 2,
       "end_column": 3
     },
@@ -378,8 +379,8 @@
         "has_error_handling": false,
         "side_effects": []
       },
-      "start_line": 118,
-      "end_line": 122,
+      "start_line": 120,
+      "end_line": 124,
       "start_column": 0,
       "end_column": 1
     }
@@ -438,8 +439,8 @@
           "class_name": "AdvancedCalculator",
           "caller_symbol_id": "a01131f6d52bde8c06c9ac2b7a78a9ede4cf67182d5cfde6ecdc94868278a8fc",
           "class_symbol_id": "6a10725ffbea1ae944bbebf431cfb243ce7d6b3c04515546ef1f46cf44044a70",
-          "start_line": 120,
-          "end_line": 120,
+          "start_line": 122,
+          "end_line": 122,
           "start_column": 15,
           "end_column": 50,
           "snippet": "new AdvancedCalculator(\"engine\", 2)",
@@ -447,7 +448,7 @@
         }
       ],
       "start_line": 100,
-      "end_line": 116,
+      "end_line": 118,
       "start_column": 0,
       "end_column": 1
     }

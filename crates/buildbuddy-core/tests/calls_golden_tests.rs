@@ -125,6 +125,22 @@ fn test_verify_calls_ts_golden() {
         }
     }
 
+    // Verify this.getBaseName() resolving to parent class method is static
+    let parent_call = result.calls.iter().find(|c| c.callee_name == "this.getBaseName").expect("find this.getBaseName");
+    assert_eq!(
+        parent_call.resolution_status,
+        buildbuddy_core::symbols::CallResolutionStatus::Static,
+        "this.getBaseName() resolving to parent class method must be static"
+    );
+
+    // Verify this.internalCompute() defined in same class is confirmed
+    let same_class_call = result.calls.iter().find(|c| c.callee_name == "this.internalCompute").expect("find this.internalCompute");
+    assert_eq!(
+        same_class_call.resolution_status,
+        buildbuddy_core::symbols::CallResolutionStatus::Confirmed,
+        "this.internalCompute() defined in same class must be confirmed"
+    );
+
     // Golden JSON persistence/verification
     let calls_path = dir.join("expected-calls.json");
     let metrics_path = dir.join("expected-metrics.json");
@@ -263,6 +279,22 @@ fn test_verify_calls_py_golden() {
             );
         }
     }
+
+    // Verify self.get_base_name() resolving to parent class method is static
+    let parent_call = result.calls.iter().find(|c| c.callee_name == "self.get_base_name").expect("find self.get_base_name");
+    assert_eq!(
+        parent_call.resolution_status,
+        buildbuddy_core::symbols::CallResolutionStatus::Static,
+        "self.get_base_name() resolving to parent class method must be static"
+    );
+
+    // Verify self.internal_compute() defined in same class is confirmed
+    let same_class_call = result.calls.iter().find(|c| c.callee_name == "self.internal_compute").expect("find self.internal_compute");
+    assert_eq!(
+        same_class_call.resolution_status,
+        buildbuddy_core::symbols::CallResolutionStatus::Confirmed,
+        "self.internal_compute() defined in same class must be confirmed"
+    );
 
     // Golden JSON persistence/verification
     let calls_path = dir.join("expected-calls.json");

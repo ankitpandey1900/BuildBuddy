@@ -110,7 +110,9 @@ export class AdvancedCalculator extends BaseService implements ICalculator {
   }
 
   public calculate(a: number, b: number): number {
-    // Call on this (confirmed)
+    // Call on this resolving to parent class method (static)
+    this.getBaseName();
+    // Call on this resolving to same class method (confirmed)
     return this.internalCompute(a + b);
   }
 }

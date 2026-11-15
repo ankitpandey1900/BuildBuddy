@@ -361,6 +361,7 @@
         "return_type": "int",
         "callers": [],
         "callees": [
+          "self.get_base_name",
           "self.internal_compute"
         ],
         "imports_used": [],
@@ -371,7 +372,7 @@
         "side_effects": []
       },
       "start_line": 84,
-      "end_line": 86,
+      "end_line": 88,
       "start_column": 4,
       "end_column": 43
     },
@@ -394,8 +395,8 @@
         "has_error_handling": false,
         "side_effects": []
       },
-      "start_line": 88,
-      "end_line": 91,
+      "start_line": 90,
+      "end_line": 93,
       "start_column": 0,
       "end_column": 26
     }
@@ -453,8 +454,8 @@
           "class_name": "AdvancedCalculator",
           "caller_symbol_id": "8d559844776942de247d9341bbd4c35bc489b7fde6042a8d2e50883d55780776",
           "class_symbol_id": "47848861305d62aa265abe4f421449e0420c5f7b948777fa4fdcd0b7ab25260b",
-          "start_line": 90,
-          "end_line": 90,
+          "start_line": 92,
+          "end_line": 92,
           "start_column": 11,
           "end_column": 42,
           "snippet": "AdvancedCalculator(\"engine\", 2)",
@@ -462,7 +463,7 @@
         }
       ],
       "start_line": 76,
-      "end_line": 86,
+      "end_line": 88,
       "start_column": 0,
       "end_column": 43
     }

@@ -51,6 +51,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
             root_node,
             None,
             None,
+            None,
             &mut functions,
             &mut classes,
             &mut all_calls,
@@ -116,6 +117,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
         node: Node,
         current_function_symbol: Option<&ExtractedSymbol>,
         current_class_name: Option<&str>,
+        current_class_superclass: Option<&str>,
         functions: &mut Vec<ExtractedFunction>,
         classes: &mut Vec<ExtractedClass>,
         all_calls: &mut Vec<ExtractedCallSite>,
@@ -127,6 +129,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                 "class_declaration" | "class" => {
                     if let Some(cls) = self.extract_class(child) {
                         let class_name = cls.name.clone();
+                        let superclass_name = cls.superclass.clone();
                         classes.push(cls);
 
                         // Recurse into class body
@@ -135,6 +138,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                                 body,
                                 current_function_symbol,
                                 Some(&class_name),
+                                superclass_name.as_deref(),
                                 functions,
                                 classes,
                                 all_calls,
@@ -154,6 +158,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                                 body,
                                 Some(&func_sym),
                                 current_class_name,
+                                current_class_superclass,
                                 functions,
                                 classes,
                                 all_calls,
@@ -172,6 +177,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                                 body,
                                 Some(&method_sym),
                                 current_class_name,
+                                current_class_superclass,
                                 functions,
                                 classes,
                                 all_calls,
@@ -190,6 +196,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                                 body,
                                 Some(&arrow_sym),
                                 current_class_name,
+                                current_class_superclass,
                                 functions,
                                 classes,
                                 all_calls,
@@ -203,6 +210,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                                 body,
                                 current_function_symbol,
                                 current_class_name,
+                                current_class_superclass,
                                 functions,
                                 classes,
                                 all_calls,
@@ -212,12 +220,19 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                     }
                 }
                 "call_expression" => {
-                    self.extract_call_site(child, current_function_symbol, current_class_name, all_calls);
+                    self.extract_call_site(
+                        child,
+                        current_function_symbol,
+                        current_class_name,
+                        current_class_superclass,
+                        all_calls,
+                    );
                     // Continue recursing for nested calls e.g. fn(otherFn())
                     self.traverse_node(
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         functions,
                         classes,
                         all_calls,
@@ -235,6 +250,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         functions,
                         classes,
                         all_calls,
@@ -246,6 +262,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         functions,
                         classes,
                         all_calls,
@@ -584,6 +601,7 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
         node: Node,
         current_function_symbol: Option<&ExtractedSymbol>,
         current_class_name: Option<&str>,
+        current_class_superclass: Option<&str>,
         all_calls: &mut Vec<ExtractedCallSite>,
     ) {
         let fn_node = match node.child_by_field_name("function") {
@@ -708,6 +726,14 @@ impl<'a> TypeScriptAstAnalyzer<'a> {
 
                         let (status, sym_id) = if let Some(m) = method_sym {
                             (CallResolutionStatus::Confirmed, Some(m.stable_id.clone()))
+                        } else if let Some(super_name) = current_class_superclass {
+                            // Method is not defined in the same class, but class extends parent class -> static
+                            let parent_sym = self.symbols.iter().find(|s| {
+                                (s.qualified_name == format!("{}.{}", super_name, prop_text)
+                                    || (s.parent_name.as_deref() == Some(super_name) && s.name == prop_text))
+                                    && s.kind == SymbolKind::Method
+                            });
+                            (CallResolutionStatus::Static, parent_sym.map(|s| s.stable_id.clone()))
                         } else {
                             (CallResolutionStatus::Inferred, None)
                         };

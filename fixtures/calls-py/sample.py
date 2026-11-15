@@ -82,7 +82,9 @@ class AdvancedCalculator(BaseService):
         return val * self.precision
 
     def calculate(self, a: int, b: int) -> int:
-        # Call on self (confirmed)
+        # Call on self resolving to parent class method (static)
+        self.get_base_name()
+        # Call on self resolving to same class method (confirmed)
         return self.internal_compute(a + b)
 
 def run_demo():

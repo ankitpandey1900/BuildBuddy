@@ -141,19 +141,21 @@ When a `const` or assignment is encountered:
 
 ### 6. Read-Only Git Detection & Changed Files Parser
 
-- **Pure-Rust Git Parser Rationale**:
+- **Pure-Rust Git Parser Rationale (Why Hand-Written Reader was Kept over gix/git2)**:
   - We considered `git2` (bindings to C `libgit2`) and `gix` (pure-Rust git oxide).
   - `git2` requires building the C library with CMake and OpenSSL/WinHTTP, introducing native toolchain fragility and potential build failures in restricted or offline environments.
-  - Furthermore, `git2` and `gix` require heavy transitive dependencies (over 80+ crates) that were neither in the initial project configuration nor in the local offline cargo cache.
+  - Furthermore, `git2` and `gix` require heavy transitive dependencies (over 80+ crates) that were neither in the initial project configuration nor in the local offline cargo cache, substantially increasing build times and binary footprint.
   - Spawning a `git` binary violates AGENTS.md rule: "Never modify, execute, or shell out on files from the analyzed project" and introduces runtime system dependencies (git must be installed and in PATH).
   - Consequently, we chose a hand-crafted pure-Rust parser for Git metadata:
     1. `.git/HEAD` reference parsing (supports branch symref and detached HEAD sha).
     2. `.git/refs/heads/*` and `.git/packed-refs` lookup.
     3. Worktrees and submodules (`gitdir: <path>`).
-    4. `.git/index` binary parser (DIRC v2, v3, v4 format) parsing 62-byte entry headers, mtime, ctime, file size, object SHA-1, flags, and path.
+    4. `.git/index` binary parser (DIRC format) parsing 62-byte entry headers, mtime, ctime, file size, object SHA-1, flags, and path.
     5. Pure-Rust RFC 3174 SHA-1 implementation for computing blob hashes (`blob <size>\0<content>`).
-  - **Changed Files Detection**:
-    - By comparing the working tree file size and mtime (or content hash) against `.git/index` entries, and `.git/index` entries against HEAD tree/objects, we reliably identify modified, deleted, and untracked files with zero subprocess execution, zero external network, and zero native C compilation dependencies.
+  - **Git Changed-Files Limitations**:
+    - **Index Versions Supported**: Supports Git binary DIRC format versions 2 and 3 (with standard 62-byte fixed entry headers followed by null-padded path strings). DIRC format version 4 (prefix path compression) and optional extension blocks (e.g. UNTR, TREE, REUC, EOIE) are not parsed.
+    - **Untracked / Newly Added Files Not Detected**: Only entries present in `.git/index` are compared against the working tree (detecting modified and deleted tracked files). Brand new untracked files or files created in the working tree without being added to the git index are not reported in `changed_files`.
+    - **No Tree Objects Unpacking**: The parser compares filesystem metadata/hashes against the index, rather than unpacking loose or packed commit tree objects.
 
 ## 7. Cyclomatic Complexity Formula & Metric Definitions
 
@@ -221,9 +223,12 @@ Every call site extracted from source code must be cataloged with strict provena
 
 ### Resolution Statuses:
 - **`confirmed`**: Resolved to a concrete symbol in the project via:
-  1. Same-scope local definition (e.g. function defined in the module, or method called on `this`/`self` defined in the class).
-  2. Concrete import resolved to an exported symbol in a target module.
-- **`static`**: Name match within the same module, without an explicit import proof.
+  1. Same-scope local definition (e.g. function defined in the module).
+  2. Method called on `this`/`self` defined in the same class.
+  3. Concrete import resolved to an exported symbol in a target module.
+- **`static`**:
+  1. Method call on `this` or `self` resolving to a parent class method (`this.method()` or `self.method()`) where the target method is inherited from a superclass rather than defined in the immediate class.
+  2. Name match within the same module, without an explicit import proof.
 - **`inferred`**: Method call on an unknown receiver (e.g. `client.fetchData()`, `resp.json()`), dynamic call (e.g. `obj[name]()`, `getattr(obj, name)()`), or callback parameter invocation.
 - **`unknown`**: Identifier or call target that cannot be resolved to any symbol.
 

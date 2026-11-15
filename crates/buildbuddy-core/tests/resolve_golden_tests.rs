@@ -148,3 +148,31 @@ fn test_verify_resolve_ts_golden() {
     assert_eq!(report, expected);
 }
 
+#[test]
+fn test_verify_resolve_py_golden() {
+    let dir = fixtures_dir().join("resolve-py");
+    let report = analyze_fixture_resolution(&dir);
+
+    let expected_path = dir.join("expected-resolved.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+        .expect("Write expected-resolved.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-resolved.json does not exist. Run with UPDATE_GOLDEN=1 to generate it."
+        );
+    }
+
+    let expected: ProjectResolutionReport =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+
+    assert_eq!(report, expected);
+}
+

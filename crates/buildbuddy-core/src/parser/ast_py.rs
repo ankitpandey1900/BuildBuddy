@@ -50,6 +50,7 @@ impl<'a> PythonAstAnalyzer<'a> {
             root_node,
             None,
             None,
+            None,
             &mut functions,
             &mut classes,
             &mut all_calls,
@@ -114,6 +115,7 @@ impl<'a> PythonAstAnalyzer<'a> {
         node: Node,
         current_function_symbol: Option<&ExtractedSymbol>,
         current_class_name: Option<&str>,
+        current_class_superclass: Option<&str>,
         functions: &mut Vec<ExtractedFunction>,
         classes: &mut Vec<ExtractedClass>,
         all_calls: &mut Vec<ExtractedCallSite>,
@@ -125,6 +127,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                 "class_definition" => {
                     if let Some(cls) = self.extract_class(child) {
                         let class_name = cls.name.clone();
+                        let superclass_name = cls.superclass.clone();
                         classes.push(cls);
 
                         if let Some(body) = child.child_by_field_name("body") {
@@ -132,6 +135,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                                 body,
                                 current_function_symbol,
                                 Some(&class_name),
+                                superclass_name.as_deref(),
                                 functions,
                                 classes,
                                 all_calls,
@@ -150,6 +154,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                                 body,
                                 Some(&func_sym),
                                 current_class_name,
+                                current_class_superclass,
                                 functions,
                                 classes,
                                 all_calls,
@@ -163,6 +168,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         all_calls,
                         instantiations,
                     );
@@ -170,6 +176,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         functions,
                         classes,
                         all_calls,
@@ -181,6 +188,7 @@ impl<'a> PythonAstAnalyzer<'a> {
                         child,
                         current_function_symbol,
                         current_class_name,
+                        current_class_superclass,
                         functions,
                         classes,
                         all_calls,
@@ -526,6 +534,7 @@ impl<'a> PythonAstAnalyzer<'a> {
         node: Node,
         current_function_symbol: Option<&ExtractedSymbol>,
         current_class_name: Option<&str>,
+        current_class_superclass: Option<&str>,
         all_calls: &mut Vec<ExtractedCallSite>,
         instantiations: &mut Vec<ClassInstantiation>,
     ) {
@@ -681,6 +690,14 @@ impl<'a> PythonAstAnalyzer<'a> {
 
                         let (status, sym_id) = if let Some(m) = method_sym {
                             (CallResolutionStatus::Confirmed, Some(m.stable_id.clone()))
+                        } else if let Some(super_name) = current_class_superclass {
+                            // Method is not defined in the same class, but class extends a parent class -> static
+                            let parent_sym = self.symbols.iter().find(|s| {
+                                (s.qualified_name == format!("{}.{}", super_name, attr_text)
+                                    || (s.parent_name.as_deref() == Some(super_name) && s.name == attr_text))
+                                    && s.kind == SymbolKind::Method
+                            });
+                            (CallResolutionStatus::Static, parent_sym.map(|s| s.stable_id.clone()))
                         } else {
                             (CallResolutionStatus::Inferred, None)
                         };
