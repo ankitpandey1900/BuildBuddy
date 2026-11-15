@@ -9,7 +9,9 @@ import type {
   Project,
   ScanCompletePayload,
   ScanProgressPayload,
+  SymbolDetail,
   SymbolDto,
+  SymbolRecord,
 } from "@/types/ipc";
 
 // Safely detect if running inside Tauri webview
@@ -129,6 +131,30 @@ export async function onScanComplete(
 export async function getFileSymbols(fileId: number): Promise<SymbolDto[]> {
   if (!isTauri()) return [];
   return await tauriInvoke<SymbolDto[]>("get_file_symbols", { fileId });
+}
+
+export async function listSymbols(
+  projectId: number,
+  fileId?: number,
+  kind?: string,
+  search?: string,
+  limit?: number,
+  offset?: number,
+): Promise<SymbolRecord[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<SymbolRecord[]>("list_symbols", {
+    projectId,
+    fileId: fileId ?? null,
+    kind: kind ?? null,
+    search: search ?? null,
+    limit: limit ?? null,
+    offset: offset ?? null,
+  });
+}
+
+export async function getSymbolDetail(symbolId: number): Promise<SymbolDetail | null> {
+  if (!isTauri()) return null;
+  return await tauriInvoke<SymbolDetail | null>("get_symbol_detail", { symbolId });
 }
 
 export async function getFileImports(fileId: number): Promise<ImportDto[]> {

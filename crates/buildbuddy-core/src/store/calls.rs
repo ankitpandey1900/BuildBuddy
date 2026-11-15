@@ -544,3 +544,251 @@ pub fn delete_calls_for_file_incremental(
     tx.commit()?;
     Ok(())
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallDetailItem {
+    pub id: i64,
+    pub caller_symbol_id: Option<i64>,
+    pub caller_name: Option<String>,
+    pub caller_file_path: Option<String>,
+    pub callee_symbol_id: Option<i64>,
+    pub callee_name: String,
+    pub callee_file_path: Option<String>,
+    pub resolution_status: String,
+    pub is_dynamic: bool,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+    pub snippet: Option<String>,
+    pub confidence: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InstantiationDetailItem {
+    pub id: i64,
+    pub caller_symbol_id: Option<i64>,
+    pub caller_name: Option<String>,
+    pub caller_file_path: Option<String>,
+    pub class_symbol_id: Option<i64>,
+    pub class_name: String,
+    pub resolution_status: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+    pub snippet: Option<String>,
+    pub confidence: String,
+}
+
+pub fn get_function_by_symbol_id(conn: &Connection, symbol_id: i64) -> Result<Option<StoredFunction>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, symbol_id, file_id, name, parameters_json, return_type,
+                branch_count, loop_count, cyclomatic_complexity, has_error_handling,
+                side_effects_json, imports_used_json, callers_json, callees_json, source_evidence_id
+         FROM functions
+         WHERE symbol_id = ?1",
+    )?;
+
+    let mut rows = stmt.query(params![symbol_id])?;
+    if let Some(row) = rows.next()? {
+        let params_json: String = row.get(4)?;
+        let parameters: Vec<Parameter> = serde_json::from_str(&params_json).unwrap_or_default();
+
+        let side_effects_json: String = row.get(10)?;
+        let side_effects: Vec<SideEffectMarker> = serde_json::from_str(&side_effects_json).unwrap_or_default();
+
+        let imports_json: String = row.get(11)?;
+        let imports_used: Vec<String> = serde_json::from_str(&imports_json).unwrap_or_default();
+
+        let callers_json: String = row.get(12)?;
+        let callers: Vec<String> = serde_json::from_str(&callers_json).unwrap_or_default();
+
+        let callees_json: String = row.get(13)?;
+        let callees: Vec<String> = serde_json::from_str(&callees_json).unwrap_or_default();
+
+        Ok(Some(StoredFunction {
+            id: row.get(0)?,
+            symbol_id: row.get(1)?,
+            file_id: row.get(2)?,
+            name: row.get(3)?,
+            parameters,
+            return_type: row.get(5)?,
+            branch_count: row.get::<_, i64>(6)? as usize,
+            loop_count: row.get::<_, i64>(7)? as usize,
+            cyclomatic_complexity: row.get::<_, i64>(8)? as usize,
+            has_error_handling: row.get::<_, i64>(9)? == 1,
+            side_effects,
+            imports_used,
+            callers,
+            callees,
+            source_evidence_id: row.get(14)?,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn get_class_by_symbol_id(conn: &Connection, symbol_id: i64) -> Result<Option<StoredClass>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, symbol_id, file_id, name, superclass_name, interfaces_json,
+                properties_json, methods_json, constructors_json, source_evidence_id
+         FROM classes
+         WHERE symbol_id = ?1",
+    )?;
+
+    let mut rows = stmt.query(params![symbol_id])?;
+    if let Some(row) = rows.next()? {
+        let ifaces_json: String = row.get(5)?;
+        let interfaces: Vec<String> = serde_json::from_str(&ifaces_json).unwrap_or_default();
+
+        let props_json: String = row.get(6)?;
+        let properties: Vec<ClassProperty> = serde_json::from_str(&props_json).unwrap_or_default();
+
+        let methods_json: String = row.get(7)?;
+        let methods: Vec<ClassMethod> = serde_json::from_str(&methods_json).unwrap_or_default();
+
+        let ctors_json: String = row.get(8)?;
+        let constructors: Vec<ClassConstructor> = serde_json::from_str(&ctors_json).unwrap_or_default();
+
+        Ok(Some(StoredClass {
+            id: row.get(0)?,
+            symbol_id: row.get(1)?,
+            file_id: row.get(2)?,
+            name: row.get(3)?,
+            superclass_name: row.get(4)?,
+            interfaces,
+            properties,
+            methods,
+            constructors,
+            source_evidence_id: row.get(9)?,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn get_incoming_calls_for_symbol(conn: &Connection, symbol_id: i64) -> Result<Vec<CallDetailItem>> {
+    let mut stmt = conn.prepare(
+        "SELECT c.id, c.caller_symbol_id, s_caller.name, f_caller.relative_path,
+                c.callee_symbol_id, c.callee_name, f_callee.relative_path,
+                c.resolution_status, c.is_dynamic,
+                e.start_line, e.end_line, e.start_column, e.end_column, e.snippet, e.confidence
+         FROM call_relationships c
+         JOIN source_evidence e ON c.source_evidence_id = e.id
+         LEFT JOIN symbols s_caller ON c.caller_symbol_id = s_caller.id
+         LEFT JOIN files f_caller ON s_caller.file_id = f_caller.id
+         LEFT JOIN symbols s_callee ON c.callee_symbol_id = s_callee.id
+         LEFT JOIN files f_callee ON s_callee.file_id = f_callee.id
+         WHERE c.callee_symbol_id = ?1
+         ORDER BY e.start_line ASC, e.start_column ASC",
+    )?;
+
+    let rows = stmt.query_map(params![symbol_id], |row| {
+        Ok(CallDetailItem {
+            id: row.get(0)?,
+            caller_symbol_id: row.get(1)?,
+            caller_name: row.get(2)?,
+            caller_file_path: row.get(3)?,
+            callee_symbol_id: row.get(4)?,
+            callee_name: row.get(5)?,
+            callee_file_path: row.get(6)?,
+            resolution_status: row.get(7)?,
+            is_dynamic: row.get::<_, i64>(8)? == 1,
+            start_line: row.get::<_, i64>(9)? as usize,
+            end_line: row.get::<_, i64>(10)? as usize,
+            start_column: row.get::<_, i64>(11)? as usize,
+            end_column: row.get::<_, i64>(12)? as usize,
+            snippet: row.get(13)?,
+            confidence: row.get(14)?,
+        })
+    })?;
+
+    let mut calls = Vec::new();
+    for r in rows {
+        calls.push(r?);
+    }
+    Ok(calls)
+}
+
+pub fn get_outgoing_calls_for_symbol(conn: &Connection, symbol_id: i64) -> Result<Vec<CallDetailItem>> {
+    let mut stmt = conn.prepare(
+        "SELECT c.id, c.caller_symbol_id, s_caller.name, f_caller.relative_path,
+                c.callee_symbol_id, c.callee_name, f_callee.relative_path,
+                c.resolution_status, c.is_dynamic,
+                e.start_line, e.end_line, e.start_column, e.end_column, e.snippet, e.confidence
+         FROM call_relationships c
+         JOIN source_evidence e ON c.source_evidence_id = e.id
+         LEFT JOIN symbols s_caller ON c.caller_symbol_id = s_caller.id
+         LEFT JOIN files f_caller ON s_caller.file_id = f_caller.id
+         LEFT JOIN symbols s_callee ON c.callee_symbol_id = s_callee.id
+         LEFT JOIN files f_callee ON s_callee.file_id = f_callee.id
+         WHERE c.caller_symbol_id = ?1
+         ORDER BY e.start_line ASC, e.start_column ASC",
+    )?;
+
+    let rows = stmt.query_map(params![symbol_id], |row| {
+        Ok(CallDetailItem {
+            id: row.get(0)?,
+            caller_symbol_id: row.get(1)?,
+            caller_name: row.get(2)?,
+            caller_file_path: row.get(3)?,
+            callee_symbol_id: row.get(4)?,
+            callee_name: row.get(5)?,
+            callee_file_path: row.get(6)?,
+            resolution_status: row.get(7)?,
+            is_dynamic: row.get::<_, i64>(8)? == 1,
+            start_line: row.get::<_, i64>(9)? as usize,
+            end_line: row.get::<_, i64>(10)? as usize,
+            start_column: row.get::<_, i64>(11)? as usize,
+            end_column: row.get::<_, i64>(12)? as usize,
+            snippet: row.get(13)?,
+            confidence: row.get(14)?,
+        })
+    })?;
+
+    let mut calls = Vec::new();
+    for r in rows {
+        calls.push(r?);
+    }
+    Ok(calls)
+}
+
+pub fn get_instantiations_for_symbol(conn: &Connection, symbol_id: i64) -> Result<Vec<InstantiationDetailItem>> {
+    let mut stmt = conn.prepare(
+        "SELECT i.id, i.caller_symbol_id, s_caller.name, f_caller.relative_path,
+                i.class_symbol_id, i.class_name,
+                i.resolution_status,
+                e.start_line, e.end_line, e.start_column, e.end_column, e.snippet, e.confidence
+         FROM class_instantiations i
+         JOIN source_evidence e ON i.source_evidence_id = e.id
+         LEFT JOIN symbols s_caller ON i.caller_symbol_id = s_caller.id
+         LEFT JOIN files f_caller ON s_caller.file_id = f_caller.id
+         WHERE i.class_symbol_id = ?1 OR i.caller_symbol_id = ?1
+         ORDER BY e.start_line ASC, e.start_column ASC",
+    )?;
+
+    let rows = stmt.query_map(params![symbol_id], |row| {
+        Ok(InstantiationDetailItem {
+            id: row.get(0)?,
+            caller_symbol_id: row.get(1)?,
+            caller_name: row.get(2)?,
+            caller_file_path: row.get(3)?,
+            class_symbol_id: row.get(4)?,
+            class_name: row.get(5)?,
+            resolution_status: row.get(6)?,
+            start_line: row.get::<_, i64>(7)? as usize,
+            end_line: row.get::<_, i64>(8)? as usize,
+            start_column: row.get::<_, i64>(9)? as usize,
+            end_column: row.get::<_, i64>(10)? as usize,
+            snippet: row.get(11)?,
+            confidence: row.get(12)?,
+        })
+    })?;
+
+    let mut insts = Vec::new();
+    for r in rows {
+        insts.push(r?);
+    }
+    Ok(insts)
+}

@@ -51,6 +51,138 @@ export interface SymbolDto {
   docstring: string | null;
 }
 
+export interface Parameter {
+  name: string;
+  type_annotation: string | null;
+  default_value: string | null;
+}
+
+export interface SideEffectMarker {
+  category: "filesystem" | "network" | "database" | "process" | "environment";
+  api_name: string;
+  matched_pattern: string;
+  description: string;
+}
+
+export interface ClassProperty {
+  name: string;
+  type_annotation: string | null;
+  visibility: string | null;
+  is_static: boolean;
+}
+
+export interface ClassMethod {
+  name: string;
+  signature: string;
+  visibility: string | null;
+  is_static: boolean;
+  is_async: boolean;
+}
+
+export interface ClassConstructor {
+  signature: string;
+  parameters: Parameter[];
+  visibility: string | null;
+}
+
+export interface StoredFunction {
+  id: number;
+  symbol_id: number;
+  file_id: number;
+  name: string;
+  parameters: Parameter[];
+  return_type: string | null;
+  branch_count: number;
+  loop_count: number;
+  cyclomatic_complexity: number;
+  has_error_handling: boolean;
+  side_effects: SideEffectMarker[];
+  imports_used: string[];
+  callers: string[];
+  callees: string[];
+  source_evidence_id: number | null;
+}
+
+export interface StoredClass {
+  id: number;
+  symbol_id: number;
+  file_id: number;
+  name: string;
+  superclass_name: string | null;
+  interfaces: string[];
+  properties: ClassProperty[];
+  methods: ClassMethod[];
+  constructors: ClassConstructor[];
+  source_evidence_id: number | null;
+}
+
+export interface SymbolRecord {
+  id: number;
+  project_id: number;
+  file_id: number;
+  file_path: string;
+  stable_id: string;
+  name: string;
+  qualified_name: string;
+  kind: string;
+  parent_name: string | null;
+  signature: string | null;
+  return_type: string | null;
+  visibility: string | null;
+  is_exported: boolean;
+  is_async: boolean;
+  docstring: string | null;
+  start_line: number;
+  end_line: number;
+  start_column: number;
+  end_column: number;
+  confidence: "confirmed" | "static" | "inferred" | "unknown";
+}
+
+export interface CallDetailItem {
+  id: number;
+  caller_symbol_id: number | null;
+  caller_name: string | null;
+  caller_file_path: string | null;
+  callee_symbol_id: number | null;
+  callee_name: string;
+  callee_file_path: string | null;
+  resolution_status: "confirmed" | "static" | "inferred" | "unknown";
+  is_dynamic: boolean;
+  start_line: number;
+  end_line: number;
+  start_column: number;
+  end_column: number;
+  snippet: string | null;
+  confidence: string;
+}
+
+export interface InstantiationDetailItem {
+  id: number;
+  caller_symbol_id: number | null;
+  caller_name: string | null;
+  caller_file_path: string | null;
+  class_symbol_id: number | null;
+  class_name: string;
+  resolution_status: "confirmed" | "static" | "inferred" | "unknown";
+  start_line: number;
+  end_line: number;
+  start_column: number;
+  end_column: number;
+  snippet: string | null;
+  confidence: string;
+}
+
+export interface SymbolDetail {
+  symbol: SymbolRecord;
+  snippet: string | null;
+  function_metrics: StoredFunction | null;
+  class_details: StoredClass | null;
+  incoming_calls: CallDetailItem[];
+  outgoing_calls: CallDetailItem[];
+  instantiations: InstantiationDetailItem[];
+}
+
 export interface ImportDto {
   source_module: string;
   imported_name: string;

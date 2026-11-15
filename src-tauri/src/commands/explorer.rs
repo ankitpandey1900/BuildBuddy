@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::store::files::{get_file_by_id as get_file_db, list_files_for_project, FileRecord};
 use crate::core::store::projects::get_project_by_id;
-use crate::core::store::symbols::{get_imports_for_file, get_symbols_for_file, search_symbols_fts};
+use crate::core::store::symbols::{
+    get_imports_for_file, get_symbol_detail as get_symbol_detail_db, get_symbols_for_file,
+    list_symbols as list_symbols_db, search_symbols_fts, SymbolDetail, SymbolRecord,
+};
 use crate::core::symbols::{ExtractedImport, ExtractedSymbol};
 use crate::AppState;
 
@@ -138,5 +141,37 @@ pub async fn search_symbols(
 ) -> Result<Vec<(String, String, String)>, String> {
     let conn = state.conn().map_err(|e| e.to_string())?;
     search_symbols_fts(&conn, project_id, &query, limit.unwrap_or(20)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_symbols(
+    project_id: i64,
+    file_id: Option<i64>,
+    kind: Option<String>,
+    search: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<SymbolRecord>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    list_symbols_db(
+        &conn,
+        project_id,
+        file_id,
+        kind.as_deref(),
+        search.as_deref(),
+        limit.unwrap_or(100),
+        offset.unwrap_or(0),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_symbol_detail(
+    symbol_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<SymbolDetail>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    get_symbol_detail_db(&conn, symbol_id).map_err(|e| e.to_string())
 }
 

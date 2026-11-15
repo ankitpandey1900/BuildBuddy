@@ -59,6 +59,8 @@ pub fn run() {
             commands::explorer::get_file_symbols,
             commands::explorer::get_file_imports,
             commands::explorer::search_symbols,
+            commands::explorer::list_symbols,
+            commands::explorer::get_symbol_detail,
             commands::graph::get_dependencies_overview,
             commands::graph::get_circular_dependencies,
             commands::graph::get_import_edges,
