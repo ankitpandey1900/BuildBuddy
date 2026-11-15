@@ -1,0 +1,455 @@
+import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { ArchitectureView } from "../ArchitectureView";
+import type { PositionedModel } from "../../../types/diagram";
+import * as tauriLib from "../../../lib/tauri";
+
+// Mock DOM Matrix, ResizeObserver, offsetWidth, offsetHeight for React Flow in jsdom
+if (typeof (globalThis as any).DOMMatrixReadOnly === "undefined") {
+  (globalThis as any).DOMMatrixReadOnly = class DOMMatrixReadOnly {
+    m22 = 1;
+    constructor(_transform?: string) {}
+  };
+}
+
+Object.defineProperties(window.HTMLElement.prototype, {
+  offsetWidth: {
+    get() {
+      return parseFloat(this.style.width) || 120;
+    },
+  },
+  offsetHeight: {
+    get() {
+      return parseFloat(this.style.height) || 40;
+    },
+  },
+});
+
+window.Element.prototype.getBoundingClientRect = function () {
+  const width = parseFloat((this as HTMLElement).style?.width) || 120;
+  const height = parseFloat((this as HTMLElement).style?.height) || 40;
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: height,
+    toJSON() {
+      return this;
+    },
+  };
+};
+
+class MockResizeObserver {
+  callback: ResizeObserverCallback;
+  constructor(cb: ResizeObserverCallback) {
+    this.callback = cb;
+  }
+  observe(target: Element) {
+    this.callback([{ target } as any], this as any);
+  }
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver = MockResizeObserver as any;
+
+describe("ArchitectureView React Flow Integration", () => {
+  const goldenPositionedModel: PositionedModel = {
+    diagram_type: "architecture_overview",
+    width: 1200,
+    height: 800,
+    groups: [
+      {
+        id: "group:ui",
+        label: "UI Components",
+        collapsed: false,
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 300,
+      },
+    ],
+    nodes: [
+      {
+        id: "file:src/index.ts",
+        kind: "file",
+        label: "index.ts",
+        x: 150,
+        y: 150,
+        width: 180,
+        height: 40,
+        source_ref: {
+          file_path: "src/index.ts",
+          start_line: 1,
+          end_line: 25,
+        },
+        metrics: {
+          line_count: 25,
+          function_count: 2,
+        },
+      },
+      {
+        id: "file:src/ui/Button.tsx",
+        kind: "component",
+        label: "Button.tsx",
+        group_id: "group:ui",
+        x: 200,
+        y: 220,
+        width: 200,
+        height: 50,
+        source_ref: {
+          file_path: "src/ui/Button.tsx",
+          start_line: 5,
+          end_line: 40,
+        },
+      },
+      {
+        id: "class:BaseService",
+        kind: "class",
+        label: "BaseService",
+        x: 600,
+        y: 150,
+        width: 220,
+        height: 60,
+        metrics: {
+          class_count: 1,
+          function_count: 4,
+          complexity: 2,
+        },
+      },
+      {
+        id: "module:core",
+        kind: "module",
+        label: "core",
+        x: 600,
+        y: 350,
+        width: 200,
+        height: 50,
+      },
+      {
+        id: "external:react",
+        kind: "external",
+        label: "react",
+        x: 200,
+        y: 450,
+        width: 160,
+        height: 40,
+      },
+    ],
+    edges: [
+      {
+        id: "edge:import",
+        from: "file:src/index.ts",
+        to: "file:src/ui/Button.tsx",
+        relationship: "import",
+        confidence: "static",
+        evidence_id: 101,
+        evidence_key: "src/index.ts:1-1:import_stmt",
+        label: "imports Button",
+        points: [
+          { x: 150, y: 190 },
+          { x: 200, y: 220 },
+        ],
+      },
+      {
+        id: "edge:call",
+        from: "file:src/index.ts",
+        to: "class:BaseService",
+        relationship: "call",
+        confidence: "static",
+        evidence_id: 102,
+        evidence_key: "src/index.ts:10-10:call_site",
+        label: "executes",
+        points: [
+          { x: 330, y: 170 },
+          { x: 600, y: 170 },
+        ],
+      },
+      {
+        id: "edge:inheritance",
+        from: "class:BaseService",
+        to: "module:core",
+        relationship: "inheritance",
+        confidence: "confirmed",
+        evidence_id: 103,
+        evidence_key: "BaseService.ts:5-15:ast_node",
+        label: "extends",
+        points: [
+          { x: 700, y: 210 },
+          { x: 700, y: 350 },
+        ],
+      },
+      {
+        id: "edge:instantiation",
+        from: "file:src/index.ts",
+        to: "class:BaseService",
+        relationship: "instantiation",
+        confidence: "confirmed",
+        evidence_id: 104,
+        evidence_key: "src/index.ts:12-12:call_site",
+        label: "new Service()",
+        points: [
+          { x: 330, y: 180 },
+          { x: 600, y: 180 },
+        ],
+      },
+      {
+        id: "edge:declared_dependency",
+        from: "file:src/ui/Button.tsx",
+        to: "external:react",
+        relationship: "declared_dependency",
+        confidence: "static",
+        evidence_id: 105,
+        evidence_key: "package.json:15-15:manifest_entry",
+        label: "react dep",
+        points: [
+          { x: 250, y: 270 },
+          { x: 250, y: 450 },
+        ],
+      },
+      {
+        id: "edge:entry",
+        from: "file:src/index.ts",
+        to: "module:core",
+        relationship: "entry",
+        confidence: "confirmed",
+        evidence_id: 106,
+        evidence_key: "package.json:5-5:entry_point",
+        label: "starts core",
+        points: [
+          { x: 240, y: 190 },
+          { x: 600, y: 370 },
+        ],
+      },
+      {
+        id: "edge:inferred",
+        from: "file:src/ui/Button.tsx",
+        to: "class:BaseService",
+        relationship: "call",
+        confidence: "inferred",
+        evidence_id: 107,
+        evidence_key: "src/ui/Button.tsx:20-20:call_site",
+        label: "client.notify",
+        points: [
+          { x: 400, y: 240 },
+          { x: 600, y: 190 },
+        ],
+      },
+      {
+        id: "edge:unknown",
+        from: "file:src/index.ts",
+        to: "external:react",
+        relationship: "call",
+        confidence: "unknown",
+        evidence_id: 108,
+        evidence_key: "src/index.ts:25-25:call_site",
+        label: "dynamicCall",
+        points: [
+          { x: 200, y: 190 },
+          { x: 200, y: 450 },
+        ],
+      },
+    ],
+  };
+
+  it("renders nodes and groups from golden positioned model", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    expect(screen.getByText("index.ts")).toBeInTheDocument();
+    expect(screen.getByText("Button.tsx")).toBeInTheDocument();
+    expect(screen.getByText("BaseService")).toBeInTheDocument();
+    expect(screen.getByText("core")).toBeInTheDocument();
+    expect(screen.getByText("react")).toBeInTheDocument();
+    expect(screen.getByText("UI Components")).toBeInTheDocument();
+  });
+
+  it("inferred edge renders visible text badge 'inferred'", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const inferredBadge = screen.getByTestId("edge-inferred-badge");
+    expect(inferredBadge).toBeInTheDocument();
+    expect(inferredBadge).toHaveTextContent("inferred");
+  });
+
+  it("unknown edge renders visible text badge 'unknown'", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const unknownBadge = screen.getByTestId("edge-unknown-badge");
+    expect(unknownBadge).toBeInTheDocument();
+    expect(unknownBadge).toHaveTextContent("unknown");
+  });
+
+  it("legend toggles and shows all relationship types and confidence descriptions", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const legendBtn = screen.getByLabelText("Toggle diagram legend");
+    expect(legendBtn).toBeInTheDocument();
+
+    // Click to open legend
+    fireEvent.click(legendBtn);
+
+    expect(screen.getByText("Relationships")).toBeInTheDocument();
+    expect(screen.getByText("import")).toBeInTheDocument();
+    expect(screen.getByText("call")).toBeInTheDocument();
+    expect(screen.getByText("instantiation")).toBeInTheDocument();
+    expect(screen.getByText("inheritance")).toBeInTheDocument();
+    expect(screen.getByText("manifest dep")).toBeInTheDocument();
+    expect(screen.getByText("entry point")).toBeInTheDocument();
+    expect(screen.getByText("Confidence")).toBeInTheDocument();
+    expect(screen.getByText("dashed line")).toBeInTheDocument();
+  });
+
+  it("filtering hides the right edges reactively", async () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    // Initially edges like 'imports Button' and 'client.notify' are visible
+    expect(screen.getByText("imports Button")).toBeInTheDocument();
+    expect(screen.getByText("client.notify")).toBeInTheDocument();
+
+    // Open filter panel
+    const filterBtn = screen.getByLabelText("Toggle diagram filters");
+    fireEvent.click(filterBtn);
+
+    // Toggle off 'import' relationships
+    const importCheck = screen.getByLabelText("import");
+    fireEvent.click(importCheck);
+
+    // The 'imports Button' edge label should now be hidden
+    await waitFor(() => {
+      expect(screen.queryByText("imports Button")).not.toBeInTheDocument();
+    });
+
+    // But other edges remain
+    expect(screen.getByText("client.notify")).toBeInTheDocument();
+  });
+
+  it("search highlights and focuses the matching node", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const searchInput = screen.getByRole("searchbox", { name: "Search nodes" });
+    fireEvent.change(searchInput, { target: { value: "BaseService" } });
+
+    expect(screen.getByText("1 match")).toBeInTheDocument();
+
+    // Press Enter to focus
+    fireEvent.keyDown(searchInput, { key: "Enter", code: "Enter" });
+
+    const baseServiceNode = screen.getByRole("button", {
+      name: "class node: BaseService",
+    });
+    expect(baseServiceNode).toBeInTheDocument();
+  });
+
+  it("clicking a node opens source in Explorer at the line and selects it in inspector", () => {
+    const handleNavigateToSource = vi.fn();
+    const handleSelectDiagramElement = vi.fn();
+
+    render(
+      <ArchitectureView
+        initialPositionedModel={goldenPositionedModel}
+        onNavigateToSource={handleNavigateToSource}
+        onSelectDiagramElement={handleSelectDiagramElement}
+      />
+    );
+
+    const indexNode = screen.getByRole("button", {
+      name: "file node: index.ts",
+    });
+    fireEvent.click(indexNode);
+
+    // Assert source navigation called with exact file and line
+    expect(handleNavigateToSource).toHaveBeenCalledWith("src/index.ts", 1);
+
+    // Assert diagram element selected for inspector
+    expect(handleSelectDiagramElement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "node",
+        node: expect.objectContaining({ id: "file:src/index.ts" }),
+      })
+    );
+  });
+
+  it("keyboard navigation: Tab to nodes and Enter to open source", () => {
+    const handleNavigateToSource = vi.fn();
+
+    render(
+      <ArchitectureView
+        initialPositionedModel={goldenPositionedModel}
+        onNavigateToSource={handleNavigateToSource}
+      />
+    );
+
+    const indexNode = screen.getByRole("button", {
+      name: "file node: index.ts",
+    });
+
+    // Press Enter while focused on node
+    fireEvent.keyDown(indexNode, { key: "Enter", code: "Enter" });
+    expect(handleNavigateToSource).toHaveBeenCalledWith("src/index.ts", 1);
+  });
+
+  it("progressive disclosure: synthetic 2,000-node model returns collapsed overview and keeps DOM node count bounded", async () => {
+    // Mock getDiagram to return a collapsed overview for a large 2,000-node repo
+    const mockOverviewNodes = Array.from({ length: 20 }, (_, i) => ({
+      id: `group:mod_${i}`,
+      kind: "module" as const,
+      label: `Module ${i}`,
+      width: 200,
+      height: 50,
+      x: (i % 5) * 220,
+      y: Math.floor(i / 5) * 80,
+    }));
+
+    const mockCollapsedOverview = {
+      model: {
+        diagram_type: "module_dependency" as const,
+        nodes: mockOverviewNodes,
+        edges: [],
+        groups: Array.from({ length: 20 }, (_, i) => ({
+          id: `group:mod_${i}`,
+          label: `Module ${i}`,
+          collapsed: true,
+        })),
+      },
+      aggregated_edges: [],
+      total_node_count: 2000,
+      threshold: 150,
+    };
+
+    vi.spyOn(tauriLib, "getDiagram").mockResolvedValue({
+      model: {
+        diagram_type: "file_dependency",
+        nodes: Array.from({ length: 2000 }, (_, i) => ({
+          id: `file:src/file_${i}.ts`,
+          kind: "file",
+          label: `file_${i}.ts`,
+          width: 180,
+          height: 40,
+        })),
+        edges: [],
+        groups: [],
+      },
+      dropped_edges: [],
+      collapsed_overview: mockCollapsedOverview,
+    });
+
+    render(<ArchitectureView projectId={1} />);
+
+    // Verify banner notifies user of progressive disclosure
+    await waitFor(() => {
+      expect(screen.getByTestId("progressive-disclosure-banner")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Graph exceeds 150 nodes \(2000 files\)/)
+    ).toBeInTheDocument();
+
+    // Verify DOM node count remains strictly bounded to overview (around 20 modules, not 2,000 DOM elements)
+    const renderedButtons = screen.getAllByRole("button");
+    // Far fewer than 2,000 DOM nodes!
+    expect(renderedButtons.length).toBeLessThan(100);
+  });
+});

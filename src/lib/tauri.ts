@@ -17,6 +17,12 @@ import type {
   SymbolDto,
   SymbolRecord,
 } from "@/types/ipc";
+import type {
+  DiagramOptions,
+  DiagramResponse,
+  DiagramType,
+  DrillDownResult,
+} from "@/types/diagram";
 
 // Safely detect if running inside Tauri webview
 export const isTauri = () => {
@@ -241,6 +247,50 @@ export async function analyzeArchitecture(projectId: number, projectPath: string
   if (!isTauri()) return null;
   return await tauriInvoke<any>("analyze_architecture", { projectId, projectPath });
 }
+
+export async function getDiagram(
+  diagramType: DiagramType,
+  projectId: number,
+  options?: DiagramOptions
+): Promise<DiagramResponse> {
+  if (!isTauri()) {
+    return {
+      model: {
+        diagram_type: diagramType,
+        nodes: [],
+        edges: [],
+        groups: [],
+      },
+      dropped_edges: [],
+      collapsed_overview: null,
+    };
+  }
+  return await tauriInvoke<DiagramResponse>("get_diagram", {
+    diagramType,
+    projectId,
+    options,
+  });
+}
+
+export async function drillDown(
+  groupId: string,
+  projectId: number,
+  diagramType?: DiagramType
+): Promise<DrillDownResult> {
+  if (!isTauri()) {
+    return {
+      group_id: groupId,
+      nodes: [],
+      edges: [],
+    };
+  }
+  return await tauriInvoke<DrillDownResult>("drill_down", {
+    groupId,
+    projectId,
+    diagramType,
+  });
+}
+
 
 
 

@@ -18,6 +18,7 @@ import type {
   CallDetailItem,
   SideEffectMarker,
 } from "@/types/ipc";
+import type { SelectedDiagramElement } from "@/types/diagram";
 import { Badge } from "@/components/ui/Badge";
 import { getClassDetail, getSymbolDetail } from "@/lib/tauri";
 
@@ -27,6 +28,8 @@ export interface InspectorPanelProps {
   width: number;
   selectedFile: FileRecord | null;
   selectedSymbol?: SymbolRecord | null;
+  selectedDiagramElement?: SelectedDiagramElement | null;
+  onClearDiagramElement?: () => void;
   onSelectSymbol?: (symbol: SymbolRecord | null) => void;
   onNavigateToSource?: (filePath: string, line: number) => void;
   // Optional pre-loaded detail for tests
@@ -40,6 +43,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   width,
   selectedFile,
   selectedSymbol,
+  selectedDiagramElement,
+  onClearDiagramElement,
   onSelectSymbol,
   onNavigateToSource,
   initialSymbolDetail,
@@ -202,12 +207,28 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </button>
           )}
           <span className="text-caption font-semibold text-text-primary uppercase tracking-wider font-mono">
-            {isInspectingSymbol ? "Symbol Inspector" : "File Inspector"}
+            {selectedDiagramElement
+              ? selectedDiagramElement.type === "node"
+                ? "Diagram Node"
+                : "Relationship"
+              : isInspectingSymbol
+              ? "Symbol Inspector"
+              : "File Inspector"}
           </span>
           {isLoading && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
         </div>
 
         <div className="flex items-center gap-1">
+          {selectedDiagramElement && onClearDiagramElement && (
+            <button
+              onClick={onClearDiagramElement}
+              title="Clear diagram element selection"
+              className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary"
+              data-testid="inspector-clear-diagram-btn"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
           {isInspectingSymbol && selectedFile && (
             <button
               onClick={handleClearSymbol}
@@ -231,7 +252,22 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-3 text-meta flex flex-col gap-4">
-        {isInspectingSymbol && activeSymbolRecord ? (
+        {selectedDiagramElement ? (
+          selectedDiagramElement.type === "node" ? (
+            <DiagramNodeInspector
+              node={selectedDiagramElement.node}
+              connectedEdges={selectedDiagramElement.connectedEdges}
+              onNavigateToSource={onNavigateToSource}
+            />
+          ) : (
+            <DiagramEdgeInspector
+              edge={selectedDiagramElement.edge}
+              fromNode={selectedDiagramElement.fromNode}
+              toNode={selectedDiagramElement.toNode}
+              onNavigateToSource={onNavigateToSource}
+            />
+          )
+        ) : isInspectingSymbol && activeSymbolRecord ? (
           <>
             {/* Symbol Header Summary */}
             <div className="flex flex-col gap-2 pb-3 border-b border-border-subtle" data-testid="symbol-header-section">
@@ -832,3 +868,205 @@ function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
+
+const DiagramNodeInspector: React.FC<{
+  node: import("@/types/diagram").DiagramNode;
+  connectedEdges?: import("@/types/diagram").DiagramEdge[];
+  onNavigateToSource?: (filePath: string, line: number) => void;
+}> = ({ node, connectedEdges, onNavigateToSource }) => {
+  return (
+    <div className="flex flex-col gap-3 font-mono" data-testid="diagram-node-inspector">
+      <div className="flex flex-col gap-1 pb-3 border-b border-border-subtle">
+        <div className="flex items-center justify-between gap-1">
+          <span className="font-semibold text-text-primary text-sm truncate" title={node.label}>
+            {node.label}
+          </span>
+          <Badge variant="neutral" size="sm" className="uppercase text-[10px]">
+            {node.kind}
+          </Badge>
+        </div>
+        <div className="text-[10px] text-text-muted truncate" title={node.id}>
+          ID: {node.id}
+        </div>
+        {node.group_id && (
+          <div className="text-[10px] text-text-muted truncate">
+            Group: {node.group_id}
+          </div>
+        )}
+      </div>
+
+      {node.source_ref && (
+        <div className="flex flex-col gap-1 p-2 bg-canvas rounded border border-border-subtle text-[11px]">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+            Source Reference
+          </span>
+          <div className="flex items-center justify-between text-text-secondary">
+            <span className="truncate" title={node.source_ref.file_path}>
+              {node.source_ref.file_path}:{node.source_ref.start_line}
+            </span>
+            {onNavigateToSource && (
+              <button
+                type="button"
+                onClick={() => onNavigateToSource(node.source_ref!.file_path, node.source_ref!.start_line)}
+                className="text-accent flex items-center gap-1 hover:underline text-[10px] flex-shrink-0"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Open in Source Explorer</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {node.metrics && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+            Metrics
+          </span>
+          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+            {node.metrics.line_count !== undefined && (
+              <div className="p-1.5 bg-subtle rounded border border-border-subtle">
+                <span className="text-text-muted text-[10px] block">Lines</span>
+                <span className="text-text-primary font-semibold">{node.metrics.line_count}</span>
+              </div>
+            )}
+            {node.metrics.function_count !== undefined && (
+              <div className="p-1.5 bg-subtle rounded border border-border-subtle">
+                <span className="text-text-muted text-[10px] block">Functions</span>
+                <span className="text-text-primary font-semibold">{node.metrics.function_count}</span>
+              </div>
+            )}
+            {node.metrics.class_count !== undefined && (
+              <div className="p-1.5 bg-subtle rounded border border-border-subtle">
+                <span className="text-text-muted text-[10px] block">Classes</span>
+                <span className="text-text-primary font-semibold">{node.metrics.class_count}</span>
+              </div>
+            )}
+            {node.metrics.complexity !== undefined && (
+              <div className="p-1.5 bg-subtle rounded border border-border-subtle">
+                <span className="text-text-muted text-[10px] block">Complexity</span>
+                <span className="text-text-primary font-semibold">{node.metrics.complexity}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {connectedEdges && connectedEdges.length > 0 && (
+        <div className="flex flex-col gap-1 pt-2 border-t border-border-subtle">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+            Connected Links ({connectedEdges.length})
+          </span>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {connectedEdges.map((e) => (
+              <div key={e.id} className="p-1.5 bg-subtle rounded border border-border-subtle text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-text-primary">{e.relationship}</span>
+                  <Badge variant={e.confidence === "confirmed" ? "confirmed" : e.confidence === "static" ? "static" : e.confidence === "inferred" ? "inferred" : "unknown"} size="sm">
+                    {e.confidence}
+                  </Badge>
+                </div>
+                <div className="text-text-muted truncate mt-0.5" title={`${e.from} -> ${e.to}`}>
+                  {e.from === node.id ? `-> ${e.to}` : `<- ${e.from}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DiagramEdgeInspector: React.FC<{
+  edge: import("@/types/diagram").DiagramEdge;
+  fromNode?: import("@/types/diagram").DiagramNode;
+  toNode?: import("@/types/diagram").DiagramNode;
+  onNavigateToSource?: (filePath: string, line: number) => void;
+}> = ({ edge, fromNode, toNode, onNavigateToSource }) => {
+  let sourceFilePath: string | null = null;
+  let sourceLineNumber: number | null = null;
+
+  if (edge.evidence_key) {
+    const parts = edge.evidence_key.split(":");
+    if (parts.length >= 3) {
+      sourceFilePath = parts.slice(0, parts.length - 2).join(":");
+      const lineRange = parts[parts.length - 2];
+      const startLine = parseInt(lineRange.split("-")[0], 10);
+      if (!isNaN(startLine)) {
+        sourceLineNumber = startLine;
+      }
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 font-mono" data-testid="diagram-edge-inspector">
+      <div className="flex flex-col gap-1 pb-3 border-b border-border-subtle">
+        <div className="flex items-center justify-between gap-1">
+          <span className="font-semibold text-text-primary text-sm uppercase">
+            {edge.relationship}
+          </span>
+          <Badge variant={edge.confidence === "confirmed" ? "confirmed" : edge.confidence === "static" ? "static" : edge.confidence === "inferred" ? "inferred" : "unknown"} size="sm">
+            {edge.confidence}
+          </Badge>
+        </div>
+        {edge.label && (
+          <div className="text-[11px] text-text-secondary mt-0.5">
+            Label: <span className="text-text-primary font-medium">{edge.label}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Endpoints */}
+      <div className="flex flex-col gap-1.5 p-2 bg-canvas rounded border border-border-subtle text-[11px]">
+        <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+          Endpoints
+        </span>
+        <div className="text-text-secondary truncate">
+          <span className="text-text-muted">From: </span>
+          <span className="text-text-primary font-medium" title={edge.from}>
+            {fromNode ? fromNode.label : edge.from}
+          </span>
+        </div>
+        <div className="text-text-secondary truncate">
+          <span className="text-text-muted">To: </span>
+          <span className="text-text-primary font-medium" title={edge.to}>
+            {toNode ? toNode.label : edge.to}
+          </span>
+        </div>
+      </div>
+
+      {/* Provenance Evidence */}
+      <div className="flex flex-col gap-2 p-2 bg-subtle rounded border border-border-subtle text-[11px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+            Provenance Evidence
+          </span>
+          <span className="text-[9px] text-text-muted">ID #{edge.evidence_id}</span>
+        </div>
+
+        <div className="text-[10px] break-all bg-canvas p-1.5 rounded border border-border-subtle text-text-muted font-mono" title={edge.evidence_key}>
+          Key: {edge.evidence_key}
+        </div>
+
+        {sourceFilePath && sourceLineNumber !== null && (
+          <div className="flex items-center justify-between pt-1 text-[11px]">
+            <span className="truncate text-text-secondary" title={sourceFilePath}>
+              {sourceFilePath}:L{sourceLineNumber}
+            </span>
+            {onNavigateToSource && (
+              <button
+                type="button"
+                onClick={() => onNavigateToSource(sourceFilePath!, sourceLineNumber!)}
+                className="text-accent flex items-center gap-1 hover:underline text-[10px] flex-shrink-0"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Jump to Source</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -4,6 +4,7 @@ import { NavRail } from "./NavRail";
 import { InspectorPanel } from "./InspectorPanel";
 import { StatusBar } from "./StatusBar";
 import type { FileRecord, Project, ScanProgressPayload, SymbolRecord, ViewType } from "@/types/ipc";
+import type { SelectedDiagramElement } from "@/types/diagram";
 
 interface AppShellProps {
   currentProject: Project | null;
@@ -11,6 +12,8 @@ interface AppShellProps {
   files: FileRecord[];
   selectedFile: FileRecord | null;
   selectedSymbol?: SymbolRecord | null;
+  selectedDiagramElement?: SelectedDiagramElement | null;
+  onClearDiagramElement?: () => void;
   isScanning: boolean;
   scanProgress: ScanProgressPayload | null;
   activeView: ViewType;
@@ -36,6 +39,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   files,
   selectedFile,
   selectedSymbol,
+  selectedDiagramElement,
+  onClearDiagramElement,
   isScanning,
   scanProgress,
   activeView,
@@ -83,6 +88,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           width={inspectorWidth}
           selectedFile={selectedFile}
           selectedSymbol={selectedSymbol}
+          selectedDiagramElement={selectedDiagramElement}
+          onClearDiagramElement={onClearDiagramElement}
           onSelectSymbol={onSelectSymbol}
           onNavigateToSource={onNavigateToSource}
         />

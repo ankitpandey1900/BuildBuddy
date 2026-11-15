@@ -345,10 +345,50 @@ Benchmarked using Vitest with explicit high-resolution timing (`performance.now(
 - **150-node / ~450-edge file dependency graph layout**: **2473.15 ms**.
 - **100-node group drill_down layout**: **207.16 ms**.
 
-### 7. Intentionally Not Supported in this Phase
-- **React Flow Canvas UI Rendering**: Visual interactive rendering on the React Flow canvas is NOT implemented in this task and is scheduled for the next task.
-- **Custom User Node Positioning Persistence**: Saving manual drag-and-drop coordinates to the database is not supported; layouts are computed deterministically.
-- **Interactive Edge Editing / Rerouting**: Users cannot manually drag edge bend points.
+## 12. Architecture Screen & React Flow Interactive Rendering
+
+### 1. Canvas Architecture & Sizing
+- **React Flow Integration**: Renders the pre-computed, deterministic `PositionedModel` from the ELK layout worker.
+- **Node Sizing Standards**: Fixed dimensions per kind matching Design Tokens:
+  - `file`: 180 x 40 px
+  - `module`: 200 x 50 px
+  - `class`: 220 x 60 px
+  - `component`: 200 x 50 px
+  - `external`: 160 x 40 px
+- **Visual Styling**: Professional engineering workbench standard (thin 1px borders, neutral palette, high contrast, no gradients, glows, shadows, or AI badges).
+
+### 2. Edge Rendering & Visual Encoding
+- **Orthogonal Bend Points**: `OrthogonalEdge` draws exact SVG rectilinear paths using the bend points computed by ELK (`edge.points`), falling back to smooth step paths only when bend points are absent.
+- **Line Styles & Markers**:
+  - `import`: 1.5px solid muted stroke, default triangular arrowhead (`#bb-arrow-default`).
+  - `call`: 1.5px solid stroke with label.
+  - `inheritance`: 1.75px solid secondary stroke with hollow triangular marker (`#bb-arrow-inheritance`).
+  - `instantiation`: 1.5px dashed stroke (`5,4` dash array).
+  - `declared_dependency`: 1.5px dotted stroke (`2,3` dash array).
+  - `entry`: 2.5px prominent solid accent stroke with blue arrowhead (`#bb-arrow-entry`).
+- **Confidence Overrides**: Never rely on color alone.
+  - `inferred`: Rendered with dashed stroke (`6,4`) AND an explicit uppercase badge labeled `"inferred"`.
+  - `unknown`: Rendered with dotted stroke (`2,2`) AND an explicit uppercase badge labeled `"unknown"`.
+
+### 3. Progressive Disclosure & Navigation
+- **150-Node Threshold Banner**: If a project diagram exceeds 150 nodes, the system loads a collapsed module overview and displays an informative banner with the total file count.
+- **Group Drill-Down**: Clicking a module group triggers `drill_down(group_id)`, showing only the nodes and edges internal to that group.
+- **Breadcrumb Navigation**: A persistent breadcrumb banner (`Back to Overview / <module_name>`) allows one-click return to the overview.
+
+### 4. Selection & Shared Inspector Integration
+- **Node Selection**: Clicking a node highlights its upstream dependencies (orange) and downstream dependencies (green), opens the node's source file in Explorer at the line, and opens `DiagramNodeInspector` in the shared right inspector panel.
+- **Edge Selection**: Clicking an edge highlights the connection and displays `DiagramEdgeInspector` showing relationship type, confidence, endpoints, and exact source evidence key and numeric ID.
+
+### 5. Multi-Format Export & Path Security Boundary
+- **Supported Formats**:
+  - `Mermaid (.mmd)`: Deterministic text export mapping node kinds to shapes and relationship types to Mermaid arrow styles.
+  - `SVG (.svg)`: Inline SVG serialization with embedded styles.
+  - `PNG (.png)`: 2x high-resolution raster export via offscreen canvas.
+  - `PDF (.pdf)`: Vector print format using SVG pipeline.
+- **Path Security Boundary**:
+  - `validateExportPath(targetPath, projectRootPath)`: Strictly prohibits saving export files inside the analyzed project directory or its descendants.
+  - Rejects attempts to overwrite or pollute the target repository source code, enforcing BuildBuddy's core safety guarantee: *never modify, execute, or shell out on files from the analyzed project*.
+
 
 
 

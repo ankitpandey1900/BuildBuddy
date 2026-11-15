@@ -132,6 +132,35 @@ export interface PositionedModel {
   height: number;
 }
 
+export interface DiagramOptions {
+  enable_progressive_disclosure?: boolean;
+}
+
+export interface DiagramResponse {
+  model: DiagramModel;
+  dropped_edges: DroppedEdge[];
+  collapsed_overview?: CollapsedOverview | null;
+}
+
+export type SelectedDiagramElement =
+  | {
+      type: "node";
+      node: DiagramNode;
+      connectedEdges?: DiagramEdge[];
+    }
+  | {
+      type: "edge";
+      edge: DiagramEdge;
+      fromNode?: DiagramNode;
+      toNode?: DiagramNode;
+    };
+
+export interface DiagramFilters {
+  relationshipTypes: RelationshipType[];
+  confidences: DiagramConfidence[];
+  isolatedGroupId: string | null;
+}
+
 export const NODE_SIZE_FILE = { width: 180, height: 40 };
 export const NODE_SIZE_MODULE = { width: 200, height: 50 };
 export const NODE_SIZE_CLASS = { width: 220, height: 60 };
