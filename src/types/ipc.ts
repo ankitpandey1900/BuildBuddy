@@ -292,3 +292,105 @@ export interface GitRepoStatus {
   current_branch: string | null;
   commit_hash: string | null;
 }
+
+export interface EvidenceItem {
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  snippet: string;
+  signal_type: string;
+  description: string;
+}
+
+export interface FrameworkDetection {
+  name: string;
+  version: string | null;
+  confidence: "confirmed" | "static" | "inferred" | "unknown";
+  evidence: EvidenceItem[];
+}
+
+export interface EntryPoint {
+  name: string;
+  entry_type: string;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  snippet: string;
+  confidence: "confirmed" | "static" | "inferred" | "unknown";
+}
+
+export interface ModuleGroup {
+  name: string;
+  root_directory: string;
+  layer: "frontend" | "backend" | "data" | "shared" | "config" | "unclassified";
+  file_count: number;
+  cohesion_score: number;
+  files: string[];
+}
+
+export interface LanguageMetric {
+  name: string;
+  file_count: number;
+  line_count: number;
+  percentage: number;
+}
+
+export interface OverviewMetrics {
+  total_files: number;
+  total_modules: number;
+  total_symbols: number;
+  total_functions: number;
+  total_classes: number;
+  total_entry_points: number;
+  total_dependencies: number;
+  unsupported_files_count: number;
+  partial_files_count: number;
+}
+
+export interface AnalysisCompletionDto {
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  files_scanned: number;
+  files_parsed: number;
+}
+
+export interface OverviewDataDto {
+  project_name: string;
+  root_path: string;
+  metrics: OverviewMetrics;
+  languages: LanguageMetric[];
+  frameworks: FrameworkDetection[];
+  entry_points: EntryPoint[];
+  modules: ModuleGroup[];
+  completion: AnalysisCompletionDto | null;
+}
+
+export interface ArchitectureNode {
+  id: string;
+  label: string;
+  kind: string;
+  layer: string;
+  file_path: string | null;
+}
+
+export interface ArchitectureEdge {
+  id: string;
+  source: string;
+  target: string;
+  edge_type: string;
+}
+
+export interface ArchitectureGroup {
+  id: string;
+  label: string;
+  layer: string;
+  node_ids: string[];
+}
+
+export interface ArchitectureModel {
+  nodes: ArchitectureNode[];
+  edges: ArchitectureEdge[];
+  groups: ArchitectureGroup[];
+}

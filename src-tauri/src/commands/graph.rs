@@ -157,6 +157,36 @@ pub async fn resolve_and_persist_project_graph(
     // Cross-file call resolution after import edges are stored
     let _ = crate::core::graph::CallResolver::resolve_project_calls(&conn, project_id);
 
+    // Run architecture analysis (frameworks, entry points, modules, diagrams)
+    let parser = crate::core::parser::ParserManager::new();
+    let mut all_files_vec = Vec::new();
+    let mut parsed_results_vec = Vec::new();
+    for (_fid, rel_path) in &files {
+        let abs_path = root.join(rel_path);
+        let content = fs::read_to_string(&abs_path).unwrap_or_default();
+        all_files_vec.push((rel_path.clone(), content.clone()));
+
+        let ext = abs_path.extension().and_then(|s| s.to_str());
+        if let Some(e) = ext {
+            if matches!(e, "ts" | "tsx" | "js" | "jsx" | "py") {
+                if let Ok(parsed) = parser.parse_source(rel_path, Some(e), &content) {
+                    parsed_results_vec.push((rel_path.clone(), parsed, content));
+                }
+            }
+        }
+    }
+    let all_files_refs: Vec<(String, &str)> = all_files_vec.iter().map(|(p, c)| (p.clone(), c.as_str())).collect();
+    let parsed_refs: Vec<(String, &crate::core::parser::FileParseResult, &str)> = parsed_results_vec.iter().map(|(p, res, c)| (p.clone(), res, c.as_str())).collect();
+    let arch_report = crate::core::arch::ArchitectureAnalyzer::analyze(&all_files_refs, &parsed_refs, &manifest_deps, &edges);
+    let _ = crate::core::store::arch::ArchStore::persist_architecture(
+        &mut conn,
+        project_id,
+        &arch_report.frameworks,
+        &arch_report.entry_points,
+        &arch_report.modules,
+        &arch_report.architecture_model,
+    );
+
     for cycle in cycles {
         let desc = cycle.cycle_files.join(" -> ");
         let metadata = serde_json::to_string(&cycle.cycle_files).unwrap_or_default();

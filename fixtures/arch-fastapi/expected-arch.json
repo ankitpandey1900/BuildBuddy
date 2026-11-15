@@ -1,0 +1,292 @@
+{
+  "frameworks": [
+    {
+      "name": "FastAPI",
+      "version": "==0.111.0",
+      "confidence": "Confirmed",
+      "evidence": [
+        {
+          "file_path": "requirements.txt",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "fastapi==0.111.0",
+          "signal_type": "manifest_dependency",
+          "description": "Declared FastAPI manifest dependency"
+        },
+        {
+          "file_path": "api/routes.py",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "from fastapi import APIRouter",
+          "signal_type": "import_usage",
+          "description": "AST import of FastAPI module"
+        },
+        {
+          "file_path": "api/routes.py",
+          "start_line": 4,
+          "end_line": 4,
+          "snippet": "router = APIRouter()",
+          "signal_type": "source_pattern",
+          "description": "FastAPI application or router instance"
+        },
+        {
+          "file_path": "main.py",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "from fastapi import FastAPI",
+          "signal_type": "import_usage",
+          "description": "AST import of FastAPI module"
+        },
+        {
+          "file_path": "main.py",
+          "start_line": 4,
+          "end_line": 4,
+          "snippet": "app = FastAPI(title=\"Sample API\")",
+          "signal_type": "source_pattern",
+          "description": "FastAPI application or router instance"
+        }
+      ]
+    }
+  ],
+  "entry_points": [
+    {
+      "name": "FastAPI Application Factory / Instance",
+      "entry_type": "app_factory",
+      "file_path": "main.py",
+      "start_line": 4,
+      "end_line": 4,
+      "snippet": "app = FastAPI(title=\"Sample API\")",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "Python __main__ Entry",
+      "entry_type": "main_block",
+      "file_path": "main.py",
+      "start_line": 7,
+      "end_line": 7,
+      "snippet": "if __name__ == \"__main__\":",
+      "confidence": "Confirmed"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 0.0,
+      "files": [
+        "main.py",
+        "requirements.txt"
+      ]
+    },
+    {
+      "name": "api",
+      "root_directory": "api",
+      "layer": "Backend",
+      "file_count": 1,
+      "cohesion_score": 0.0,
+      "files": [
+        "api/routes.py"
+      ]
+    },
+    {
+      "name": "models",
+      "root_directory": "models",
+      "layer": "Data",
+      "file_count": 1,
+      "cohesion_score": 1.0,
+      "files": [
+        "models/user.py"
+      ]
+    },
+    {
+      "name": "services",
+      "root_directory": "services",
+      "layer": "Backend",
+      "file_count": 1,
+      "cohesion_score": 0.0,
+      "files": [
+        "services/user_service.py"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "."
+      },
+      {
+        "id": "file:main.py",
+        "label": "main.py",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "main.py"
+      },
+      {
+        "id": "file:requirements.txt",
+        "label": "requirements.txt",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "requirements.txt"
+      },
+      {
+        "id": "module:api",
+        "label": "api",
+        "kind": "module",
+        "layer": "backend",
+        "file_path": "api"
+      },
+      {
+        "id": "file:api/routes.py",
+        "label": "routes.py",
+        "kind": "file",
+        "layer": "backend",
+        "file_path": "api/routes.py"
+      },
+      {
+        "id": "module:models",
+        "label": "models",
+        "kind": "module",
+        "layer": "data",
+        "file_path": "models"
+      },
+      {
+        "id": "file:models/user.py",
+        "label": "user.py",
+        "kind": "file",
+        "layer": "data",
+        "file_path": "models/user.py"
+      },
+      {
+        "id": "module:services",
+        "label": "services",
+        "kind": "module",
+        "layer": "backend",
+        "file_path": "services"
+      },
+      {
+        "id": "file:services/user_service.py",
+        "label": "user_service.py",
+        "kind": "file",
+        "layer": "backend",
+        "file_path": "services/user_service.py"
+      },
+      {
+        "id": "entry:main.py:4",
+        "label": "FastAPI Application Factory / Instance",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "main.py"
+      },
+      {
+        "id": "entry:main.py:7",
+        "label": "Python __main__ Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "main.py"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:main.py:.",
+        "source": "file:main.py",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:requirements.txt:.",
+        "source": "file:requirements.txt",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:api/routes.py:api",
+        "source": "file:api/routes.py",
+        "target": "module:api",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:models/user.py:models",
+        "source": "file:models/user.py",
+        "target": "module:models",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:services/user_service.py:services",
+        "source": "file:services/user_service.py",
+        "target": "module:services",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "import:api/routes.py:services/user_service.py:2",
+        "source": "file:api/routes.py",
+        "target": "file:services/user_service.py",
+        "edge_type": "imports"
+      },
+      {
+        "id": "import:main.py:api/routes.py:2",
+        "source": "file:main.py",
+        "target": "file:api/routes.py",
+        "edge_type": "imports"
+      },
+      {
+        "id": "import:services/user_service.py:models/user.py:1",
+        "source": "file:services/user_service.py",
+        "target": "file:models/user.py",
+        "edge_type": "imports"
+      },
+      {
+        "id": "starts:FastAPI Application Factory / Instance:main.py",
+        "source": "entry:main.py:4",
+        "target": "file:main.py",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Python __main__ Entry:main.py",
+        "source": "entry:main.py:7",
+        "target": "file:main.py",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:main.py",
+          "file:requirements.txt"
+        ]
+      },
+      {
+        "id": "group:api",
+        "label": "api",
+        "layer": "backend",
+        "node_ids": [
+          "file:api/routes.py"
+        ]
+      },
+      {
+        "id": "group:models",
+        "label": "models",
+        "layer": "data",
+        "node_ids": [
+          "file:models/user.py"
+        ]
+      },
+      {
+        "id": "group:services",
+        "label": "services",
+        "layer": "backend",
+        "node_ids": [
+          "file:services/user_service.py"
+        ]
+      }
+    ]
+  }
+}

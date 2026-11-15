@@ -67,6 +67,9 @@ pub fn run() {
             commands::graph::get_import_edges,
             commands::graph::get_git_status,
             commands::graph::resolve_and_persist_project_graph,
+            commands::arch::get_overview_data,
+            commands::arch::get_architecture_model,
+            commands::arch::analyze_architecture,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");

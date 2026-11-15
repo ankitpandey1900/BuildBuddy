@@ -1,3 +1,4 @@
+pub mod arch;
 pub mod calls;
 pub mod connection;
 pub mod files;
@@ -5,6 +6,8 @@ pub mod graph;
 pub mod migrations;
 pub mod projects;
 pub mod symbols;
+
+pub use arch::ArchStore;
 
 pub use calls::{
     delete_calls_for_file_incremental, get_calls_for_file, get_classes_for_file,

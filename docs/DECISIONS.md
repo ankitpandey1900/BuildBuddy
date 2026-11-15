@@ -235,6 +235,53 @@ Every call site extracted from source code must be cataloged with strict provena
 ### Rule
 Never upgrade a status to make output appear more complete. Dynamic and ambiguous calls must strictly remain `inferred` or `unknown`. Every call edge must link to an explicit `source_evidence` record.
 
+## 10. Framework Detection, Entry Points & Module Grouping Heuristics
+
+### Context
+Offline architecture discovery must identify active technology frameworks, startup entry points, and cohesive architectural layers strictly from verifiable repository evidence without relying on an LLM or guessing.
+
+### 1. Multi-Signal Framework Detection & Confidence Classification
+We evaluate four distinct physical signals for supported ecosystems (React, Next.js, Express, Vue, FastAPI, Flask, Django):
+1. **Manifest Dependency (`manifest_dependency`)**: Declared dependency in `package.json`, `requirements.txt`, or `pyproject.toml`.
+2. **Configuration File (`config_file`)**: Dedicated framework configuration files (e.g. `next.config.*`, `vite.config.*`, `vue.config.js`, `manage.py`, `settings.py`).
+3. **AST Import Statement (`import_usage`)**: Direct syntax node import of framework modules (e.g. `import React from 'react'`, `from fastapi import FastAPI`, `import express from 'express'`).
+4. **Source Pattern (`source_pattern`)**: Concrete framework idioms (e.g. `createRoot(container)`, `app.listen(port)`, `app = FastAPI()`, `app = Flask(__name__)`, `createApp()`, `models.Model`).
+
+### Confidence Assignment Rules:
+- **`confirmed`**: Direct runtime manifest dependency + verified code usage (import, config, or source pattern).
+- **`static`**: Verified code usage (import or source pattern) present without a corresponding manifest entry.
+- **`inferred`**: Direct runtime dependency declared in manifest, but without verified AST import usage.
+- **Negative Detection Rule**: If a framework appears only in `devDependencies` and has no import, no config, and no source pattern, it is not detected as an active framework (0 detections). Package names appearing only in source comments or string literals are filtered out by AST token inspection and never counted as detections.
+
+### 2. Application Entry Points
+Entry points represent physical starting locations for application execution and are categorized into:
+- **`package_manifest`**: `package.json` fields (`main`, `bin`, and standard lifecycle scripts `start`, `dev`, `serve`, `build`).
+- **`framework_entry`**: Conventional framework startup locations (e.g. `Express HTTP Server Entry` for `app.listen()`, `React DOM Root Entry` for `createRoot()`, Next.js route entry files, Vue `createApp()`, Django `manage.py`/`wsgi.py`).
+- **`main_block`**: Python `if __name__ == "__main__":` blocks.
+- **`app_factory`**: Application factory functions (e.g. `create_app()`, `app = FastAPI()`, `app = Flask()`).
+
+Every entry point is recorded with file path, line range, source snippet, and an explicit `source_evidence` foreign key.
+
+### 3. Module Grouping & Layer Labeling
+- **Directory Grouping**: Modules are grouped by logical root directories (subdirectories of `src/` or top-level project directories).
+- **Layer Classification**: Modules are classified into layers strictly when evidence supports them:
+  - `frontend`: Contains UI components, TSX/JSX/Vue/HTML/CSS files, or directory name matches `client`, `frontend`, `ui`, `pages`, `components`.
+  - `backend`: Contains HTTP routers, controllers, API handlers, or directory name matches `server`, `backend`, `api`, `routes`, `services`.
+  - `data`: Contains ORM entities, schemas, database migrations, SQL, or directory name matches `models`, `entities`, `data`, `db`.
+  - `config`: Contains configuration files (`tsconfig.json`, `package.json`, `.config.*`, `settings.py`) or directory `config`.
+  - `shared`: Modules imported by both frontend and backend modules, or matching `shared`, `common`, `utils`, `lib`.
+  - `unclassified`: Any module lacking conclusive physical evidence.
+- **Strict Rule**: Speculative architectural paradigms (e.g. "MVC", "Microservices", "Clean Architecture", "Hexagonal Architecture") must never be applied without explicit structural proof.
+- **Import Cohesion Metric**: Computed deterministically as:
+  $$\text{Cohesion} = \frac{E_{\text{internal}}}{E_{\text{internal}} + E_{\text{outgoing}}}$$
+  (evaluated to 1.0 if the module has no internal or outgoing dependencies).
+
+### 4. Overview UI Constraints (PRD 8.3 & Agents.md Rule 4)
+- No composite health scores (e.g. arbitrary "85/100" health scores).
+- Every metric provides a tooltip definition and provides interactive drill-down to underlying database records.
+- Clicking any framework opens the `FrameworkEvidenceModal` displaying the complete evidence provenance list.
+
+
 
 
 

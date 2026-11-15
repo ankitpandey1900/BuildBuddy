@@ -1,0 +1,112 @@
+{
+  "frameworks": [],
+  "entry_points": [
+    {
+      "name": "package.json main",
+      "entry_type": "package_manifest",
+      "file_path": "package.json",
+      "start_line": 4,
+      "end_line": 4,
+      "snippet": "\"main\": \"index.js\"",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "package.json script: start",
+      "entry_type": "package_manifest",
+      "file_path": "package.json",
+      "start_line": 6,
+      "end_line": 6,
+      "snippet": "\"start\": \"node index.js\"",
+      "confidence": "Confirmed"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Unclassified",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "index.js",
+        "package.json"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "unclassified",
+        "file_path": "."
+      },
+      {
+        "id": "file:index.js",
+        "label": "index.js",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "index.js"
+      },
+      {
+        "id": "file:package.json",
+        "label": "package.json",
+        "kind": "file",
+        "layer": "unclassified",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:4",
+        "label": "package.json main",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:6",
+        "label": "package.json script: start",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:index.js:.",
+        "source": "file:index.js",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:package.json:.",
+        "source": "file:package.json",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "starts:package.json main:package.json",
+        "source": "entry:package.json:4",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: start:package.json",
+        "source": "entry:package.json:6",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "unclassified",
+        "node_ids": [
+          "file:index.js",
+          "file:package.json"
+        ]
+      }
+    ]
+  }
+}

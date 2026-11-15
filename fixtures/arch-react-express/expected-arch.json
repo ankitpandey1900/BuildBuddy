@@ -1,0 +1,378 @@
+{
+  "frameworks": [
+    {
+      "name": "Express",
+      "version": "^4.19.2",
+      "confidence": "Confirmed",
+      "evidence": [
+        {
+          "file_path": "package.json",
+          "start_line": 10,
+          "end_line": 10,
+          "snippet": "\"express\": \"^4.19.2\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared Express manifest dependency"
+        },
+        {
+          "file_path": "src/server/index.ts",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import express from 'express';",
+          "signal_type": "import_usage",
+          "description": "AST import of Express module"
+        },
+        {
+          "file_path": "src/server/index.ts",
+          "start_line": 3,
+          "end_line": 3,
+          "snippet": "const app = express();",
+          "signal_type": "source_pattern",
+          "description": "Express application initialization or router pattern"
+        }
+      ]
+    },
+    {
+      "name": "React",
+      "version": "^18.3.1",
+      "confidence": "Confirmed",
+      "evidence": [
+        {
+          "file_path": "package.json",
+          "start_line": 11,
+          "end_line": 11,
+          "snippet": "\"react\": \"^18.3.1\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared manifest dependency 'react' (Direct)"
+        },
+        {
+          "file_path": "package.json",
+          "start_line": 12,
+          "end_line": 12,
+          "snippet": "\"react-dom\": \"^18.3.1\"",
+          "signal_type": "manifest_dependency",
+          "description": "Declared manifest dependency 'react-dom' (Direct)"
+        },
+        {
+          "file_path": "src/client/App.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import React, { useState } from 'react';",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react'"
+        },
+        {
+          "file_path": "src/client/App.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import React, { useState } from 'react';",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react'"
+        },
+        {
+          "file_path": "src/client/main.tsx",
+          "start_line": 1,
+          "end_line": 1,
+          "snippet": "import React from 'react';",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react'"
+        },
+        {
+          "file_path": "src/client/main.tsx",
+          "start_line": 2,
+          "end_line": 2,
+          "snippet": "import { createRoot } from 'react-dom/client';",
+          "signal_type": "import_usage",
+          "description": "AST import of React module 'react-dom/client'"
+        },
+        {
+          "file_path": "src/client/App.tsx",
+          "start_line": 4,
+          "end_line": 4,
+          "snippet": "const [count, setCount] = useState(0);",
+          "signal_type": "source_pattern",
+          "description": "React hook or rendering pattern"
+        },
+        {
+          "file_path": "src/client/main.tsx",
+          "start_line": 7,
+          "end_line": 7,
+          "snippet": "const root = createRoot(container);",
+          "signal_type": "source_pattern",
+          "description": "React hook or rendering pattern"
+        }
+      ]
+    }
+  ],
+  "entry_points": [
+    {
+      "name": "package.json main",
+      "entry_type": "package_manifest",
+      "file_path": "package.json",
+      "start_line": 4,
+      "end_line": 4,
+      "snippet": "\"main\": \"src/server/index.ts\"",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "package.json script: start",
+      "entry_type": "package_manifest",
+      "file_path": "package.json",
+      "start_line": 6,
+      "end_line": 6,
+      "snippet": "\"start\": \"node dist/server.js\"",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "package.json script: dev",
+      "entry_type": "package_manifest",
+      "file_path": "package.json",
+      "start_line": 7,
+      "end_line": 7,
+      "snippet": "\"dev\": \"vite\"",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "React DOM Root Entry",
+      "entry_type": "framework_entry",
+      "file_path": "src/client/main.tsx",
+      "start_line": 7,
+      "end_line": 7,
+      "snippet": "const root = createRoot(container);",
+      "confidence": "Confirmed"
+    },
+    {
+      "name": "Express HTTP Server Entry",
+      "entry_type": "framework_entry",
+      "file_path": "src/server/index.ts",
+      "start_line": 10,
+      "end_line": 10,
+      "snippet": "app.listen(port, () => {",
+      "confidence": "Confirmed"
+    }
+  ],
+  "modules": [
+    {
+      "name": "root",
+      "root_directory": ".",
+      "layer": "Config",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "package.json",
+        "vite.config.ts"
+      ]
+    },
+    {
+      "name": "src::client",
+      "root_directory": "src/client",
+      "layer": "Frontend",
+      "file_count": 2,
+      "cohesion_score": 1.0,
+      "files": [
+        "src/client/App.tsx",
+        "src/client/main.tsx"
+      ]
+    },
+    {
+      "name": "src::server",
+      "root_directory": "src/server",
+      "layer": "Backend",
+      "file_count": 1,
+      "cohesion_score": 1.0,
+      "files": [
+        "src/server/index.ts"
+      ]
+    }
+  ],
+  "architecture_model": {
+    "nodes": [
+      {
+        "id": "module:.",
+        "label": "root",
+        "kind": "module",
+        "layer": "config",
+        "file_path": "."
+      },
+      {
+        "id": "file:package.json",
+        "label": "package.json",
+        "kind": "file",
+        "layer": "config",
+        "file_path": "package.json"
+      },
+      {
+        "id": "file:vite.config.ts",
+        "label": "vite.config.ts",
+        "kind": "file",
+        "layer": "config",
+        "file_path": "vite.config.ts"
+      },
+      {
+        "id": "module:src/client",
+        "label": "src::client",
+        "kind": "module",
+        "layer": "frontend",
+        "file_path": "src/client"
+      },
+      {
+        "id": "file:src/client/App.tsx",
+        "label": "App.tsx",
+        "kind": "file",
+        "layer": "frontend",
+        "file_path": "src/client/App.tsx"
+      },
+      {
+        "id": "file:src/client/main.tsx",
+        "label": "main.tsx",
+        "kind": "file",
+        "layer": "frontend",
+        "file_path": "src/client/main.tsx"
+      },
+      {
+        "id": "module:src/server",
+        "label": "src::server",
+        "kind": "module",
+        "layer": "backend",
+        "file_path": "src/server"
+      },
+      {
+        "id": "file:src/server/index.ts",
+        "label": "index.ts",
+        "kind": "file",
+        "layer": "backend",
+        "file_path": "src/server/index.ts"
+      },
+      {
+        "id": "entry:package.json:4",
+        "label": "package.json main",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:6",
+        "label": "package.json script: start",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:package.json:7",
+        "label": "package.json script: dev",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "package.json"
+      },
+      {
+        "id": "entry:src/client/main.tsx:7",
+        "label": "React DOM Root Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "src/client/main.tsx"
+      },
+      {
+        "id": "entry:src/server/index.ts:10",
+        "label": "Express HTTP Server Entry",
+        "kind": "entry_point",
+        "layer": "entry",
+        "file_path": "src/server/index.ts"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:package.json:.",
+        "source": "file:package.json",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:vite.config.ts:.",
+        "source": "file:vite.config.ts",
+        "target": "module:.",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:src/client/App.tsx:src/client",
+        "source": "file:src/client/App.tsx",
+        "target": "module:src/client",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:src/client/main.tsx:src/client",
+        "source": "file:src/client/main.tsx",
+        "target": "module:src/client",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "edge:src/server/index.ts:src/server",
+        "source": "file:src/server/index.ts",
+        "target": "module:src/server",
+        "edge_type": "belongs_to"
+      },
+      {
+        "id": "import:src/client/main.tsx:src/client/App.tsx:3",
+        "source": "file:src/client/main.tsx",
+        "target": "file:src/client/App.tsx",
+        "edge_type": "imports"
+      },
+      {
+        "id": "starts:package.json main:package.json",
+        "source": "entry:package.json:4",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: start:package.json",
+        "source": "entry:package.json:6",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:package.json script: dev:package.json",
+        "source": "entry:package.json:7",
+        "target": "file:package.json",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:React DOM Root Entry:src/client/main.tsx",
+        "source": "entry:src/client/main.tsx:7",
+        "target": "file:src/client/main.tsx",
+        "edge_type": "starts"
+      },
+      {
+        "id": "starts:Express HTTP Server Entry:src/server/index.ts",
+        "source": "entry:src/server/index.ts:10",
+        "target": "file:src/server/index.ts",
+        "edge_type": "starts"
+      }
+    ],
+    "groups": [
+      {
+        "id": "group:.",
+        "label": "root",
+        "layer": "config",
+        "node_ids": [
+          "file:package.json",
+          "file:vite.config.ts"
+        ]
+      },
+      {
+        "id": "group:src/client",
+        "label": "src::client",
+        "layer": "frontend",
+        "node_ids": [
+          "file:src/client/App.tsx",
+          "file:src/client/main.tsx"
+        ]
+      },
+      {
+        "id": "group:src/server",
+        "label": "src::server",
+        "layer": "backend",
+        "node_ids": [
+          "file:src/server/index.ts"
+        ]
+      }
+    ]
+  }
+}

@@ -3,10 +3,11 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ExplorerView } from "@/components/explorer/ExplorerView";
 import { DependenciesView } from "@/components/dependencies/DependenciesView";
 import { CodeIntelligenceView } from "@/components/intelligence/CodeIntelligenceView";
+import { OverviewView } from "@/components/overview/OverviewView";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
-import { LayoutDashboard, GitGraph, Network, Database, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
+import { GitGraph, Network, Database, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
 
 export const App: React.FC = () => {
   const project = useProjectState();
@@ -33,11 +34,19 @@ export const App: React.FC = () => {
         );
       case "overview":
         return (
-          <PlaceholderView
-            title="Overview"
-            icon={<LayoutDashboard className="w-8 h-8 text-accent" />}
-            description="System metrics, detected entry points, and high-level architectural summary."
-            badge="Phase 3 / Task 8"
+          <OverviewView
+            projectId={project.currentProject?.id}
+            currentProject={project.currentProject}
+            onNavigateToView={(view) => ui.setActiveView(view)}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
+            onFilterFilesByLanguage={(lang) => {
+              project.setLanguageFilter(lang);
+              ui.setActiveView("explorer");
+            }}
+            onOpenFolder={project.openFolder}
           />
         );
       case "architecture":

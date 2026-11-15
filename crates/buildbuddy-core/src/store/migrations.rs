@@ -45,7 +45,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             end_column INTEGER NOT NULL,
             snippet TEXT,
             confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
-            evidence_type TEXT CHECK(evidence_type IN ('ast_node', 'manifest_entry', 'import_stmt', 'export_stmt', 'call_site', 'type_annotation', 'heuristic')) NOT NULL,
+            evidence_type TEXT CHECK(evidence_type IN ('ast_node', 'manifest_entry', 'import_stmt', 'export_stmt', 'call_site', 'type_annotation', 'heuristic', 'config_file', 'source_pattern', 'entry_point')) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
 
@@ -278,6 +278,63 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_instantiations_class ON class_instantiations(class_symbol_id);
         CREATE INDEX IF NOT EXISTS idx_instantiations_file ON class_instantiations(file_id);
+
+        CREATE TABLE IF NOT EXISTS frameworks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            version TEXT,
+            confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            evidence_json TEXT DEFAULT '[]' NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_frameworks_project ON frameworks(project_id);
+
+        CREATE TABLE IF NOT EXISTS entry_points (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            entry_type TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            snippet TEXT,
+            confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_entry_points_project ON entry_points(project_id);
+
+        CREATE TABLE IF NOT EXISTS modules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            root_directory TEXT NOT NULL,
+            layer TEXT CHECK(layer IN ('frontend', 'backend', 'data', 'shared', 'config', 'unclassified')) NOT NULL,
+            file_count INTEGER DEFAULT 0 NOT NULL,
+            cohesion_score REAL DEFAULT 0.0,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            UNIQUE(project_id, root_directory)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_modules_project ON modules(project_id);
+
+        CREATE TABLE IF NOT EXISTS diagrams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            diagram_type TEXT CHECK(diagram_type IN ('architecture', 'dependency', 'call_graph', 'er_diagram', 'sequence')) NOT NULL,
+            title TEXT NOT NULL,
+            model_json TEXT NOT NULL,
+            layout_engine TEXT DEFAULT 'elk' NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_diagrams_project ON diagrams(project_id);
         "
     )?;
     Ok(())
@@ -319,6 +376,10 @@ mod tests {
         assert!(tables.contains(&"classes".to_string()));
         assert!(tables.contains(&"call_relationships".to_string()));
         assert!(tables.contains(&"class_instantiations".to_string()));
+        assert!(tables.contains(&"frameworks".to_string()));
+        assert!(tables.contains(&"entry_points".to_string()));
+        assert!(tables.contains(&"modules".to_string()));
+        assert!(tables.contains(&"diagrams".to_string()));
     }
 }
 

@@ -1,11 +1,13 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ArchitectureModel,
   ClassDetailResponse,
   FileContentDto,
   FileRecord,
   ImportDto,
   ListSymbolsFilter,
+  OverviewDataDto,
   ParseCompletePayload,
   ParseProgressPayload,
   Project,
@@ -203,5 +205,42 @@ export async function onParseComplete(
     callback(event.payload);
   });
 }
+
+export async function getOverviewData(projectId: number): Promise<OverviewDataDto> {
+  if (!isTauri()) {
+    return {
+      project_name: "Mock Project",
+      root_path: "/mock/project",
+      metrics: {
+        total_files: 0,
+        total_modules: 0,
+        total_symbols: 0,
+        total_functions: 0,
+        total_classes: 0,
+        total_entry_points: 0,
+        total_dependencies: 0,
+        unsupported_files_count: 0,
+        partial_files_count: 0,
+      },
+      languages: [],
+      frameworks: [],
+      entry_points: [],
+      modules: [],
+      completion: null,
+    };
+  }
+  return await tauriInvoke<OverviewDataDto>("get_overview_data", { projectId });
+}
+
+export async function getArchitectureModel(projectId: number): Promise<ArchitectureModel | null> {
+  if (!isTauri()) return null;
+  return await tauriInvoke<ArchitectureModel | null>("get_architecture_model", { projectId });
+}
+
+export async function analyzeArchitecture(projectId: number, projectPath: string): Promise<any> {
+  if (!isTauri()) return null;
+  return await tauriInvoke<any>("analyze_architecture", { projectId, projectPath });
+}
+
 
 
