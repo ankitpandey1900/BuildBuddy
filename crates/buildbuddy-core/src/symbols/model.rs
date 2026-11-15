@@ -79,6 +79,128 @@ pub struct ExtractedExport {
     pub line_number: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallResolutionStatus {
+    Confirmed,
+    Static,
+    Inferred,
+    Unknown,
+}
+
+impl CallResolutionStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CallResolutionStatus::Confirmed => "confirmed",
+            CallResolutionStatus::Static => "static",
+            CallResolutionStatus::Inferred => "inferred",
+            CallResolutionStatus::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractedCallSite {
+    pub caller_symbol_id: Option<String>,
+    pub callee_name: String,
+    pub callee_symbol_id: Option<String>,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+    pub snippet: String,
+    pub resolution_status: CallResolutionStatus,
+    pub is_dynamic: bool,
+    pub receiver: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SideEffectMarker {
+    pub category: String, // "fs", "network", "db"
+    pub pattern: String,
+    pub confidence: String, // "static"
+    pub line_number: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FunctionMetrics {
+    pub parameters: Vec<Parameter>,
+    pub return_type: Option<String>,
+    pub callers: Vec<String>,
+    pub callees: Vec<String>,
+    pub imports_used: Vec<String>,
+    pub branch_count: usize,
+    pub loop_count: usize,
+    pub cyclomatic_complexity: usize,
+    pub has_error_handling: bool,
+    pub side_effects: Vec<SideEffectMarker>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractedFunction {
+    pub symbol_stable_id: String,
+    pub name: String,
+    pub qualified_name: String,
+    pub metrics: FunctionMetrics,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClassProperty {
+    pub name: String,
+    pub type_annotation: Option<String>,
+    pub visibility: Option<String>,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClassMethod {
+    pub name: String,
+    pub signature: String,
+    pub visibility: Option<String>,
+    pub is_static: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClassConstructor {
+    pub signature: String,
+    pub parameters: Vec<Parameter>,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClassInstantiation {
+    pub class_name: String,
+    pub caller_symbol_id: Option<String>,
+    pub class_symbol_id: Option<String>,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+    pub snippet: String,
+    pub resolution_status: CallResolutionStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractedClass {
+    pub symbol_stable_id: String,
+    pub name: String,
+    pub superclass: Option<String>,
+    pub interfaces: Vec<String>,
+    pub properties: Vec<ClassProperty>,
+    pub methods: Vec<ClassMethod>,
+    pub constructors: Vec<ClassConstructor>,
+    pub instantiations: Vec<ClassInstantiation>,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

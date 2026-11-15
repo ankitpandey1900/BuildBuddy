@@ -155,6 +155,82 @@ When a `const` or assignment is encountered:
   - **Changed Files Detection**:
     - By comparing the working tree file size and mtime (or content hash) against `.git/index` entries, and `.git/index` entries against HEAD tree/objects, we reliably identify modified, deleted, and untracked files with zero subprocess execution, zero external network, and zero native C compilation dependencies.
 
+## 7. Cyclomatic Complexity Formula & Metric Definitions
+
+### Context
+Code metrics such as cyclomatic complexity, branch counts, and loop counts must be computed deterministically offline without LLM interpretation or variability across platforms.
+
+### Decision & Arithmetic Formula
+We compute McCabe's Cyclomatic Complexity using the standard decision-point formula:
+$$CC = 1 + D$$
+where $D$ is the number of distinct decision points (branches, loops, short-circuit operators, and exception handlers) encountered within the function/method body:
+
+$$\text{Cyclomatic Complexity} = 1 + \sum \text{branches} + \sum \text{loops}$$
+
+Specifically:
+- **Base Complexity**: Every function begins with a base complexity of `1`.
+- **Branch Points (+1 each)**:
+  - `if` statements / `elif` clauses (TypeScript: `if_statement`; Python: `if_statement`, `elif_clause`).
+  - Ternary / conditional expressions (TypeScript: `ternary_expression`; Python: `conditional_expression`).
+  - `switch` non-default cases (TypeScript: `case_clause` or `switch_case`).
+  - Short-circuit boolean binary expressions:
+    - TypeScript/JavaScript: `&&`, `||`, `??` (nullish coalescing).
+    - Python: `and`, `or`.
+  - Exception catch/except handlers:
+    - TypeScript/JavaScript: `catch_clause`.
+    - Python: `except_clause`.
+- **Loop Points (+1 each)**:
+  - TypeScript/JavaScript: `for_statement`, `for_in_statement`, `for_of_statement`, `while_statement`, `do_statement`.
+  - Python: `for_statement`, `while_statement`.
+
+### Examples with Arithmetic
+1. Simple function without branching:
+   $CC = 1 \text{ (base)} = 1$
+2. Single `if`:
+   $CC = 1 \text{ (base)} + 1 \text{ (if)} = 2$
+3. `if` with compound condition `(a && b)`:
+   $CC = 1 \text{ (base)} + 1 \text{ (if)} + 1 \text{ (&&)} = 3$
+4. `for` loop enclosing `if/else` and `try/catch`:
+   $CC = 1 \text{ (base)} + 1 \text{ (for)} + 1 \text{ (if)} + 1 \text{ (catch)} = 4$
+5. `switch` with 3 `case` clauses and 1 `default`:
+   $CC = 1 \text{ (base)} + 3 \text{ (case clauses)} = 4$
+
+## 8. Side-Effect Marker Patterns
+
+### Context
+To identify potential side effects (file system operations, network requests, database interactions) statically without false claims of dynamic execution, BuildBuddy applies an explicit pattern matching list.
+
+### Decision
+- **Confidence Level**: Matches are recorded with confidence `"static"`, never `"confirmed"`.
+- **Pattern Match Categories**:
+  1. **File System (`fs`)**:
+     - `fs.readFile`, `fs.readFileSync`, `fs.writeFile`, `fs.writeFileSync`, `fs.open`, `fs.unlink`, `fs.mkdir`, `fs.rmdir`, `fs.createReadStream`, `fs.createWriteStream`, `fs.promises`, `promises.readFile`, `promises.writeFile`.
+     - Python: `open`, `read`, `write`, `close`, `os.remove`, `os.unlink`, `os.mkdir`, `os.rmdir`, `os.path`, `pathlib.Path`, `shutil.copy`, `shutil.rmtree`.
+  2. **Network (`network`)**:
+     - `fetch`, `axios`, `http.get`, `http.request`, `https.get`, `https.request`, `WebSocket`.
+     - Python: `requests.get`, `requests.post`, `requests.put`, `requests.delete`, `requests.request`, `urllib.request`, `aiohttp`, `httpx.get`, `httpx.post`, `socket.connect`, `socket.send`.
+  3. **Database (`db`)**:
+     - `query`, `execute`, `connect`, `cursor`, `session.query`, `session.add`, `session.commit`, `session.rollback`.
+     - `prisma`, `prisma.findUnique`, `prisma.findMany`, `prisma.create`, `prisma.update`, `prisma.delete`.
+     - `repository.find`, `findOne`, `createConnection`, `select`, `insert`, `update`, `delete`, `commit`, `rollback`.
+
+## 9. Call Edge Resolution Status & Provenance Hierarchy
+
+### Context
+Every call site extracted from source code must be cataloged with strict provenance and an objective resolution status.
+
+### Resolution Statuses:
+- **`confirmed`**: Resolved to a concrete symbol in the project via:
+  1. Same-scope local definition (e.g. function defined in the module, or method called on `this`/`self` defined in the class).
+  2. Concrete import resolved to an exported symbol in a target module.
+- **`static`**: Name match within the same module, without an explicit import proof.
+- **`inferred`**: Method call on an unknown receiver (e.g. `client.fetchData()`, `resp.json()`), dynamic call (e.g. `obj[name]()`, `getattr(obj, name)()`), or callback parameter invocation.
+- **`unknown`**: Identifier or call target that cannot be resolved to any symbol.
+
+### Rule
+Never upgrade a status to make output appear more complete. Dynamic and ambiguous calls must strictly remain `inferred` or `unknown`. Every call edge must link to an explicit `source_evidence` record.
+
+
 
 
 

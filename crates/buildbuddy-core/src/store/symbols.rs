@@ -179,7 +179,10 @@ pub fn persist_file_parse_result(
         }
     }
 
-    // 5. Update file counts and status
+    // 5. Persist functions, classes, call_relationships, and class_instantiations
+    crate::store::calls::persist_file_calls_and_metrics_tx(&tx, project_id, file_id, result)?;
+
+    // 6. Update file counts and status
     tx.execute(
         "UPDATE files SET
             function_count = ?1,
@@ -356,6 +359,9 @@ mod tests {
             symbols: vec![sym],
             imports: vec![imp],
             exports: Vec::new(),
+            functions: Vec::new(),
+            classes: Vec::new(),
+            calls: Vec::new(),
             errors: Vec::new(),
         };
 
@@ -430,6 +436,9 @@ mod tests {
             symbols: vec![sym],
             imports: vec![imp],
             exports: vec![exp],
+            functions: Vec::new(),
+            classes: Vec::new(),
+            calls: Vec::new(),
             errors: Vec::new(),
         };
 

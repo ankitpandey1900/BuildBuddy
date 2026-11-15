@@ -95,7 +95,16 @@ impl IncrementalEngine {
                 del_file.execute(params![id])?;
             }
 
-            // For modified files, delete existing symbols, imports, exports, edges, and evidence
+            // For modified files, delete existing symbols, imports, exports, edges, functions, classes, calls, and evidence
+            let mut del_calls_origin = tx.prepare("DELETE FROM call_relationships WHERE file_id = ?1")?;
+            let mut del_calls_targeting = tx.prepare(
+                "DELETE FROM call_relationships WHERE callee_symbol_id IN (SELECT id FROM symbols WHERE file_id = ?1)"
+            )?;
+            let mut del_instantiations = tx.prepare(
+                "DELETE FROM class_instantiations WHERE file_id = ?1 OR class_symbol_id IN (SELECT id FROM symbols WHERE file_id = ?1)"
+            )?;
+            let mut del_functions = tx.prepare("DELETE FROM functions WHERE file_id = ?1")?;
+            let mut del_classes = tx.prepare("DELETE FROM classes WHERE file_id = ?1")?;
             let mut del_symbols = tx.prepare("DELETE FROM symbols WHERE file_id = ?1")?;
             let mut del_imports = tx.prepare("DELETE FROM imports WHERE file_id = ?1")?;
             let mut del_exports = tx.prepare("DELETE FROM exports WHERE file_id = ?1")?;
@@ -110,6 +119,11 @@ impl IncrementalEngine {
                 }) {
                     del_evidence.execute(params![project_id, rel_path])?;
                 }
+                del_calls_origin.execute(params![id])?;
+                del_calls_targeting.execute(params![id])?;
+                del_instantiations.execute(params![id])?;
+                del_functions.execute(params![id])?;
+                del_classes.execute(params![id])?;
                 del_symbols.execute(params![id])?;
                 del_imports.execute(params![id])?;
                 del_exports.execute(params![id])?;
@@ -359,6 +373,21 @@ mod tests {
             )
             .unwrap();
         assert_eq!(edge_count, 0, "Import edges for deleted file must be gone");
+
+        let call_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM call_relationships WHERE file_id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(call_count, 0, "Call relationships for deleted file must be gone");
+
+        let func_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM functions WHERE file_id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(func_count, 0, "Functions for deleted file must be gone");
+
+        let class_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM classes WHERE file_id = ?1", params![deleted_fid], |r| r.get(0))
+            .unwrap();
+        assert_eq!(class_count, 0, "Classes for deleted file must be gone");
 
         let orphan_evidence: i64 = conn
             .query_row(

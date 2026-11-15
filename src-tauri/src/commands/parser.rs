@@ -112,6 +112,11 @@ pub async fn start_parse(
                     eprintln!("Failed to persist parsed symbols for {}: {}", result.relative_path, e);
                 }
             }
+
+            // Resolve calls and project-wide callers
+            if let Err(e) = crate::core::graph::CallResolver::resolve_project_calls(&db_conn, project_id) {
+                eprintln!("Failed to resolve project calls: {}", e);
+            }
         }
 
         let is_cancelled = cancel_flag.load(Ordering::Relaxed);

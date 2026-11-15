@@ -91,6 +91,9 @@ impl ParserWorkerPool {
                                     symbols: Vec::new(),
                                     imports: Vec::new(),
                                     exports: Vec::new(),
+                                    functions: Vec::new(),
+                                    classes: Vec::new(),
+                                    calls: Vec::new(),
                                     errors: vec![format!("Failed to read file: {}", e)],
                                 },
                             ));
@@ -110,6 +113,9 @@ impl ParserWorkerPool {
                             symbols: Vec::new(),
                             imports: Vec::new(),
                             exports: Vec::new(),
+                            functions: Vec::new(),
+                            classes: Vec::new(),
+                            calls: Vec::new(),
                             errors: vec![e.to_string()],
                         },
                     };

@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::symbols::model::{ExtractedExport, ExtractedImport, ExtractedSymbol};
+use crate::symbols::model::{
+    ExtractedCallSite, ExtractedClass, ExtractedExport, ExtractedFunction, ExtractedImport,
+    ExtractedSymbol,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParserLimits {
@@ -50,6 +53,12 @@ pub struct FileParseResult {
     pub symbols: Vec<ExtractedSymbol>,
     pub imports: Vec<ExtractedImport>,
     pub exports: Vec<ExtractedExport>,
+    #[serde(default)]
+    pub functions: Vec<ExtractedFunction>,
+    #[serde(default)]
+    pub classes: Vec<ExtractedClass>,
+    #[serde(default)]
+    pub calls: Vec<ExtractedCallSite>,
     pub errors: Vec<String>,
 }
 

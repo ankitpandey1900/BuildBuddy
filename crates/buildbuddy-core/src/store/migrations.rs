@@ -205,6 +205,79 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);
+
+        CREATE TABLE IF NOT EXISTS functions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            symbol_id INTEGER NOT NULL UNIQUE REFERENCES symbols(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            parameters_json TEXT DEFAULT '[]' NOT NULL,
+            return_type TEXT,
+            branch_count INTEGER DEFAULT 0 NOT NULL,
+            loop_count INTEGER DEFAULT 0 NOT NULL,
+            cyclomatic_complexity INTEGER DEFAULT 1 NOT NULL,
+            has_error_handling INTEGER DEFAULT 0 NOT NULL,
+            side_effects_json TEXT DEFAULT '[]' NOT NULL,
+            imports_used_json TEXT DEFAULT '[]' NOT NULL,
+            callers_json TEXT DEFAULT '[]' NOT NULL,
+            callees_json TEXT DEFAULT '[]' NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_functions_file ON functions(file_id);
+        CREATE INDEX IF NOT EXISTS idx_functions_symbol ON functions(symbol_id);
+
+        CREATE TABLE IF NOT EXISTS classes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            symbol_id INTEGER NOT NULL UNIQUE REFERENCES symbols(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            superclass_name TEXT,
+            interfaces_json TEXT DEFAULT '[]' NOT NULL,
+            properties_json TEXT DEFAULT '[]' NOT NULL,
+            methods_json TEXT DEFAULT '[]' NOT NULL,
+            constructors_json TEXT DEFAULT '[]' NOT NULL,
+            source_evidence_id INTEGER REFERENCES source_evidence(id) ON DELETE SET NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_classes_file ON classes(file_id);
+        CREATE INDEX IF NOT EXISTS idx_classes_symbol ON classes(symbol_id);
+
+        CREATE TABLE IF NOT EXISTS call_relationships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            caller_symbol_id INTEGER REFERENCES symbols(id) ON DELETE CASCADE,
+            callee_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+            callee_name TEXT NOT NULL,
+            resolution_status TEXT CHECK(resolution_status IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            is_dynamic INTEGER DEFAULT 0 NOT NULL,
+            source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_call_caller ON call_relationships(caller_symbol_id);
+        CREATE INDEX IF NOT EXISTS idx_call_callee ON call_relationships(callee_symbol_id);
+        CREATE INDEX IF NOT EXISTS idx_call_file ON call_relationships(file_id);
+
+        CREATE TABLE IF NOT EXISTS class_instantiations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+            caller_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+            class_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+            class_name TEXT NOT NULL,
+            resolution_status TEXT CHECK(resolution_status IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_instantiations_class ON class_instantiations(class_symbol_id);
+        CREATE INDEX IF NOT EXISTS idx_instantiations_file ON class_instantiations(file_id);
         "
     )?;
     Ok(())
@@ -242,6 +315,10 @@ mod tests {
         assert!(tables.contains(&"manifest_dependencies".to_string()));
         assert!(tables.contains(&"findings".to_string()));
         assert!(tables.contains(&"fts_symbols".to_string()));
+        assert!(tables.contains(&"functions".to_string()));
+        assert!(tables.contains(&"classes".to_string()));
+        assert!(tables.contains(&"call_relationships".to_string()));
+        assert!(tables.contains(&"class_instantiations".to_string()));
     }
 }
 

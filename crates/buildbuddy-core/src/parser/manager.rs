@@ -61,6 +61,9 @@ impl ParserManager {
                 symbols: Vec::new(),
                 imports: Vec::new(),
                 exports: Vec::new(),
+                functions: Vec::new(),
+                classes: Vec::new(),
+                calls: Vec::new(),
                 errors: vec!["Unsupported language extension".to_string()],
             }),
         }

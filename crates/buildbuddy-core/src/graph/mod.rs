@@ -1,3 +1,4 @@
+pub mod call_resolver;
 pub mod model;
 pub mod resolver;
 pub mod resolver_py;
@@ -5,6 +6,7 @@ pub mod resolver_ts;
 pub mod topology;
 pub mod unused;
 
+pub use call_resolver::CallResolver;
 pub use model::{
     CircularDependencyCycle, DependencyOverview, ImportEdge, ManifestDependencySummary,
     ProjectResolutionReport, ResolutionStatus, ResolvedEdgeSummary,

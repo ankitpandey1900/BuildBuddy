@@ -34,6 +34,9 @@ impl LanguageAdapter for PythonAdapter {
                 symbols: Vec::new(),
                 imports: Vec::new(),
                 exports: Vec::new(),
+                functions: Vec::new(),
+                classes: Vec::new(),
+                calls: Vec::new(),
                 errors: vec![format!(
                     "File size {} bytes exceeds limit of {} bytes",
                     source.len(),
@@ -63,6 +66,9 @@ impl LanguageAdapter for PythonAdapter {
                     symbols: Vec::new(),
                     imports: Vec::new(),
                     exports: Vec::new(),
+                    functions: Vec::new(),
+                    classes: Vec::new(),
+                    calls: Vec::new(),
                     errors: vec![format!("Parser timed out after {} ms", limits.timeout_ms)],
                 });
             }
@@ -83,6 +89,15 @@ impl LanguageAdapter for PythonAdapter {
         let all_exports = find_all_export_names(root_node, source_bytes);
         extract_from_node(root_node, source_bytes, relative_path, None, false, all_exports.as_ref(), &mut symbols, &mut imports, &mut exports);
 
+        let analyzer = crate::parser::ast_py::PythonAstAnalyzer::new(
+            source_bytes,
+            relative_path,
+            &imports,
+            &exports,
+            &symbols,
+        );
+        let (functions, classes, calls) = analyzer.analyze(root_node);
+
         let status = if has_syntax_errors {
             ParseStatus::Partial
         } else {
@@ -96,6 +111,9 @@ impl LanguageAdapter for PythonAdapter {
             symbols,
             imports,
             exports,
+            functions,
+            classes,
+            calls,
             errors,
         })
     }

@@ -154,6 +154,9 @@ pub async fn resolve_and_persist_project_graph(
 
     GraphStore::insert_import_edges(&mut conn, project_id, &edges).map_err(|e| e.to_string())?;
 
+    // Cross-file call resolution after import edges are stored
+    let _ = crate::core::graph::CallResolver::resolve_project_calls(&conn, project_id);
+
     for cycle in cycles {
         let desc = cycle.cycle_files.join(" -> ");
         let metadata = serde_json::to_string(&cycle.cycle_files).unwrap_or_default();

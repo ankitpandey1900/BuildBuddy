@@ -1,5 +1,8 @@
+pub mod ast_py;
+pub mod ast_ts;
 pub mod manager;
 pub mod python;
+pub mod side_effects;
 pub mod traits;
 pub mod typescript;
 pub mod worker_pool;

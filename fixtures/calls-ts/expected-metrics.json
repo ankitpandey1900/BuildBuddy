@@ -1,0 +1,455 @@
+[
+  [
+    {
+      "symbol_stable_id": "c2574476c6273260e8016185930f3acb24302679934b4da9ab11e3815d00926f",
+      "name": "directLocalHelper",
+      "qualified_name": "directLocalHelper",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "a",
+            "type_annotation": "number",
+            "default_value": null
+          },
+          {
+            "name": "b",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": "number",
+        "callers": [
+          "callsDemonstration"
+        ],
+        "callees": [],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 7,
+      "end_line": 9,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "fdb50a97605bdc0ade0c1645115927e8a4e850f9aec41e36bda606735e4817a0",
+      "name": "simpleLinear",
+      "qualified_name": "simpleLinear",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "x",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": "number",
+        "callers": [],
+        "callees": [],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 13,
+      "end_line": 16,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "bbe9e75e586c8cd5c5ba3a551e5dd6c9824ce13f3d8859ed29401245b97e11e9",
+      "name": "singleBranch",
+      "qualified_name": "singleBranch",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "x",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": "string",
+        "callers": [],
+        "callees": [],
+        "imports_used": [],
+        "branch_count": 1,
+        "loop_count": 0,
+        "cyclomatic_complexity": 2,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 20,
+      "end_line": 25,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "97dcf6763ec3fbfa21de7b6f9173f67863ff3f75af55e3f7a13e56b547c9a16c",
+      "name": "compoundConditionWithEffects",
+      "qualified_name": "compoundConditionWithEffects",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "a",
+            "type_annotation": "boolean",
+            "default_value": null
+          },
+          {
+            "name": "b",
+            "type_annotation": "boolean",
+            "default_value": null
+          },
+          {
+            "name": "c",
+            "type_annotation": "boolean",
+            "default_value": null
+          }
+        ],
+        "return_type": "boolean",
+        "callers": [],
+        "callees": [
+          "fetch"
+        ],
+        "imports_used": [],
+        "branch_count": 3,
+        "loop_count": 0,
+        "cyclomatic_complexity": 4,
+        "has_error_handling": false,
+        "side_effects": [
+          {
+            "category": "network",
+            "pattern": "fetch",
+            "confidence": "static",
+            "line_number": 31
+          }
+        ]
+      },
+      "start_line": 29,
+      "end_line": 35,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "ac9981b1a1b4dda185f14e52605c7f20d73d39e5404efcb6ae87112cb36be838",
+      "name": "loopWithCatchAndFs",
+      "qualified_name": "loopWithCatchAndFs",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "items",
+            "type_annotation": "string[]",
+            "default_value": null
+          }
+        ],
+        "return_type": "number",
+        "callers": [],
+        "callees": [
+          "fs.readFile"
+        ],
+        "imports_used": [],
+        "branch_count": 2,
+        "loop_count": 1,
+        "cyclomatic_complexity": 4,
+        "has_error_handling": true,
+        "side_effects": [
+          {
+            "category": "fs",
+            "pattern": "fs.readFile",
+            "confidence": "static",
+            "line_number": 44
+          }
+        ]
+      },
+      "start_line": 39,
+      "end_line": 52,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "39bce236d6ee292933246661ce09b26733949e79af2447f405491b486481224e",
+      "name": "complexSwitchAndDynamic",
+      "qualified_name": "complexSwitchAndDynamic",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "code",
+            "type_annotation": "number",
+            "default_value": null
+          },
+          {
+            "name": "flag",
+            "type_annotation": "boolean",
+            "default_value": null
+          },
+          {
+            "name": "obj",
+            "type_annotation": "any",
+            "default_value": null
+          },
+          {
+            "name": "dynamicMethod",
+            "type_annotation": "string",
+            "default_value": null
+          }
+        ],
+        "return_type": "string",
+        "callers": [],
+        "callees": [
+          "db.query",
+          "eval",
+          "obj[dynamicMethod]"
+        ],
+        "imports_used": [],
+        "branch_count": 4,
+        "loop_count": 0,
+        "cyclomatic_complexity": 5,
+        "has_error_handling": false,
+        "side_effects": [
+          {
+            "category": "db",
+            "pattern": "query",
+            "confidence": "static",
+            "line_number": 71
+          }
+        ]
+      },
+      "start_line": 56,
+      "end_line": 76,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "493a056f08a09b7c494c5dd4aaa2a8231949e9b212bb57319d8f2c3e8510946d",
+      "name": "callsDemonstration",
+      "qualified_name": "callsDemonstration",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "client",
+            "type_annotation": "any",
+            "default_value": null
+          },
+          {
+            "name": "callback",
+            "type_annotation": "(n: number) => void",
+            "default_value": null
+          }
+        ],
+        "return_type": "void",
+        "callers": [],
+        "callees": [
+          "callback",
+          "client.fetchData",
+          "directLocalHelper",
+          "importedHelper",
+          "unresolvedGlobalFunction"
+        ],
+        "imports_used": [
+          "importedHelper"
+        ],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 80,
+      "end_line": 98,
+      "start_column": 0,
+      "end_column": 1
+    },
+    {
+      "symbol_stable_id": "f351c2d60dd4e39ed731c7f6c0d83576dc1c0b6db1edf89f65e545143d9f2e18",
+      "name": "constructor",
+      "qualified_name": "AdvancedCalculator.constructor",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "name",
+            "type_annotation": "string",
+            "default_value": null
+          },
+          {
+            "name": "precision",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": null,
+        "callers": [],
+        "callees": [
+          "super"
+        ],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 103,
+      "end_line": 106,
+      "start_column": 2,
+      "end_column": 3
+    },
+    {
+      "symbol_stable_id": "13a0722ca7def09ac767ad6403a8d2715a3ea087a7bafd5a174d1e18225bade2",
+      "name": "internalCompute",
+      "qualified_name": "AdvancedCalculator.internalCompute",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "val",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": "number",
+        "callers": [
+          "AdvancedCalculator.calculate"
+        ],
+        "callees": [],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 108,
+      "end_line": 110,
+      "start_column": 2,
+      "end_column": 3
+    },
+    {
+      "symbol_stable_id": "700007da7526577c6060e711aed318a4996918fa01dcdc5d0a3e9185ef92fa06",
+      "name": "calculate",
+      "qualified_name": "AdvancedCalculator.calculate",
+      "metrics": {
+        "parameters": [
+          {
+            "name": "a",
+            "type_annotation": "number",
+            "default_value": null
+          },
+          {
+            "name": "b",
+            "type_annotation": "number",
+            "default_value": null
+          }
+        ],
+        "return_type": "number",
+        "callers": [],
+        "callees": [
+          "this.internalCompute"
+        ],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 112,
+      "end_line": 115,
+      "start_column": 2,
+      "end_column": 3
+    },
+    {
+      "symbol_stable_id": "a01131f6d52bde8c06c9ac2b7a78a9ede4cf67182d5cfde6ecdc94868278a8fc",
+      "name": "runDemo",
+      "qualified_name": "runDemo",
+      "metrics": {
+        "parameters": [],
+        "return_type": "void",
+        "callers": [],
+        "callees": [
+          "calc.calculate"
+        ],
+        "imports_used": [],
+        "branch_count": 0,
+        "loop_count": 0,
+        "cyclomatic_complexity": 1,
+        "has_error_handling": false,
+        "side_effects": []
+      },
+      "start_line": 118,
+      "end_line": 122,
+      "start_column": 0,
+      "end_column": 1
+    }
+  ],
+  [
+    {
+      "symbol_stable_id": "6a10725ffbea1ae944bbebf431cfb243ce7d6b3c04515546ef1f46cf44044a70",
+      "name": "AdvancedCalculator",
+      "superclass": "BaseService",
+      "interfaces": [
+        "ICalculator"
+      ],
+      "properties": [
+        {
+          "name": "precision",
+          "type_annotation": "number",
+          "visibility": "public",
+          "is_static": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "internalCompute",
+          "signature": "internalCompute(val)",
+          "visibility": "public",
+          "is_static": false
+        },
+        {
+          "name": "calculate",
+          "signature": "calculate(a, b)",
+          "visibility": "public",
+          "is_static": false
+        }
+      ],
+      "constructors": [
+        {
+          "signature": "constructor(name, precision)",
+          "parameters": [
+            {
+              "name": "name",
+              "type_annotation": ": string",
+              "default_value": null
+            },
+            {
+              "name": "precision",
+              "type_annotation": ": number",
+              "default_value": null
+            }
+          ],
+          "start_line": 103,
+          "end_line": 106
+        }
+      ],
+      "instantiations": [
+        {
+          "class_name": "AdvancedCalculator",
+          "caller_symbol_id": "a01131f6d52bde8c06c9ac2b7a78a9ede4cf67182d5cfde6ecdc94868278a8fc",
+          "class_symbol_id": "6a10725ffbea1ae944bbebf431cfb243ce7d6b3c04515546ef1f46cf44044a70",
+          "start_line": 120,
+          "end_line": 120,
+          "start_column": 15,
+          "end_column": 50,
+          "snippet": "new AdvancedCalculator(\"engine\", 2)",
+          "resolution_status": "confirmed"
+        }
+      ],
+      "start_line": 100,
+      "end_line": 116,
+      "start_column": 0,
+      "end_column": 1
+    }
+  ]
+]
