@@ -5,7 +5,8 @@ export type RelationshipType =
   | "call"
   | "inheritance"
   | "instantiation"
-  | "declared_dependency";
+  | "declared_dependency"
+  | "entry";
 
 export type DiagramConfidence = "confirmed" | "static" | "inferred" | "unknown";
 
@@ -47,6 +48,7 @@ export interface DiagramEdge {
   relationship: RelationshipType;
   confidence: DiagramConfidence;
   evidence_id: number;
+  evidence_key: string;
   label?: string;
 }
 
@@ -58,6 +60,7 @@ export interface AggregatedEdge {
   edge_count: number;
   underlying_edge_ids: string[];
   evidence_ids: number[];
+  evidence_keys: string[];
 }
 
 export interface DiagramGroup {
@@ -151,3 +154,4 @@ export function getNodeSizeForKind(kind: DiagramNodeKind): { width: number; heig
       return NODE_SIZE_EXTERNAL;
   }
 }
+

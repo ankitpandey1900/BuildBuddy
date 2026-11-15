@@ -1,0 +1,165 @@
+{
+  "diagram_type": "file_dependency",
+  "nodes": [
+    {
+      "id": "file:package.json",
+      "kind": "file",
+      "label": "package.json",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "package.json",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 0
+      }
+    },
+    {
+      "id": "file:src/barrel.ts",
+      "kind": "file",
+      "label": "barrel.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/barrel.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/cycle_a.ts",
+      "kind": "file",
+      "label": "cycle_a.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/cycle_a.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/cycle_b.ts",
+      "kind": "file",
+      "label": "cycle_b.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/cycle_b.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:src/index.ts",
+      "kind": "file",
+      "label": "index.ts",
+      "group_id": "group:dir:src",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "src/index.ts",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 1,
+        "class_count": 0,
+        "import_count": 1
+      }
+    },
+    {
+      "id": "file:tsconfig.json",
+      "kind": "file",
+      "label": "tsconfig.json",
+      "width": 180.0,
+      "height": 40.0,
+      "source_ref": {
+        "file_path": "tsconfig.json",
+        "start_line": 1,
+        "end_line": 1
+      },
+      "metrics": {
+        "line_count": 0,
+        "function_count": 0,
+        "class_count": 0,
+        "import_count": 0
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge:import:file:src/barrel.ts:file:src/cycle_a.ts::1",
+      "from": "file:src/barrel.ts",
+      "to": "file:src/cycle_a.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 12,
+      "evidence_key": "src/barrel.ts:1-1:import_stmt"
+    },
+    {
+      "id": "edge:import:file:src/cycle_a.ts:file:src/cycle_b.ts:b:1",
+      "from": "file:src/cycle_a.ts",
+      "to": "file:src/cycle_b.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 13,
+      "evidence_key": "src/cycle_a.ts:1-1:import_stmt",
+      "label": "import b"
+    },
+    {
+      "id": "edge:import:file:src/cycle_b.ts:file:src/cycle_a.ts:a:1",
+      "from": "file:src/cycle_b.ts",
+      "to": "file:src/cycle_a.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 14,
+      "evidence_key": "src/cycle_b.ts:1-1:import_stmt",
+      "label": "import a"
+    },
+    {
+      "id": "edge:import:file:src/index.ts:file:src/barrel.ts:a:1",
+      "from": "file:src/index.ts",
+      "to": "file:src/barrel.ts",
+      "relationship": "import",
+      "confidence": "static",
+      "evidence_id": 15,
+      "evidence_key": "src/index.ts:1-1:import_stmt",
+      "label": "import a"
+    }
+  ],
+  "groups": [
+    {
+      "id": "group:dir:src",
+      "label": "src",
+      "collapsed": false
+    }
+  ]
+}

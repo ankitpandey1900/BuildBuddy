@@ -294,21 +294,26 @@ All entry points detected statically are assigned `confidence: "static"`. Every 
 PRD Section 7 requires diagrams to be first-class engineering blueprints rather than decorative report visuals. The pipeline must normalize data from the SQLite database into a typed `DiagramModel`, enforce strict provenance, progressively disclose large repositories, and compute orthogonal layered layouts deterministically offline using ELK.js in a cancellable Web Worker.
 
 ### 1. Relationship Vocabulary
-Edges strictly use the following 5 semantic relationship types:
+Edges strictly use the following 6 semantic relationship types:
 - **`import`**: Syntactic import statement (file-to-file or module-to-module).
 - **`call`**: Direct, imported, or receiver function/method invocation.
 - **`inheritance`**: OOP superclass / interface inheritance (`class Child extends Parent`).
 - **`instantiation`**: Object construction / class instantiation (`new Service()`).
 - **`declared_dependency`**: Package manifest dependency declared in `package.json`, `requirements.txt`, etc.
+- **`entry`**: Startup entry point linkage (connecting entry point component node to containing module).
 
 **Rule**: Different relationship types are NEVER merged into a single edge. Each edge represents an atomic, verifiable relationship.
 
-### 2. Edge Confidence Rules
+### 2. Edge Confidence Rules & Stable Identifiers
 Every edge records its confidence classification:
 - **`confirmed`**: Direct AST declaration, same-file symbol resolution, or direct class instantiation.
 - **`static`**: Resolved cross-file imports, parent method calls, and declared manifest dependencies.
 - **`inferred`**: Calls on unverified receivers (e.g. `client.fetchData()`, callback invocations, dynamic property calls). Inferred edges NEVER merge with confirmed or static edges and retain explicit `inferred` confidence.
 - **`unknown`**: Call targets that cannot be statically resolved to any known symbol.
+
+**Stable Identifiers & Evidence Key**:
+- Edge IDs are generated deterministically using structural identifiers (e.g. `edge:import:{from}:{to}:{imported_name}:{line_number}`, `edge:entry:{ep_node_id}:{mod_id}`, `edge:inheritance:{from}:{to}`) rather than auto-incrementing database row IDs. This ensures order-independence and stability across database insertions.
+- Alongside the numeric `evidence_id`, all edges and aggregated edges carry a canonical `evidence_key` formatted as `{relative_path}:{start_line}-{end_line}:{evidence_type}`.
 
 ### 3. Node Sizing Standards (Width x Height)
 To guarantee predictable hierarchy and avoid overlapping labels:
@@ -320,8 +325,8 @@ To guarantee predictable hierarchy and avoid overlapping labels:
 
 ### 4. Progressive Disclosure & Threshold
 - **Threshold**: **150 nodes**. When any diagram model exceeds 150 nodes, the builder returns a module-level overview with collapsed groups (`collapsed: true`).
-- **Aggregated Edges**: Inter-module edges summarize connections while maintaining full traceability: each `AggregatedEdge` preserves the complete list of underlying edge IDs and source evidence IDs (`underlying_edge_ids`, `evidence_ids`).
-- **Drill-Down**: The `drill_down(group_id)` function isolates the selected group, returning exactly the member nodes and internal/incident edges for detailed inspection.
+- **Aggregated Edges**: Inter-module edges summarize connections while maintaining full traceability: each `AggregatedEdge` preserves the complete list of underlying edge IDs, source evidence IDs, and canonical evidence keys (`underlying_edge_ids`, `evidence_ids`, `evidence_keys`).
+- **Drill-Down**: The `drill_down(group_id)` function isolates the selected group, returning exactly that group's member nodes and the edges between them (edges where both `from` and `to` reside strictly within the target group).
 
 ### 5. ELK.js Layout Options & Justification
 - **`elk.algorithm: "layered"`**: Sugiyama layered layout enforces directional visual flow and minimizes edge crossings.
@@ -332,9 +337,15 @@ To guarantee predictable hierarchy and avoid overlapping labels:
   - Compact: 24px node-to-node, 36px between layers, 20px group padding.
   - Spacious: 60px node-to-node, 80px between layers, 40px group padding.
 - **`org.eclipse.elk.randomSeed: "1"`**: Guarantees deterministic layout output across multiple runs with identical input.
-- **Web Worker Architecture**: All ELK calculations execute in a dedicated, cancellable Web Worker (`src/diagram/layout/worker.ts`), preventing main thread freezing during heavy layout computations.
+- **Web Worker Architecture & Immediate Cancellation**: All ELK calculations execute in a dedicated Web Worker (`src/diagram/layout/worker.ts`), preventing main thread UI blocking. Because synchronous layout execution cannot be preempted by messages alone, calling `cancel()` invokes `worker.terminate()` immediately at the OS thread level to abort CPU consumption, and transparently spawns a fresh Worker instance for subsequent requests.
 
-### 6. Intentionally Not Supported in this Phase
+### 6. Real Measured Layout Performance
+Benchmarked using Vitest with explicit high-resolution timing (`performance.now()`):
+- **2,000-node / 6,000-edge graph (collapsed overview layout)**: **848.61 ms** (cold) / **60.36 ms** (warm test run).
+- **150-node / ~450-edge file dependency graph layout**: **2473.15 ms**.
+- **100-node group drill_down layout**: **207.16 ms**.
+
+### 7. Intentionally Not Supported in this Phase
 - **React Flow Canvas UI Rendering**: Visual interactive rendering on the React Flow canvas is NOT implemented in this task and is scheduled for the next task.
 - **Custom User Node Positioning Persistence**: Saving manual drag-and-drop coordinates to the database is not supported; layouts are computed deterministically.
 - **Interactive Edge Editing / Rerouting**: Users cannot manually drag edge bend points.

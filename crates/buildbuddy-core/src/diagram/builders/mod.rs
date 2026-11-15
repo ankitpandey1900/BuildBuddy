@@ -7,3 +7,4 @@ pub use file_dependency::build_file_dependency_diagram;
 pub use module_dependency::build_module_dependency_diagram;
 pub use architecture_overview::build_architecture_overview_diagram;
 pub use class_diagram::build_class_diagram;
+

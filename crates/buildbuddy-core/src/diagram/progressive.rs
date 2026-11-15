@@ -73,7 +73,7 @@ pub fn build_collapsed_overview(model: &DiagramModel) -> CollapsedOverview {
 
     // 4. Aggregate edges between different groups/nodes
     // Group key: (from_group, to_group, relationship)
-    let mut edge_groups: BTreeMap<(String, String, String), (Vec<String>, Vec<i64>)> =
+    let mut edge_groups: BTreeMap<(String, String, String), (Vec<String>, Vec<i64>, Vec<String>)> =
         BTreeMap::new();
 
     for edge in &model.edges {
@@ -86,20 +86,22 @@ pub fn build_collapsed_overview(model: &DiagramModel) -> CollapsedOverview {
         }
 
         let key = (from_target, to_target, edge.relationship.as_str().to_string());
-        let entry = edge_groups.entry(key).or_insert_with(|| (Vec::new(), Vec::new()));
+        let entry = edge_groups.entry(key).or_insert_with(|| (Vec::new(), Vec::new(), Vec::new()));
         entry.0.push(edge.id.clone());
         entry.1.push(edge.evidence_id);
+        entry.2.push(edge.evidence_key.clone());
     }
 
     let mut aggregated_edges: Vec<AggregatedEdge> = Vec::new();
     let mut overview_edges: Vec<DiagramEdge> = Vec::new();
 
-    for ((from, to, rel_str), (edge_ids, evidence_ids)) in edge_groups {
+    for ((from, to, rel_str), (edge_ids, evidence_ids, evidence_keys)) in edge_groups {
         let rel = super::model::RelationshipType::from_str(&rel_str);
         let agg_id = format!("agg:{}:{}:{}", from, to, rel.as_str());
 
-        // Overview diagram edge using representative evidence_id (the first one)
+        // Overview diagram edge using representative evidence (the first one)
         let first_evidence = evidence_ids[0];
+        let first_evidence_key = evidence_keys[0].clone();
         overview_edges.push(DiagramEdge {
             id: agg_id.clone(),
             from: from.clone(),
@@ -107,6 +109,7 @@ pub fn build_collapsed_overview(model: &DiagramModel) -> CollapsedOverview {
             relationship: rel.clone(),
             confidence: super::model::DiagramConfidence::Static,
             evidence_id: first_evidence,
+            evidence_key: first_evidence_key,
             label: Some(format!("{} ({} links)", rel.as_str(), edge_ids.len())),
         });
 
@@ -118,6 +121,7 @@ pub fn build_collapsed_overview(model: &DiagramModel) -> CollapsedOverview {
             edge_count: edge_ids.len(),
             underlying_edge_ids: edge_ids,
             evidence_ids,
+            evidence_keys,
         });
     }
 
@@ -230,6 +234,7 @@ mod tests {
                 relationship: RelationshipType::Import,
                 confidence: DiagramConfidence::Static,
                 evidence_id: 101,
+                evidence_key: "src/file_1.ts:1-1:import_stmt".to_string(),
                 label: None,
             },
             DiagramEdge {
@@ -239,6 +244,7 @@ mod tests {
                 relationship: RelationshipType::Import,
                 confidence: DiagramConfidence::Static,
                 evidence_id: 102,
+                evidence_key: "src/file_2.ts:1-1:import_stmt".to_string(),
                 label: None,
             },
             DiagramEdge {
@@ -248,6 +254,7 @@ mod tests {
                 relationship: RelationshipType::Import,
                 confidence: DiagramConfidence::Static,
                 evidence_id: 103,
+                evidence_key: "src/file_1.ts:2-2:import_stmt".to_string(),
                 label: None,
             },
         ];
@@ -298,3 +305,4 @@ mod tests {
         assert_eq!(drill.edges[0].id, "e:internal");
     }
 }
+

@@ -5,11 +5,16 @@ import type { LayoutOptions, LayoutWorkerRequest, LayoutWorkerResponse } from ".
 export { layout } from "./engine";
 export * from "./types";
 
+export type WorkerFactory = () => Worker;
+
 /**
  * Controller for running layout calculations inside a cancellable Web Worker.
+ * When cancelled, worker.terminate() is invoked to immediately kill the worker
+ * thread and stop CPU execution, and a fresh worker is re-spawned for future jobs.
  */
 export class LayoutWorkerClient {
   private worker: Worker | null = null;
+  private workerFactory: WorkerFactory | null = null;
   private pendingRequests = new Map<
     string,
     {
@@ -19,17 +24,30 @@ export class LayoutWorkerClient {
   >();
   private requestCounter = 0;
 
-  constructor() {
-    if (typeof window !== "undefined" && typeof Worker !== "undefined") {
-      try {
-        this.worker = new Worker(new URL("./worker.ts", import.meta.url), {
+  constructor(workerFactory?: WorkerFactory) {
+    if (workerFactory) {
+      this.workerFactory = workerFactory;
+    } else if (typeof window !== "undefined" && typeof Worker !== "undefined") {
+      this.workerFactory = () =>
+        new Worker(new URL("./worker.ts", import.meta.url), {
           type: "module",
         });
-        this.worker.onmessage = this.handleMessage.bind(this);
-      } catch (e) {
-        // Fallback to direct layout in environments where Worker constructor fails
-        this.worker = null;
-      }
+    }
+
+    this.initWorker();
+  }
+
+  private initWorker() {
+    if (!this.workerFactory) {
+      this.worker = null;
+      return;
+    }
+
+    try {
+      this.worker = this.workerFactory();
+      this.worker.onmessage = this.handleMessage.bind(this);
+    } catch {
+      this.worker = null;
     }
   }
 
@@ -51,6 +69,8 @@ export class LayoutWorkerClient {
 
   /**
    * Request a layout calculation. Returns a Promise and a cancel() function.
+   * Calling cancel() calls worker.terminate() to abort execution immediately
+   * and recreates a new worker instance.
    */
   public calculate(
     model: DiagramModel,
@@ -89,12 +109,16 @@ export class LayoutWorkerClient {
     });
 
     const cancel = () => {
-      if (this.pendingRequests.has(id)) {
-        const msg: LayoutWorkerRequest = {
-          type: "cancel",
-          id,
-        };
-        this.worker?.postMessage(msg);
+      const pending = this.pendingRequests.get(id);
+      if (pending) {
+        this.pendingRequests.delete(id);
+        pending.reject(new Error("Layout calculation was cancelled"));
+
+        // Force termination of the Web Worker OS thread to halt ELK computation immediately
+        if (this.worker) {
+          this.worker.terminate();
+          this.initWorker();
+        }
       }
     };
 
@@ -104,6 +128,9 @@ export class LayoutWorkerClient {
   public terminate() {
     this.worker?.terminate();
     this.worker = null;
+    for (const [, pending] of this.pendingRequests.entries()) {
+      pending.reject(new Error("LayoutWorkerClient terminated"));
+    }
     this.pendingRequests.clear();
   }
 }

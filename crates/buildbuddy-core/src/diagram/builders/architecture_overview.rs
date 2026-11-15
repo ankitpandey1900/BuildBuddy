@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use rusqlite::{params, Connection, Result};
 
 use crate::diagram::model::{
@@ -11,14 +11,26 @@ pub fn build_architecture_overview_diagram(
     conn: &Connection,
     project_id: i64,
 ) -> Result<DiagramReport> {
-    // 1. Fetch valid evidence IDs for validation
+    // 1. Fetch valid evidence IDs and metadata for validation
     let mut valid_evidence_stmt = conn.prepare(
-        "SELECT id FROM source_evidence WHERE project_id = ?1",
+        "SELECT id, file_path, start_line, end_line, evidence_type FROM source_evidence WHERE project_id = ?1",
     )?;
-    let valid_evidence: HashSet<i64> = valid_evidence_stmt
-        .query_map(params![project_id], |row| row.get(0))?
-        .filter_map(|r| r.ok())
-        .collect();
+    let mut valid_evidence: BTreeMap<i64, String> = BTreeMap::new();
+    let ev_rows = valid_evidence_stmt.query_map(params![project_id], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)? as usize,
+            row.get::<_, i64>(3)? as usize,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    for r in ev_rows {
+        let (eid, fp, sl, el, et) = r?;
+        let norm_fp = fp.replace('\\', "/");
+        let key = format!("{}:{}-{}:{}", norm_fp, sl, el, et);
+        valid_evidence.insert(eid, key);
+    }
 
     let mut nodes: Vec<DiagramNode> = Vec::new();
     let mut edges: Vec<DiagramEdge> = Vec::new();
@@ -129,25 +141,26 @@ pub fn build_architecture_overview_diagram(
             metrics: None,
         });
 
-        // If connected to a module, create a call/starts edge
+        // If connected to a module, create an entry edge
         if let Some(mod_id) = target_mod_id {
             if let Some(ev_id) = ev_id_opt {
-                if valid_evidence.contains(&ev_id) {
+                if let Some(ev_key) = valid_evidence.get(&ev_id) {
                     let conf = DiagramConfidence::from_str(&conf_str);
                     edges.push(DiagramEdge {
-                        id: format!("edge:ep:{}:{}", ep_node_id, mod_id),
+                        id: format!("edge:entry:{}:{}", ep_node_id, mod_id),
                         from: ep_node_id.clone(),
                         to: mod_id,
-                        relationship: RelationshipType::Call,
+                        relationship: RelationshipType::Entry,
                         confidence: conf,
                         evidence_id: ev_id,
+                        evidence_key: ev_key.clone(),
                         label: Some(format!("starts {}", name)),
                     });
                 } else {
                     dropped_edges.push(DroppedEdge {
                         from: ep_node_id,
                         to: mod_id,
-                        relationship: "call".to_string(),
+                        relationship: "entry".to_string(),
                         reason: "evidence_id not in source_evidence".to_string(),
                     });
                 }
@@ -157,10 +170,11 @@ pub fn build_architecture_overview_diagram(
 
     // 4. Query call relationships that connect modules or symbols
     let mut call_stmt = conn.prepare(
-        "SELECT c.id, c.file_id, sf.relative_path, c.caller_symbol_id, c.callee_symbol_id,
-                c.callee_name, c.resolution_status, c.source_evidence_id
+        "SELECT c.id, c.file_id, sf.relative_path, c.caller_symbol_id, caller_sym.stable_id,
+                c.callee_symbol_id, c.callee_name, c.resolution_status, c.source_evidence_id
          FROM call_relationships c
          JOIN files sf ON c.file_id = sf.id
+         LEFT JOIN symbols caller_sym ON c.caller_symbol_id = caller_sym.id
          WHERE c.project_id = ?1
          ORDER BY c.id ASC",
     )?;
@@ -171,15 +185,16 @@ pub fn build_architecture_overview_diagram(
             row.get::<_, i64>(1)?,
             row.get::<_, String>(2)?,
             row.get::<_, Option<i64>>(3)?,
-            row.get::<_, Option<i64>>(4)?,
-            row.get::<_, String>(5)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<i64>>(5)?,
             row.get::<_, String>(6)?,
-            row.get::<_, i64>(7)?,
+            row.get::<_, String>(7)?,
+            row.get::<_, i64>(8)?,
         ))
     })?;
 
     for r in call_rows {
-        let (cid, _fid, src_path, _caller_id, _callee_id, callee_name, res_status, ev_id) = r?;
+        let (_cid, _fid, src_path, _caller_id, caller_stable_id, _callee_id, callee_name, res_status, ev_id) = r?;
         let src_norm = src_path.replace('\\', "/");
 
         // Determine from module
@@ -194,24 +209,31 @@ pub fn build_architecture_overview_diagram(
 
         let to_target = format!("external:{}", callee_name);
 
-        if !valid_evidence.contains(&ev_id) {
-            dropped_edges.push(DroppedEdge {
-                from: from_mod,
-                to: to_target,
-                relationship: "call".to_string(),
-                reason: "evidence_id not in source_evidence".to_string(),
-            });
-            continue;
-        }
+        let ev_key = match valid_evidence.get(&ev_id) {
+            Some(k) => k.clone(),
+            None => {
+                dropped_edges.push(DroppedEdge {
+                    from: from_mod,
+                    to: to_target,
+                    relationship: "call".to_string(),
+                    reason: "evidence_id not in source_evidence".to_string(),
+                });
+                continue;
+            }
+        };
 
         let conf = DiagramConfidence::from_str(&res_status);
+        let caller_ident = caller_stable_id.unwrap_or_else(|| src_norm.clone());
+        let edge_id = format!("edge:call:{}:{}:{}", from_mod, caller_ident, callee_name);
+
         edges.push(DiagramEdge {
-            id: format!("edge:call:{}:{}", cid, callee_name),
+            id: edge_id,
             from: from_mod,
             to: to_target,
             relationship: RelationshipType::Call,
             confidence: conf,
             evidence_id: ev_id,
+            evidence_key: ev_key,
             label: Some(format!("calls {}", callee_name)),
         });
     }
@@ -251,7 +273,7 @@ pub fn build_architecture_overview_diagram(
         });
 
         if let Some(ev_id) = ev_id_opt {
-            if valid_evidence.contains(&ev_id) {
+            if let Some(ev_key) = valid_evidence.get(&ev_id) {
                 edges.push(DiagramEdge {
                     id: format!("edge:declared:{}:{}", pkg_name, dep_type),
                     from: "module:root".to_string(),
@@ -259,6 +281,7 @@ pub fn build_architecture_overview_diagram(
                     relationship: RelationshipType::DeclaredDependency,
                     confidence: DiagramConfidence::Confirmed,
                     evidence_id: ev_id,
+                    evidence_key: ev_key.clone(),
                     label: Some(format!("declared ({})", dep_type)),
                 });
             } else {
@@ -296,3 +319,4 @@ pub fn build_architecture_overview_diagram(
         dropped_edges,
     })
 }
+

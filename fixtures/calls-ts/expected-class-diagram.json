@@ -32,6 +32,13 @@
         "function_count": 1,
         "complexity": 1
       }
+    },
+    {
+      "id": "class:runDemo",
+      "kind": "class",
+      "label": "runDemo",
+      "width": 220.0,
+      "height": 60.0
     }
   ],
   "edges": [
@@ -42,15 +49,17 @@
       "relationship": "inheritance",
       "confidence": "confirmed",
       "evidence_id": 12,
+      "evidence_key": "sample.ts:100-118:ast_node",
       "label": "extends"
     },
     {
-      "id": "edge:instantiation:1:AdvancedCalculator",
+      "id": "edge:instantiation:a10983d40b34e114cdca16b6fcc06b865441a0033c1a8d509b515ec60819c4ef:class:AdvancedCalculator",
       "from": "class:runDemo",
       "to": "class:AdvancedCalculator",
       "relationship": "instantiation",
       "confidence": "confirmed",
       "evidence_id": 45,
+      "evidence_key": "sample.ts:122-122:call_site",
       "label": "new AdvancedCalculator"
     }
   ],

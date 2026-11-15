@@ -43,6 +43,7 @@ pub enum RelationshipType {
     Inheritance,
     Instantiation,
     DeclaredDependency,
+    Entry,
 }
 
 impl RelationshipType {
@@ -53,6 +54,7 @@ impl RelationshipType {
             RelationshipType::Inheritance => "inheritance",
             RelationshipType::Instantiation => "instantiation",
             RelationshipType::DeclaredDependency => "declared_dependency",
+            RelationshipType::Entry => "entry",
         }
     }
 
@@ -63,6 +65,7 @@ impl RelationshipType {
             "inheritance" => RelationshipType::Inheritance,
             "instantiation" => RelationshipType::Instantiation,
             "declared_dependency" => RelationshipType::DeclaredDependency,
+            "entry" => RelationshipType::Entry,
             _ => RelationshipType::Import,
         }
     }
@@ -137,7 +140,7 @@ pub struct NodeMetrics {
     pub complexity: Option<usize>,
 }
 
-/// An edge in a diagram. `evidence_id` is REQUIRED (non-optional).
+/// An edge in a diagram. `evidence_id` and `evidence_key` are REQUIRED.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiagramEdge {
     pub id: String,
@@ -147,6 +150,8 @@ pub struct DiagramEdge {
     pub confidence: DiagramConfidence,
     /// Must reference a real `source_evidence` row. Non-optional.
     pub evidence_id: i64,
+    /// Stable evidence key (file_path:start_line-end_line:evidence_type).
+    pub evidence_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 }
@@ -163,6 +168,8 @@ pub struct AggregatedEdge {
     pub underlying_edge_ids: Vec<String>,
     /// Evidence IDs from the underlying edges.
     pub evidence_ids: Vec<i64>,
+    /// Evidence keys from the underlying edges.
+    pub evidence_keys: Vec<String>,
 }
 
 /// A group (container) in a diagram.
@@ -302,6 +309,7 @@ pub struct PositionedEdge {
     pub relationship: RelationshipType,
     pub confidence: DiagramConfidence,
     pub evidence_id: i64,
+    pub evidence_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     pub points: Vec<Point>,
@@ -382,6 +390,7 @@ mod tests {
                 relationship: RelationshipType::Import,
                 confidence: DiagramConfidence::Static,
                 evidence_id: 42,
+                evidence_key: "src/index.ts:1-1:import_stmt".to_string(),
                 label: Some("import { foo }".to_string()),
             }],
             groups: vec![],

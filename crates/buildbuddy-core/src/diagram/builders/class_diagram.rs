@@ -9,14 +9,26 @@ use crate::diagram::model::{
 
 /// Builds a class diagram (OOP relationships) from SQLite records.
 pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<DiagramReport> {
-    // 1. Fetch valid evidence IDs for validation
+    // 1. Fetch valid evidence IDs and metadata for validation
     let mut valid_evidence_stmt = conn.prepare(
-        "SELECT id FROM source_evidence WHERE project_id = ?1",
+        "SELECT id, file_path, start_line, end_line, evidence_type FROM source_evidence WHERE project_id = ?1",
     )?;
-    let valid_evidence: HashSet<i64> = valid_evidence_stmt
-        .query_map(params![project_id], |row| row.get(0))?
-        .filter_map(|r| r.ok())
-        .collect();
+    let mut valid_evidence: BTreeMap<i64, String> = BTreeMap::new();
+    let ev_rows = valid_evidence_stmt.query_map(params![project_id], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)? as usize,
+            row.get::<_, i64>(3)? as usize,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    for r in ev_rows {
+        let (eid, fp, sl, el, et) = r?;
+        let norm_fp = fp.replace('\\', "/");
+        let key = format!("{}:{}-{}:{}", norm_fp, sl, el, et);
+        valid_evidence.insert(eid, key);
+    }
 
     // 2. Query all classes in this project
     let mut class_stmt = conn.prepare(
@@ -153,7 +165,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                 }
 
                 match ev_id_opt {
-                    Some(ev_id) if valid_evidence.contains(&ev_id) => {
+                    Some(ev_id) if valid_evidence.contains_key(&ev_id) => {
                         edges.push(DiagramEdge {
                             id: format!("edge:inheritance:{}:{}", from_node_id, to_node_id),
                             from: from_node_id,
@@ -161,6 +173,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                             relationship: RelationshipType::Inheritance,
                             confidence: DiagramConfidence::Confirmed,
                             evidence_id: ev_id,
+                            evidence_key: valid_evidence[&ev_id].clone(),
                             label: Some("extends".to_string()),
                         });
                     }
@@ -187,7 +200,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
 
     // 4. Instantiation edges from class_instantiations
     let mut inst_stmt = conn.prepare(
-        "SELECT ci.id, ci.file_id, sf.relative_path, ci.caller_symbol_id, cs.name, cs.qualified_name,
+        "SELECT ci.id, ci.file_id, sf.relative_path, ci.caller_symbol_id, cs.stable_id, cs.name, cs.qualified_name,
                 ci.class_symbol_id, target_s.name, target_s.qualified_name, ci.class_name,
                 ci.resolution_status, ci.source_evidence_id
          FROM class_instantiations ci
@@ -206,21 +219,23 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
             row.get::<_, Option<i64>>(3)?,
             row.get::<_, Option<String>>(4)?,
             row.get::<_, Option<String>>(5)?,
-            row.get::<_, Option<i64>>(6)?,
-            row.get::<_, Option<String>>(7)?,
+            row.get::<_, Option<String>>(6)?,
+            row.get::<_, Option<i64>>(7)?,
             row.get::<_, Option<String>>(8)?,
-            row.get::<_, String>(9)?,
+            row.get::<_, Option<String>>(9)?,
             row.get::<_, String>(10)?,
-            row.get::<_, i64>(11)?,
+            row.get::<_, String>(11)?,
+            row.get::<_, i64>(12)?,
         ))
     })?;
 
     for r in inst_rows {
         let (
-            inst_id,
+            _inst_id,
             _fid,
             src_path,
             _caller_id,
+            caller_stable_id,
             _caller_name,
             caller_qual,
             _target_sym_id,
@@ -232,11 +247,23 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
         ) = r?;
 
         let src_norm = src_path.replace('\\', "/");
-        let from_node_id = if let Some(q) = caller_qual {
-            format!("class:{}", q)
-        } else {
-            format!("file:{}", src_norm)
-        };
+        let from_ident = caller_qual.unwrap_or_else(|| src_norm.clone());
+        let from_node_id = format!("class:{}", from_ident);
+
+        // Ensure from_node_id exists in nodes
+        if !known_class_names.contains(&from_ident) {
+            nodes.push(DiagramNode {
+                id: from_node_id.clone(),
+                kind: DiagramNodeKind::Class,
+                label: from_ident.clone(),
+                group_id: None,
+                width: cls_w,
+                height: cls_h,
+                source_ref: None,
+                metrics: None,
+            });
+            known_class_names.insert(from_ident.clone());
+        }
 
         let target_ident = target_qual.unwrap_or(class_name);
         let to_node_id = format!("class:{}", target_ident);
@@ -256,24 +283,31 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
             known_class_names.insert(target_ident.clone());
         }
 
-        if !valid_evidence.contains(&ev_id) {
-            dropped_edges.push(DroppedEdge {
-                from: from_node_id,
-                to: to_node_id,
-                relationship: "instantiation".to_string(),
-                reason: "evidence_id not in source_evidence".to_string(),
-            });
-            continue;
-        }
+        let ev_key = match valid_evidence.get(&ev_id) {
+            Some(k) => k.clone(),
+            None => {
+                dropped_edges.push(DroppedEdge {
+                    from: from_node_id,
+                    to: to_node_id,
+                    relationship: "instantiation".to_string(),
+                    reason: "evidence_id not in source_evidence".to_string(),
+                });
+                continue;
+            }
+        };
 
         let conf = DiagramConfidence::from_str(&res_status);
+        let caller_ident = caller_stable_id.unwrap_or_else(|| from_node_id.clone());
+        let edge_id = format!("edge:instantiation:{}:{}", caller_ident, to_node_id);
+
         edges.push(DiagramEdge {
-            id: format!("edge:instantiation:{}:{}", inst_id, target_ident),
+            id: edge_id,
             from: from_node_id,
             to: to_node_id,
             relationship: RelationshipType::Instantiation,
             confidence: conf,
             evidence_id: ev_id,
+            evidence_key: ev_key,
             label: Some(format!("new {}", target_ident)),
         });
     }
@@ -302,3 +336,4 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
         dropped_edges,
     })
 }
+

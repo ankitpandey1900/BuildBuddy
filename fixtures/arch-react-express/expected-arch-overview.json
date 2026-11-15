@@ -102,94 +102,104 @@
   ],
   "edges": [
     {
-      "id": "edge:call:10:defineConfig",
-      "from": "module:.",
-      "to": "external:defineConfig",
-      "relationship": "call",
-      "confidence": "confirmed",
-      "evidence_id": 22,
-      "label": "calls defineConfig"
-    },
-    {
-      "id": "edge:call:1:useState",
+      "id": "edge:call:module:.:4169318f585130b71c5ca97b447b8bc08180d853bae6cc551bd31a7fdffd508f:useState",
       "from": "module:.",
       "to": "external:useState",
       "relationship": "call",
       "confidence": "confirmed",
       "evidence_id": 5,
+      "evidence_key": "src/client/App.tsx:4-4:call_site",
       "label": "calls useState"
     },
     {
-      "id": "edge:call:2:document.getElementById",
-      "from": "module:.",
-      "to": "external:document.getElementById",
-      "relationship": "call",
-      "confidence": "inferred",
-      "evidence_id": 10,
-      "label": "calls document.getElementById"
-    },
-    {
-      "id": "edge:call:3:createRoot",
+      "id": "edge:call:module:.:src/client/main.tsx:createRoot",
       "from": "module:.",
       "to": "external:createRoot",
       "relationship": "call",
       "confidence": "confirmed",
       "evidence_id": 11,
+      "evidence_key": "src/client/main.tsx:7-7:call_site",
       "label": "calls createRoot"
     },
     {
-      "id": "edge:call:4:root.render",
+      "id": "edge:call:module:.:src/client/main.tsx:document.getElementById",
+      "from": "module:.",
+      "to": "external:document.getElementById",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 10,
+      "evidence_key": "src/client/main.tsx:5-5:call_site",
+      "label": "calls document.getElementById"
+    },
+    {
+      "id": "edge:call:module:.:src/client/main.tsx:root.render",
       "from": "module:.",
       "to": "external:root.render",
       "relationship": "call",
       "confidence": "inferred",
       "evidence_id": 12,
+      "evidence_key": "src/client/main.tsx:8-8:call_site",
       "label": "calls root.render"
     },
     {
-      "id": "edge:call:5:express",
-      "from": "module:.",
-      "to": "external:express",
-      "relationship": "call",
-      "confidence": "confirmed",
-      "evidence_id": 16,
-      "label": "calls express"
-    },
-    {
-      "id": "edge:call:6:app.get",
+      "id": "edge:call:module:.:src/server/index.ts:app.get",
       "from": "module:.",
       "to": "external:app.get",
       "relationship": "call",
       "confidence": "inferred",
       "evidence_id": 17,
+      "evidence_key": "src/server/index.ts:6-8:call_site",
       "label": "calls app.get"
     },
     {
-      "id": "edge:call:7:res.json",
-      "from": "module:.",
-      "to": "external:res.json",
-      "relationship": "call",
-      "confidence": "inferred",
-      "evidence_id": 18,
-      "label": "calls res.json"
-    },
-    {
-      "id": "edge:call:8:app.listen",
+      "id": "edge:call:module:.:src/server/index.ts:app.listen",
       "from": "module:.",
       "to": "external:app.listen",
       "relationship": "call",
       "confidence": "inferred",
       "evidence_id": 19,
+      "evidence_key": "src/server/index.ts:10-12:call_site",
       "label": "calls app.listen"
     },
     {
-      "id": "edge:call:9:console.log",
+      "id": "edge:call:module:.:src/server/index.ts:console.log",
       "from": "module:.",
       "to": "external:console.log",
       "relationship": "call",
       "confidence": "inferred",
       "evidence_id": 20,
+      "evidence_key": "src/server/index.ts:11-11:call_site",
       "label": "calls console.log"
+    },
+    {
+      "id": "edge:call:module:.:src/server/index.ts:express",
+      "from": "module:.",
+      "to": "external:express",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 16,
+      "evidence_key": "src/server/index.ts:3-3:call_site",
+      "label": "calls express"
+    },
+    {
+      "id": "edge:call:module:.:src/server/index.ts:res.json",
+      "from": "module:.",
+      "to": "external:res.json",
+      "relationship": "call",
+      "confidence": "inferred",
+      "evidence_id": 18,
+      "evidence_key": "src/server/index.ts:7-7:call_site",
+      "label": "calls res.json"
+    },
+    {
+      "id": "edge:call:module:.:vite.config.ts:defineConfig",
+      "from": "module:.",
+      "to": "external:defineConfig",
+      "relationship": "call",
+      "confidence": "confirmed",
+      "evidence_id": 22,
+      "evidence_key": "vite.config.ts:3-7:call_site",
+      "label": "calls defineConfig"
     },
     {
       "id": "edge:declared:express:direct",
@@ -198,6 +208,7 @@
       "relationship": "declared_dependency",
       "confidence": "confirmed",
       "evidence_id": 30,
+      "evidence_key": "package.json:10-10:manifest_entry",
       "label": "declared (direct)"
     },
     {
@@ -207,6 +218,7 @@
       "relationship": "declared_dependency",
       "confidence": "confirmed",
       "evidence_id": 32,
+      "evidence_key": "package.json:12-12:manifest_entry",
       "label": "declared (direct)"
     },
     {
@@ -216,6 +228,7 @@
       "relationship": "declared_dependency",
       "confidence": "confirmed",
       "evidence_id": 31,
+      "evidence_key": "package.json:11-11:manifest_entry",
       "label": "declared (direct)"
     },
     {
@@ -225,6 +238,7 @@
       "relationship": "declared_dependency",
       "confidence": "confirmed",
       "evidence_id": 33,
+      "evidence_key": "package.json:15-15:manifest_entry",
       "label": "declared (dev)"
     },
     {
@@ -234,51 +248,57 @@
       "relationship": "declared_dependency",
       "confidence": "confirmed",
       "evidence_id": 34,
+      "evidence_key": "package.json:7-7:manifest_entry",
       "label": "declared (dev)"
     },
     {
-      "id": "edge:ep:entry_point:package.json:module:.",
+      "id": "edge:entry:entry_point:package.json:module:.",
       "from": "entry_point:package.json",
       "to": "module:.",
-      "relationship": "call",
+      "relationship": "entry",
       "confidence": "static",
       "evidence_id": 46,
+      "evidence_key": "package.json:4-4:entry_point",
       "label": "starts package.json main"
     },
     {
-      "id": "edge:ep:entry_point:package.json:module:.",
+      "id": "edge:entry:entry_point:package.json:module:.",
       "from": "entry_point:package.json",
       "to": "module:.",
-      "relationship": "call",
+      "relationship": "entry",
       "confidence": "static",
       "evidence_id": 47,
+      "evidence_key": "package.json:6-6:entry_point",
       "label": "starts package.json script: start"
     },
     {
-      "id": "edge:ep:entry_point:package.json:module:.",
+      "id": "edge:entry:entry_point:package.json:module:.",
       "from": "entry_point:package.json",
       "to": "module:.",
-      "relationship": "call",
+      "relationship": "entry",
       "confidence": "static",
       "evidence_id": 48,
+      "evidence_key": "package.json:7-7:entry_point",
       "label": "starts package.json script: dev"
     },
     {
-      "id": "edge:ep:entry_point:src/client/main.tsx:module:.",
+      "id": "edge:entry:entry_point:src/client/main.tsx:module:.",
       "from": "entry_point:src/client/main.tsx",
       "to": "module:.",
-      "relationship": "call",
+      "relationship": "entry",
       "confidence": "static",
       "evidence_id": 49,
+      "evidence_key": "src/client/main.tsx:7-7:entry_point",
       "label": "starts React DOM Root Entry"
     },
     {
-      "id": "edge:ep:entry_point:src/server/index.ts:module:.",
+      "id": "edge:entry:entry_point:src/server/index.ts:module:.",
       "from": "entry_point:src/server/index.ts",
       "to": "module:.",
-      "relationship": "call",
+      "relationship": "entry",
       "confidence": "static",
       "evidence_id": 50,
+      "evidence_key": "src/server/index.ts:10-10:entry_point",
       "label": "starts Express HTTP Server Entry"
     }
   ],

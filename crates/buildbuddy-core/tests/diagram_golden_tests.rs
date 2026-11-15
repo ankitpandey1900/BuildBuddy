@@ -556,6 +556,7 @@ fn test_synthetic_threshold_and_drill_down() {
                 relationship: RelationshipType::Import,
                 confidence: DiagramConfidence::Static,
                 evidence_id: 1000 + i as i64,
+                evidence_key: format!("src/file_{}.ts:1-1:import_stmt", i),
                 label: None,
             });
         }
@@ -567,6 +568,7 @@ fn test_synthetic_threshold_and_drill_down() {
             relationship: RelationshipType::Import,
             confidence: DiagramConfidence::Static,
             evidence_id: 2000 + i as i64,
+            evidence_key: format!("src/file_{}.ts:2-2:import_stmt", i),
             label: None,
         });
     }
@@ -614,5 +616,213 @@ fn test_synthetic_threshold_and_drill_down() {
     assert!(!frontend_drill.edges.is_empty());
     for e in &frontend_drill.edges {
         assert!(e.id.starts_with("edge:internal"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 9. Test: diagram-cycle fixture with cycle, barrel, and inferred call
+// ---------------------------------------------------------------------------
+#[test]
+fn test_verify_diagram_cycle_golden() {
+    let dir = fixtures_dir().join("diagram-cycle");
+    let conn = setup_fixture_db(&dir);
+
+    let file_report = build_file_dependency_diagram(&conn, 1).unwrap();
+    let arch_report = build_architecture_overview_diagram(&conn, 1).unwrap();
+
+    // 1. Verify cycle between cycle_a and cycle_b
+    let a_to_b = file_report.model.edges.iter().find(|e| {
+        e.from == "file:src/cycle_a.ts" && e.to == "file:src/cycle_b.ts"
+    });
+    let b_to_a = file_report.model.edges.iter().find(|e| {
+        e.from == "file:src/cycle_b.ts" && e.to == "file:src/cycle_a.ts"
+    });
+    assert!(a_to_b.is_some(), "Must have cycle_a -> cycle_b edge");
+    assert!(b_to_a.is_some(), "Must have cycle_b -> cycle_a edge");
+
+    // 2. Verify barrel re-export
+    let barrel_to_a = file_report.model.edges.iter().find(|e| {
+        e.from == "file:src/barrel.ts" && e.to == "file:src/cycle_a.ts"
+    });
+    let index_to_barrel = file_report.model.edges.iter().find(|e| {
+        e.from == "file:src/index.ts" && e.to == "file:src/barrel.ts"
+    });
+    assert!(barrel_to_a.is_some(), "Must have barrel -> cycle_a edge");
+    assert!(index_to_barrel.is_some(), "Must have index -> barrel edge");
+
+    // 3. Verify inferred client.notify() call in architecture overview
+    let inferred_call = arch_report.model.edges.iter().find(|e| {
+        e.to == "external:client.notify" && e.relationship == RelationshipType::Call
+    });
+    assert!(inferred_call.is_some(), "Must have client.notify call edge");
+    let inf_edge = inferred_call.unwrap();
+    assert_eq!(inf_edge.confidence, DiagramConfidence::Inferred);
+
+    // Verify inferred call is NOT merged with any confirmed/static edge
+    let confirmed_calls: Vec<&DiagramEdge> = arch_report
+        .model
+        .edges
+        .iter()
+        .filter(|e| e.confidence == DiagramConfidence::Confirmed || e.confidence == DiagramConfidence::Static)
+        .collect();
+    for conf in confirmed_calls {
+        assert_ne!(inf_edge.id, conf.id);
+    }
+
+    // Save/verify golden for diagram-cycle
+    let expected_path = dir.join("expected-diagram.json");
+    let update_golden = std::env::var("UPDATE_GOLDEN").unwrap_or_default() == "1";
+
+    if update_golden {
+        fs::write(
+            &expected_path,
+            serde_json::to_string_pretty(&file_report.model).unwrap(),
+        )
+        .expect("Write expected-diagram.json");
+    } else {
+        assert!(
+            expected_path.exists(),
+            "expected-diagram.json does not exist. Run with UPDATE_GOLDEN=1."
+        );
+    }
+
+    let expected: DiagramModel =
+        serde_json::from_str(&fs::read_to_string(&expected_path).expect("Read expected"))
+            .expect("Deserialize expected");
+    assert_eq!(file_report.model, expected);
+}
+
+// ---------------------------------------------------------------------------
+// 10. Test: Order independence of stable IDs (reversing insertion order)
+// ---------------------------------------------------------------------------
+#[test]
+fn test_order_independence_stable_ids() {
+    let dir = fixtures_dir().join("resolve-ts");
+
+    // DB 1: Standard setup (alphabetical insertion)
+    let conn1 = setup_fixture_db(&dir);
+    let model1 = build_file_dependency_diagram(&conn1, 1).unwrap().model;
+
+    // DB 2: Reverse insertion order
+    let mut conn2 = open_in_memory().unwrap();
+    run_migrations(&conn2).unwrap();
+    conn2
+        .execute("INSERT INTO projects (id, name, root_path) VALUES (1, 'test', '/tmp')", [])
+        .unwrap();
+
+    let parser = ParserManager::new();
+    let mut entries: Vec<PathBuf> = walkdir::WalkDir::new(&dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    // Reverse the files list!
+    entries.reverse();
+
+    let mut file_tuples = Vec::new();
+    let mut raw_imports = Vec::new();
+    let mut id_counter = 100i64; // Start with different IDs
+
+    for p in &entries {
+        let rel_path = p.strip_prefix(&dir).unwrap().to_string_lossy().replace('\\', "/");
+        if rel_path.starts_with("expected-") {
+            continue;
+        }
+
+        let content = fs::read_to_string(p).unwrap_or_default();
+        let fid = id_counter;
+        id_counter += 1;
+
+        file_tuples.push((fid, rel_path.clone()));
+
+        conn2.execute(
+            "INSERT INTO files (id, project_id, relative_path, file_name, extension, size_bytes, content_hash, status)
+             VALUES (?1, 1, ?2, ?3, ?4, ?5, 'hash', 'parsed')",
+            rusqlite::params![
+                fid,
+                rel_path,
+                p.file_name().unwrap().to_string_lossy().to_string(),
+                p.extension().and_then(|s| s.to_str()).unwrap_or(""),
+                content.len() as i64,
+            ],
+        ).unwrap();
+
+        let ext = p.extension().and_then(|s| s.to_str());
+        if let Some(e) = ext {
+            if matches!(e, "ts" | "tsx" | "js" | "jsx") {
+                if let Ok(parsed) = parser.parse_source(&rel_path, Some(e), &content) {
+                    for imp in &parsed.imports {
+                        raw_imports.push(FileImportItem {
+                            source_file_id: fid,
+                            source_file_path: rel_path.clone(),
+                            source_module: imp.source_module.clone(),
+                            imported_name: imp.imported_name.clone(),
+                            is_type_only: imp.is_type_only,
+                            line_number: imp.line_number,
+                            source_evidence_id: None,
+                        });
+                    }
+                    persist_file_parse_result(&mut conn2, 1, fid, &parsed).unwrap();
+                }
+            }
+        }
+    }
+
+    let tsconfig = fs::read_to_string(dir.join("tsconfig.json")).ok();
+    let resolver = ProjectGraphResolver::new(&file_tuples, tsconfig.as_deref());
+    let edges = resolver.resolve_all(&raw_imports);
+    GraphStore::insert_import_edges(&mut conn2, 1, &edges).unwrap();
+
+    let model2 = build_file_dependency_diagram(&conn2, 1).unwrap().model;
+
+    // Assert identical node and edge IDs regardless of insertion order
+    let node_ids1: Vec<String> = model1.nodes.iter().map(|n| n.id.clone()).collect();
+    let node_ids2: Vec<String> = model2.nodes.iter().map(|n| n.id.clone()).collect();
+    assert_eq!(node_ids1, node_ids2, "Node IDs must be identical across insertion orders");
+
+    let edge_ids1: Vec<String> = model1.edges.iter().map(|e| e.id.clone()).collect();
+    let edge_ids2: Vec<String> = model2.edges.iter().map(|e| e.id.clone()).collect();
+    assert_eq!(edge_ids1, edge_ids2, "Edge IDs must be identical across insertion orders");
+
+    // Also compare evidence_keys
+    let ev_keys1: Vec<String> = model1.edges.iter().map(|e| e.evidence_key.clone()).collect();
+    let ev_keys2: Vec<String> = model2.edges.iter().map(|e| e.evidence_key.clone()).collect();
+    assert_eq!(ev_keys1, ev_keys2, "Evidence keys must be identical across insertion orders");
+}
+
+// ---------------------------------------------------------------------------
+// 11. Test: drill_down contract: returns exactly that group's nodes and edges
+// ---------------------------------------------------------------------------
+#[test]
+fn test_drill_down_contract_strictly_internal_edges() {
+    let dir = fixtures_dir().join("resolve-ts");
+    let conn = setup_fixture_db(&dir);
+
+    let report = build_file_dependency_diagram(&conn, 1).unwrap();
+    let target_group = "group:dir:src";
+
+    let result = drill_down(&report.model, target_group);
+    assert_eq!(result.group_id, target_group);
+    assert!(!result.nodes.is_empty());
+
+    let group_node_ids: std::collections::HashSet<String> =
+        result.nodes.iter().map(|n| n.id.clone()).collect();
+
+    // Verify that drill_down returns ONLY edges where BOTH endpoints are inside the group
+    for edge in &result.edges {
+        assert!(
+            group_node_ids.contains(&edge.from),
+            "Edge from '{}' must be inside group '{}'",
+            edge.from,
+            target_group
+        );
+        assert!(
+            group_node_ids.contains(&edge.to),
+            "Edge to '{}' must be inside group '{}'",
+            edge.to,
+            target_group
+        );
     }
 }

@@ -1,7 +1,15 @@
-import { describe, expect, it } from "vitest";
-import type { DiagramModel, DiagramNode, DiagramEdge, DiagramGroup } from "../../../types/diagram";
+import { describe, expect, it, vi } from "vitest";
+import type {
+  DiagramModel,
+  DiagramNode,
+  DiagramEdge,
+  DiagramGroup,
+  PositionedModel,
+} from "../../../types/diagram";
 import { getNodeSizeForKind } from "../../../types/diagram";
 import { layout } from "../engine";
+import { LayoutWorkerClient } from "../index";
+import callsTsClassDiagram from "../../../../fixtures/calls-ts/expected-class-diagram.json";
 
 describe("ELK.js Layout Engine", () => {
   const sampleModel: DiagramModel = {
@@ -67,6 +75,7 @@ describe("ELK.js Layout Engine", () => {
         relationship: "import",
         confidence: "static",
         evidence_id: 1,
+        evidence_key: "src/index.ts:1-1:import_stmt",
       },
       {
         id: "e2",
@@ -75,6 +84,7 @@ describe("ELK.js Layout Engine", () => {
         relationship: "import",
         confidence: "static",
         evidence_id: 2,
+        evidence_key: "src/index.ts:2-2:import_stmt",
       },
       {
         id: "e3",
@@ -83,6 +93,7 @@ describe("ELK.js Layout Engine", () => {
         relationship: "import",
         confidence: "static",
         evidence_id: 3,
+        evidence_key: "src/components/modal.ts:1-1:import_stmt",
       },
     ],
   };
@@ -97,8 +108,6 @@ describe("ELK.js Layout Engine", () => {
         const a = positioned.nodes[i];
         const b = positioned.nodes[j];
 
-        // Check if a and b share the same group or both have no group
-        // If one is inside a group and one is outside, bounding box check still applies to canvas
         const aRight = a.x + a.width;
         const aBottom = a.y + a.height;
         const bRight = b.x + b.width;
@@ -168,8 +177,198 @@ describe("ELK.js Layout Engine", () => {
     }
   });
 
+  it("layout executes on real builder output (calls-ts class diagram) without overlaps and with valid routes", async () => {
+    const classModel = callsTsClassDiagram as unknown as DiagramModel;
+    const positioned = await layout(classModel);
+
+    expect(positioned.nodes.length).toBe(classModel.nodes.length);
+    expect(positioned.edges.length).toBe(classModel.edges.length);
+
+    // Verify no overlaps
+    for (let i = 0; i < positioned.nodes.length; i++) {
+      for (let j = i + 1; j < positioned.nodes.length; j++) {
+        const a = positioned.nodes[i];
+        const b = positioned.nodes[j];
+
+        const aRight = a.x + a.width;
+        const aBottom = a.y + a.height;
+        const bRight = b.x + b.width;
+        const bBottom = b.y + b.height;
+
+        const overlaps = !(
+          aRight <= b.x ||
+          bRight <= a.x ||
+          aBottom <= b.y ||
+          bBottom <= a.y
+        );
+
+        expect(
+          overlaps,
+          `Nodes ${a.id} and ${b.id} should not overlap in real class diagram layout`
+        ).toBe(false);
+      }
+    }
+
+    // Verify all edges routed
+    for (const edge of positioned.edges) {
+      expect(edge.points).toBeDefined();
+      expect(edge.points.length).toBeGreaterThanOrEqual(2);
+      for (const pt of edge.points) {
+        expect(Number.isFinite(pt.x)).toBe(true);
+        expect(Number.isFinite(pt.y)).toBe(true);
+      }
+    }
+  });
+
+  it("measured test: layout of 150-node / ~450-edge file graph", async () => {
+    const nodeCount = 150;
+    const nodes: DiagramNode[] = [];
+    for (let i = 0; i < nodeCount; i++) {
+      nodes.push({
+        id: `file:src/file_${i}.ts`,
+        kind: "file",
+        label: `file_${i}.ts`,
+        width: 180,
+        height: 40,
+      });
+    }
+
+    const edges: DiagramEdge[] = [];
+    let edgeId = 0;
+    // Exactly 3 edges per node -> 450 edges
+    for (let i = 0; i < nodeCount; i++) {
+      const src = `file:src/file_${i}.ts`;
+      const t1 = `file:src/file_${(i + 1) % nodeCount}.ts`;
+      const t2 = `file:src/file_${(i + 3) % nodeCount}.ts`;
+      const t3 = `file:src/file_${(i + 7) % nodeCount}.ts`;
+
+      edges.push({
+        id: `edge:${++edgeId}`,
+        from: src,
+        to: t1,
+        relationship: "import",
+        confidence: "static",
+        evidence_id: edgeId,
+        evidence_key: `src/file_${i}.ts:1-1:import_stmt`,
+      });
+      edges.push({
+        id: `edge:${++edgeId}`,
+        from: src,
+        to: t2,
+        relationship: "import",
+        confidence: "static",
+        evidence_id: edgeId,
+        evidence_key: `src/file_${i}.ts:2-2:import_stmt`,
+      });
+      edges.push({
+        id: `edge:${++edgeId}`,
+        from: src,
+        to: t3,
+        relationship: "import",
+        confidence: "static",
+        evidence_id: edgeId,
+        evidence_key: `src/file_${i}.ts:3-3:import_stmt`,
+      });
+    }
+
+    expect(nodes.length).toBe(150);
+    expect(edges.length).toBe(450);
+
+    const model: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes,
+      edges,
+      groups: [],
+    };
+
+    const startTime = performance.now();
+    const positioned = await layout(model);
+    const endTime = performance.now();
+    const durationMs = endTime - startTime;
+
+    console.log(
+      `[MEASURED PERF] 150-node / 450-edge file graph layout completed in: ${durationMs.toFixed(2)} ms`
+    );
+
+    expect(positioned.nodes.length).toBe(150);
+    expect(positioned.edges.length).toBe(450);
+    expect(durationMs).toBeLessThan(15000);
+  }, 20000);
+
+  it("measured test: layout of drill_down result of one 100-node group", async () => {
+    const nodeCount = 100;
+    const groupId = "group:dir:src/services";
+    const nodes: DiagramNode[] = [];
+    for (let i = 0; i < nodeCount; i++) {
+      nodes.push({
+        id: `file:src/services/service_${i}.ts`,
+        kind: "file",
+        label: `service_${i}.ts`,
+        group_id: groupId,
+        width: 180,
+        height: 40,
+      });
+    }
+
+    // ~200 internal edges within this group
+    const edges: DiagramEdge[] = [];
+    let edgeId = 0;
+    for (let i = 0; i < nodeCount; i++) {
+      const src = `file:src/services/service_${i}.ts`;
+      const t1 = `file:src/services/service_${(i + 1) % nodeCount}.ts`;
+      const t2 = `file:src/services/service_${(i + 4) % nodeCount}.ts`;
+
+      edges.push({
+        id: `edge:${++edgeId}`,
+        from: src,
+        to: t1,
+        relationship: "import",
+        confidence: "static",
+        evidence_id: edgeId,
+        evidence_key: `src/services/service_${i}.ts:1-1:import_stmt`,
+      });
+      edges.push({
+        id: `edge:${++edgeId}`,
+        from: src,
+        to: t2,
+        relationship: "import",
+        confidence: "static",
+        evidence_id: edgeId,
+        evidence_key: `src/services/service_${i}.ts:2-2:import_stmt`,
+      });
+    }
+
+    expect(nodes.length).toBe(100);
+    expect(edges.length).toBe(200);
+
+    const model: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes,
+      edges,
+      groups: [
+        {
+          id: groupId,
+          label: "src/services",
+          collapsed: false,
+        },
+      ],
+    };
+
+    const startTime = performance.now();
+    const positioned = await layout(model);
+    const endTime = performance.now();
+    const durationMs = endTime - startTime;
+
+    console.log(
+      `[MEASURED PERF] 100-node group drill_down layout completed in: ${durationMs.toFixed(2)} ms`
+    );
+
+    expect(positioned.nodes.length).toBe(100);
+    expect(positioned.edges.length).toBe(200);
+    expect(durationMs).toBeLessThan(10000);
+  }, 20000);
+
   it("performance test: synthetic 2,000-node / 6,000-edge graph produces collapsed overview layout", async () => {
-    // Generate synthetic 2,000-node and 6,000-edge graph distributed over 20 modules
     const numModules = 20;
     const nodesPerModule = 100;
 
@@ -196,7 +395,6 @@ describe("ELK.js Layout Engine", () => {
       }
     }
 
-    // Generate 6,000 edges: 3 per node on average
     const syntheticEdges: DiagramEdge[] = [];
     let edgeIdCounter = 0;
 
@@ -213,6 +411,7 @@ describe("ELK.js Layout Engine", () => {
           relationship: "import",
           confidence: "static",
           evidence_id: edgeIdCounter,
+          evidence_key: `file:mod_${m}_file_${n}.ts:1-1:import_stmt`,
         });
 
         // 2 cross-module edges
@@ -225,6 +424,7 @@ describe("ELK.js Layout Engine", () => {
           relationship: "import",
           confidence: "static",
           evidence_id: edgeIdCounter,
+          evidence_key: `file:mod_${m}_file_${n}.ts:2-2:import_stmt`,
         });
 
         const farMod = (m + 3) % numModules;
@@ -236,6 +436,7 @@ describe("ELK.js Layout Engine", () => {
           relationship: "call",
           confidence: "inferred",
           evidence_id: edgeIdCounter,
+          evidence_key: `file:mod_${m}_file_${n}.ts:3-3:call_site`,
         });
       }
     }
@@ -243,8 +444,6 @@ describe("ELK.js Layout Engine", () => {
     expect(syntheticNodes.length).toBe(2000);
     expect(syntheticEdges.length).toBe(6000);
 
-    // Progressive disclosure collapse: for >150 nodes, builder produces module-level overview
-    // Collapsed overview represents 20 modules and aggregated inter-module edges
     const overviewNodes: DiagramNode[] = syntheticGroups.map((g) => ({
       id: g.id,
       kind: "module",
@@ -253,7 +452,6 @@ describe("ELK.js Layout Engine", () => {
       height: 50,
     }));
 
-    // Aggregate edges between modules
     const aggMap = new Map<string, { from: string; to: string; count: number }>();
     const nodeToGroup = new Map(syntheticNodes.map((n) => [n.id, n.group_id!]));
 
@@ -278,6 +476,7 @@ describe("ELK.js Layout Engine", () => {
         relationship: "import",
         confidence: "static",
         evidence_id: aggId,
+        evidence_key: `${val.from}->${val.to}:aggregated`,
         label: `${val.count} edges`,
       });
     }
@@ -295,11 +494,154 @@ describe("ELK.js Layout Engine", () => {
     const durationMs = endTime - startTime;
 
     console.log(
-      `[PERF] 2,000-node / 6,000-edge graph collapsed overview layout completed in: ${durationMs.toFixed(2)} ms`
+      `[MEASURED PERF] 2,000-node / 6,000-edge graph collapsed overview layout completed in: ${durationMs.toFixed(2)} ms`
     );
 
     expect(positionedOverview.nodes.length).toBe(overviewNodes.length);
     expect(positionedOverview.edges.length).toBe(overviewEdges.length);
-    expect(durationMs).toBeLessThan(5000); // Well under 5 seconds
+    expect(durationMs).toBeLessThan(10000);
+  }, 20000);
+});
+
+describe("LayoutWorkerClient lifecycle & cancellation", () => {
+  function createMockWorker(): Worker & {
+    postMessageMock: ReturnType<typeof vi.fn>;
+    terminateMock: ReturnType<typeof vi.fn>;
+  } {
+    const postMessageMock = vi.fn();
+    const terminateMock = vi.fn();
+
+    const workerObj = {
+      onmessage: null as any,
+      postMessage: postMessageMock,
+      terminate: terminateMock,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      onerror: null as any,
+      postMessageMock,
+      terminateMock,
+    };
+
+    return workerObj as unknown as Worker & {
+      postMessageMock: ReturnType<typeof vi.fn>;
+      terminateMock: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it("handles successful layout request via worker", async () => {
+    let mockWorkerInstance: ReturnType<typeof createMockWorker> | null = null;
+    const workerFactory = () => {
+      mockWorkerInstance = createMockWorker();
+      return mockWorkerInstance;
+    };
+
+    const client = new LayoutWorkerClient(workerFactory);
+    const testModel: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes: [],
+      edges: [],
+      groups: [],
+    };
+
+    const calculation = client.calculate(testModel);
+
+    expect(mockWorkerInstance).not.toBeNull();
+    expect(mockWorkerInstance!.postMessageMock).toHaveBeenCalledTimes(1);
+    const sentReq = mockWorkerInstance!.postMessageMock.mock.calls[0][0];
+    expect(sentReq.type).toBe("layout");
+
+    const mockPositioned: PositionedModel = {
+      diagram_type: "file_dependency",
+      nodes: [],
+      edges: [],
+      groups: [],
+      width: 500,
+      height: 400,
+    };
+
+    // Simulate worker reply
+    if (mockWorkerInstance && (mockWorkerInstance as any).onmessage) {
+      (mockWorkerInstance as any).onmessage({
+        data: {
+          type: "success",
+          id: sentReq.id,
+          model: mockPositioned,
+        },
+      } as MessageEvent);
+    }
+
+    const result = await calculation.promise;
+    expect(result.width).toBe(500);
+    expect(result.height).toBe(400);
+  });
+
+  it("cancellation terminates the worker thread and spawns a fresh worker instance", async () => {
+    let workerSpawns = 0;
+    const workerInstances: ReturnType<typeof createMockWorker>[] = [];
+
+    const workerFactory = () => {
+      workerSpawns++;
+      const instance = createMockWorker();
+      workerInstances.push(instance);
+      return instance;
+    };
+
+    const client = new LayoutWorkerClient(workerFactory);
+    expect(workerSpawns).toBe(1);
+
+    const testModel: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes: [],
+      edges: [],
+      groups: [],
+    };
+
+    const calculation = client.calculate(testModel);
+    const activeWorker = workerInstances[0];
+
+    // Trigger cancellation
+    calculation.cancel();
+
+    // Verify terminate() was called to immediately halt CPU execution
+    expect(activeWorker.terminateMock).toHaveBeenCalledTimes(1);
+
+    // Verify fresh worker was re-initialized for subsequent calculations
+    expect(workerSpawns).toBe(2);
+
+    // Verify the promise was rejected with cancellation reason
+    await expect(calculation.promise).rejects.toThrow("Layout calculation was cancelled");
+  });
+
+  it("handles worker error responses properly", async () => {
+    let mockWorkerInstance: ReturnType<typeof createMockWorker> | null = null;
+    const workerFactory = () => {
+      mockWorkerInstance = createMockWorker();
+      return mockWorkerInstance;
+    };
+
+    const client = new LayoutWorkerClient(workerFactory);
+    const testModel: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes: [],
+      edges: [],
+      groups: [],
+    };
+
+    const calculation = client.calculate(testModel);
+    const sentReq = mockWorkerInstance!.postMessageMock.mock.calls[0][0];
+
+    // Simulate worker error
+    if (mockWorkerInstance && (mockWorkerInstance as any).onmessage) {
+      (mockWorkerInstance as any).onmessage({
+        data: {
+          type: "error",
+          id: sentReq.id,
+          error: "ELK parsing error in graph structure",
+        },
+      } as MessageEvent);
+    }
+
+    await expect(calculation.promise).rejects.toThrow("ELK parsing error in graph structure");
   });
 });

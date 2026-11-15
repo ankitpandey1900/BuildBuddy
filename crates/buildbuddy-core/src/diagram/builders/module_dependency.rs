@@ -8,14 +8,26 @@ use crate::diagram::model::{
 
 /// Builds a module dependency graph from SQLite records for a project.
 pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Result<DiagramReport> {
-    // 1. Fetch valid evidence IDs for quick validation
+    // 1. Fetch valid evidence IDs and metadata for quick validation
     let mut valid_evidence_stmt = conn.prepare(
-        "SELECT id FROM source_evidence WHERE project_id = ?1",
+        "SELECT id, file_path, start_line, end_line, evidence_type FROM source_evidence WHERE project_id = ?1",
     )?;
-    let valid_evidence: HashSet<i64> = valid_evidence_stmt
-        .query_map(params![project_id], |row| row.get(0))?
-        .filter_map(|r| r.ok())
-        .collect();
+    let mut valid_evidence: BTreeMap<i64, String> = BTreeMap::new();
+    let ev_rows = valid_evidence_stmt.query_map(params![project_id], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)? as usize,
+            row.get::<_, i64>(3)? as usize,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+    for r in ev_rows {
+        let (eid, fp, sl, el, et) = r?;
+        let norm_fp = fp.replace('\\', "/");
+        let key = format!("{}:{}-{}:{}", norm_fp, sl, el, et);
+        valid_evidence.insert(eid, key);
+    }
 
     // 2. Fetch modules for this project
     let mut mod_stmt = conn.prepare(
@@ -206,8 +218,8 @@ pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Re
         };
 
         // Validate evidence_id
-        let evidence_id = match evidence_id_opt {
-            Some(id) if valid_evidence.contains(&id) => id,
+        let (evidence_id, evidence_key) = match evidence_id_opt {
+            Some(id) if valid_evidence.contains_key(&id) => (id, valid_evidence[&id].clone()),
             Some(_) => {
                 dropped_edges.push(DroppedEdge {
                     from: from_node_id,
@@ -240,6 +252,7 @@ pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Re
             relationship: RelationshipType::Import,
             confidence,
             evidence_id,
+            evidence_key,
             label: if imported_name.is_empty() {
                 None
             } else {

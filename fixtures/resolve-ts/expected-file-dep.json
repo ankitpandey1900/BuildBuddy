@@ -173,7 +173,8 @@
       "to": "file:src/components/button.ts",
       "relationship": "import",
       "confidence": "static",
-      "evidence_id": 23
+      "evidence_id": 23,
+      "evidence_key": "src/barrel.ts:1-1:import_stmt"
     },
     {
       "id": "edge:import:file:src/cycle_a.ts:file:src/cycle_b.ts:b:1",
@@ -182,6 +183,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 24,
+      "evidence_key": "src/cycle_a.ts:1-1:import_stmt",
       "label": "import b"
     },
     {
@@ -191,6 +193,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 25,
+      "evidence_key": "src/cycle_b.ts:1-1:import_stmt",
       "label": "import a"
     },
     {
@@ -200,6 +203,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 31,
+      "evidence_key": "src/index.ts:6-6:import_stmt",
       "label": "import missingHelper"
     },
     {
@@ -209,6 +213,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 26,
+      "evidence_key": "src/index.ts:1-1:import_stmt",
       "label": "import React"
     },
     {
@@ -218,6 +223,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 27,
+      "evidence_key": "src/index.ts:2-2:import_stmt",
       "label": "import Button"
     },
     {
@@ -227,6 +233,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 29,
+      "evidence_key": "src/index.ts:4-4:import_stmt",
       "label": "import Button"
     },
     {
@@ -236,6 +243,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 30,
+      "evidence_key": "src/index.ts:5-5:import_stmt",
       "label": "import a"
     },
     {
@@ -245,6 +253,7 @@
       "relationship": "import",
       "confidence": "static",
       "evidence_id": 28,
+      "evidence_key": "src/index.ts:3-3:import_stmt",
       "label": "import formatData"
     }
   ],

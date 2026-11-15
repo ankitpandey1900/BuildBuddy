@@ -87,8 +87,20 @@ export async function layout(
     existingIds.add(group.id);
   }
 
-  // 2. Build ELK edges
-  const elkEdges = model.edges.map((edge) => ({
+  // 2. Build ELK edges (filter to edges whose endpoints exist in nodes or groups)
+  const validNodeIds = new Set<string>();
+  for (const node of model.nodes) {
+    validNodeIds.add(node.id);
+  }
+  for (const group of model.groups) {
+    validNodeIds.add(group.id);
+  }
+
+  const validEdges = model.edges.filter(
+    (edge) => validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
+  );
+
+  const elkEdges = validEdges.map((edge) => ({
     id: edge.id,
     sources: [edge.from],
     targets: [edge.to],
