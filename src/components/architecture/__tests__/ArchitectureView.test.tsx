@@ -400,4 +400,34 @@ describe("ArchitectureView React Flow Integration", () => {
     // Far fewer than 2,000 DOM nodes!
     expect(renderedButtons.length).toBeLessThan(100);
   });
+
+  it("export menu disables PDF option while PDF generation is a stub", async () => {
+    vi.spyOn(tauriLib, "getDiagram").mockResolvedValue({
+      model: {
+        diagram_type: "architecture_overview",
+        nodes: [],
+        edges: [],
+        groups: [],
+      },
+      dropped_edges: [],
+    });
+
+    render(<ArchitectureView projectId={1} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /export diagram/i })).toBeInTheDocument();
+    });
+
+    const exportBtn = screen.getByRole("button", { name: /export diagram/i });
+    fireEvent.click(exportBtn);
+
+    // PDF button should be present in menu but disabled
+    const pdfBtn = screen.getByRole("menuitem", { name: /pdf/i });
+    expect(pdfBtn).toBeDisabled();
+
+    // SVG, PNG, Mermaid are enabled
+    expect(screen.getByRole("menuitem", { name: /svg/i })).not.toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /png/i })).not.toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: /mermaid/i })).not.toBeDisabled();
+  });
 });

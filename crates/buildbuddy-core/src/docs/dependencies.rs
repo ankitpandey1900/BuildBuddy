@@ -30,7 +30,6 @@ pub const TOOLING_PACKAGES: &[&str] = &[
     "concurrently",
     "rimraf",
     "cross-env",
-    "uvicorn",
 ];
 
 pub struct DependencyInventoryGenerator;
@@ -265,12 +264,42 @@ impl DependencyInventoryGenerator {
             let (title, description, severity, confidence, meta_json) = r?;
             if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&meta_json) {
                 if let Some(cycle) = meta.get("cycle").and_then(|c| c.as_array()) {
-                    for node in cycle {
-                        if let Some(node_str) = node.as_str() {
-                            let ev_key = format!("{}:1-1:import_stmt", node_str);
-                            if !evidence_keys.contains(&ev_key) {
-                                evidence_keys.push(ev_key);
-                            }
+                    let cycle_files: Vec<&str> = cycle.iter().filter_map(|n| n.as_str()).collect();
+                    let n = cycle_files.len();
+                    for i in 0..n {
+                        let from_file = cycle_files[i];
+                        let to_file = cycle_files[(i + 1) % n];
+
+                        // Query the exact line number of the import statement from from_file to to_file
+                        let line_num: Option<i64> = conn.query_row(
+                            "SELECT ie.line_number 
+                             FROM import_edges ie
+                             JOIN files f_src ON ie.source_file_id = f_src.id
+                             JOIN files f_tgt ON ie.target_file_id = f_tgt.id
+                             WHERE ie.project_id = ?1 
+                               AND f_src.relative_path = ?2 
+                               AND f_tgt.relative_path = ?3
+                             ORDER BY ie.line_number ASC
+                             LIMIT 1",
+                            params![project_id, from_file, to_file],
+                            |r| r.get(0),
+                        ).ok();
+
+                        let line = line_num.unwrap_or_else(|| {
+                            conn.query_row(
+                                "SELECT ie.line_number 
+                                 FROM import_edges ie
+                                 JOIN files f_src ON ie.source_file_id = f_src.id
+                                 WHERE ie.project_id = ?1 AND f_src.relative_path = ?2
+                                 ORDER BY ie.line_number ASC LIMIT 1",
+                                params![project_id, from_file],
+                                |r| r.get(0),
+                            ).unwrap_or(1)
+                        });
+
+                        let ev_key = format!("{}:{}-{}:import_stmt", from_file, line, line);
+                        if !evidence_keys.contains(&ev_key) {
+                            evidence_keys.push(ev_key);
                         }
                     }
                 }

@@ -28,5 +28,5 @@ Not detected
 
 | Package | Version | Type | Manifest File | Status |
 | --- | --- | --- | --- | --- |
-| uvicorn | ==0.30.0 | direct | requirements.txt:2 | tooling, not imported by design |
+| uvicorn | ==0.30.0 | direct | requirements.txt:2 | potentially unused [inferred] |
 

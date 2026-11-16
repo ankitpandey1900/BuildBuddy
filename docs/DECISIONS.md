@@ -413,6 +413,10 @@ Document tables are defined in `crates/buildbuddy-core/src/store/migrations.rs`:
 - Allowed evidence types strictly mirror repository artifacts: `manifest_entry`, `import_stmt`, `entry_point`, `ast_node`, `file_content`.
 - Never use `"heuristic"` as an evidence type (heuristic is a confidence category, not a physical code evidence type).
 - Strictly no SQLite internal row IDs or memory addresses in evidence keys or markdown body.
+- **Evidence Key Computation Rules**:
+  - **Purpose**: When purpose is extracted from README or manifest description, cites `{rel_path}:{line}-{line}:file_content` or `manifest_entry`. When purpose is dropped due to detected secrets or banned phrases, it cites **no evidence** (`Vec::new()`).
+  - **Circular Dependencies**: For each adjacent pair in a cycle (`from_file -> to_file`), the generator queries `import_edges` matching `project_id`, `from_file`, and `to_file` to determine the exact 1-based `line_number` of the import statement, producing `{from_file}:{line}-{line}:import_stmt`.
+  - **Major Modules**: Modules represent directory structural groupings (`ModuleGrouper`) computed across directory trees, not individual AST nodes or line ranges in source files. Modules therefore do **not** synthesize fake single-line evidence keys like `"file:1-1:ast_node"` and cite `Vec::new()`, matching directory structure and language breakdowns.
 
 ### 3. Confidence Classification Rules
 - `[confirmed]`: Direct runtime verification or physically declared manifest dependency items (e.g. `package.json` dependencies).
@@ -425,23 +429,33 @@ Document tables are defined in `crates/buildbuddy-core/src/store/migrations.rs`:
 
 ### 4. Purpose Section Extraction Rules
 - Quotes the first sentence of the `README` or manifest description verbatim, labeled `"from README (path:line)"` or `"from manifest (path:line)"`.
-- The extracted sentence is subjected to `check_banned_phrases()`. If it contains any prohibited marketing phrases, BuildBuddy renders `"Not detected (README present at <path>)"` without paraphrasing.
-- If all candidate sentences contain detected secrets, they are dropped and rendered as `"Not detected (README present at <path>)"`.
+- The extracted sentence is subjected to `check_banned_phrases()`. If it contains any prohibited marketing phrases, BuildBuddy renders `"Not detected (README present at <path>)"` without paraphrasing and cites no evidence.
+- If all candidate sentences contain detected secrets, they are dropped and rendered as `"Not detected (README present at <path>)"` with no evidence keys.
 
 ### 5. Generic Secret Detection & Whole-Sentence Dropping
 Implemented in `crates/buildbuddy-core/src/docs/model.rs` (`sentence_contains_secret()` and `drop_secret_sentences()`):
-- Detects 5 categories of sensitive credentials:
+- Detects sensitive credentials across categories:
   1. Known prefix keys: `sk_live_`, `sk_test_`, `pk_live_`, `pk_test_`, `ghp_`, `gho_`, `xoxb-`, `xoxp-`, `AKIA[0-9A-Z]{16}`.
-  2. Sensitive assignments: `api_key = "..."`, `password: "..."`, `secret = '...'`, `auth_token = "..."`.
+  2. Sensitive assignments: `api_key = "..."`, `password: "..."`, `secret = '...'`, `auth_token = "..."` (minimum 8 characters).
   3. Bearer authorization tokens: `Bearer [A-Za-z0-9_\-\.]{16,}`.
-  4. Private key headers: `-----BEGIN RSA PRIVATE KEY-----`, `-----BEGIN PRIVATE KEY-----`.
+  4. Private key headers: `-----BEGIN RSA PRIVATE KEY-----`, `-----BEGIN PRIVATE KEY-----` (public `-----BEGIN CERTIFICATE-----` headers are excluded).
   5. High-entropy long hex strings (>= 32 chars) and base64 strings (>= 40 chars).
+- **False-Positive Exclusions**:
+  - Standard 40-character hexadecimal strings (`[0-9a-f]{40}`) are excluded from high-entropy detection (standard Git commit SHAs).
+  - Lockfile integrity hashes starting with `sha512-`, `sha384-`, `sha256-`, or `sha1-` are excluded from high-entropy detection.
+  - Public X.509 certificate headers (`-----BEGIN CERTIFICATE-----`) are excluded because certificates are public metadata.
 - **Rule**: If a sentence contains any detected secret, the **entire sentence is dropped** from the generated output rather than partially masking it.
+- **Known Limitations of Detector**:
+  1. *Heuristic & Pattern-Based*: Does not perform semantic data-flow analysis or taint tracking across functions.
+  2. *Length/Format Gates*: Low-entropy or short credentials (<8 characters in assignments, or not matching known key prefixes) will not be caught.
+  3. *Git SHAs vs. 40-Hex Secrets*: Because 40-hex lowercase strings are excluded to allow commit messages, any 40-hex secret token would also be bypassed.
+  4. *Not an External Scanner*: This lightweight offline pass does not replace dedicated external enterprise secret scanners (e.g., Gitleaks, Trufflehog) which use extensive entropy models and external token verification.
 
 ### 6. Tooling Dependencies Classification
 Implemented in `crates/buildbuddy-core/src/docs/dependencies.rs` via `TOOLING_PACKAGES`:
 Tooling dependencies not imported in application source code are classified as `"tooling, not imported by design"` rather than reported as unused application code. The tooling list comprises:
-`typescript`, `eslint`, `prettier`, `vite`, `vitest`, `jest`, `webpack`, `rollup`, `ts-node`, `babel`, `tailwindcss`, `postcss`, `autoprefixer`, `pytest`, `mypy`, `black`, `flake8`, `isort`, `ruff`, `pylint`, `tox`, `coverage`, `nodemon`, `concurrently`, `rimraf`, `cross-env`, `uvicorn`.
+`typescript`, `eslint`, `prettier`, `vite`, `vitest`, `jest`, `webpack`, `rollup`, `ts-node`, `babel`, `tailwindcss`, `postcss`, `autoprefixer`, `pytest`, `mypy`, `black`, `flake8`, `isort`, `ruff`, `pylint`, `tox`, `coverage`, `nodemon`, `concurrently`, `rimraf`, `cross-env`.
+*(Note: `uvicorn` is intentionally excluded from `TOOLING_PACKAGES` as it is an ASGI web server runtime; when declared as a direct dependency without source imports, it is reported as potentially unused with `[inferred]` confidence).*
 
 ### 7. Prohibited Marketing / Filler Phrases Lint
 Implemented in `crates/buildbuddy-core/src/docs/lint.rs` (`check_banned_phrases()`):

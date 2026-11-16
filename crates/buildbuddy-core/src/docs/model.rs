@@ -194,8 +194,8 @@ pub fn sentence_contains_secret(sentence: &str) -> bool {
         }
     }
 
-    // 2. Private key headers
-    if sentence.contains("-----BEGIN") && (sentence.contains("PRIVATE KEY") || sentence.contains("CERTIFICATE")) {
+    // 2. Private key headers (certificates are public metadata, not secrets)
+    if sentence.contains("-----BEGIN") && sentence.contains("PRIVATE KEY") {
         return true;
     }
 
@@ -241,8 +241,26 @@ pub fn sentence_contains_secret(sentence: &str) -> bool {
     }
 
     // 5. Long hex (>= 32 chars) and long base64 (>= 40 chars)
+    // Exclude:
+    // - 40-character hexadecimal strings (standard Git commit SHAs)
+    // - Lockfile integrity strings (starting with sha512-, sha384-, sha256-, sha1-)
     for word in sentence.split(|c: char| !c.is_alphanumeric() && c != '+' && c != '/' && c != '=' && c != '_' && c != '-') {
+        // Exclude lockfile integrity strings
+        if word.starts_with("sha512-")
+            || word.starts_with("sha384-")
+            || word.starts_with("sha256-")
+            || word.starts_with("sha1-")
+        {
+            continue;
+        }
+
         let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
+
+        // Exclude 40-character Git commit SHAs
+        if clean_word.len() == 40 && clean_word.chars().all(|c| c.is_ascii_hexdigit()) {
+            continue;
+        }
+
         if clean_word.len() >= 32 && clean_word.chars().all(|c| c.is_ascii_hexdigit()) {
             return true;
         }
@@ -328,9 +346,28 @@ mod tests {
         let s4 = "-----BEGIN RSA PRIVATE KEY----- MIIEowIBAAKCAQEA0 -----END RSA PRIVATE KEY-----";
         assert!(sentence_contains_secret(s4), "Shape 4: private key header must be detected");
 
-        // Shape 5: Long hex / base64 string
-        let s5 = "Access hash is 4f8a3b1c9d2e7f60a5b4c3d2e1f0a9b8c7d6e5f4.";
-        assert!(sentence_contains_secret(s5), "Shape 5: long hex string must be detected");
+        // Shape 5: Long hex (32 chars) / base64 string
+        let s5 = "Access hash is 4f8a3b1c9d2e7f60a5b4c3d2e1f0a9b8.";
+        assert!(sentence_contains_secret(s5), "Shape 5: 32-char hex secret must be detected");
+    }
+
+    #[test]
+    fn test_git_sha_lockfile_integrity_and_certificate_not_flagged() {
+        // 40-hex git commit SHA should NOT be flagged
+        let git_commit = "Merge commit 6243ea84428052d3d7d3a4db4ea4cf58a57d8485 into master.";
+        assert!(!sentence_contains_secret(git_commit), "40-hex git commit SHA must not be flagged as secret");
+
+        // Lockfile integrity string (sha512-...) should NOT be flagged
+        let lockfile_integrity = "\"integrity\": \"sha512-v3bZ1+K2o8d4mN5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0==\"";
+        assert!(!sentence_contains_secret(lockfile_integrity), "sha512 lockfile integrity must not be flagged as secret");
+
+        // Certificate header should NOT be flagged
+        let cert_header = "-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAL0...\n-----END CERTIFICATE-----";
+        assert!(!sentence_contains_secret(cert_header), "Certificate header must not be flagged as secret");
+
+        // But private key MUST be flagged
+        let priv_key = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkq...\n-----END PRIVATE KEY-----";
+        assert!(sentence_contains_secret(priv_key), "Private key header must be flagged as secret");
     }
 
     #[test]

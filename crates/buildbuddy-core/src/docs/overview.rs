@@ -505,7 +505,6 @@ impl ProjectOverviewGenerator {
              ORDER BY name ASC",
         )?;
 
-        let mut evidence_keys = Vec::new();
         let mut table_rows = Vec::new();
 
         let rows = stmt.query_map(params![project_id], |row| {
@@ -520,19 +519,6 @@ impl ProjectOverviewGenerator {
 
         for r in rows {
             let (name, root_dir, layer, fc, cohesion) = r?;
-            let first_file: Option<String> = conn.query_row(
-                "SELECT relative_path FROM files 
-                 WHERE project_id = ?1 AND (relative_path LIKE (?2 || '/%') OR relative_path = ?2) 
-                 ORDER BY relative_path ASC LIMIT 1",
-                params![project_id, root_dir],
-                |r| r.get(0),
-            ).ok();
-
-            if let Some(f) = first_file {
-                let ev_key = format!("{}:1-1:ast_node", f);
-                evidence_keys.push(ev_key);
-            }
-
             table_rows.push(format!(
                 "| {} | {} | {} | {} | {:.2} |",
                 name, root_dir, layer, fc, cohesion
@@ -548,7 +534,9 @@ impl ProjectOverviewGenerator {
         lines.push("| --- | --- | --- | --- | --- |".to_string());
         lines.extend(table_rows);
 
-        Ok((lines.join("\n"), evidence_keys))
+        // Modules represent directory groupings rather than individual AST nodes or source file spans;
+        // no fake single-line AST evidence keys are synthesized.
+        Ok((lines.join("\n"), Vec::new()))
     }
 
     fn generate_external_dependencies(conn: &Connection, project_id: i64) -> Result<(String, Vec<String>)> {
