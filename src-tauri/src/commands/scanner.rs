@@ -4,8 +4,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, State};
 use serde::{Deserialize, Serialize};
 
-use crate::core::scanner::walker::scan_directory;
-use crate::core::store::files::batch_insert_or_update_files;
+use crate::core::pipeline::PipelineRunner;
 use crate::core::store::projects::get_project_by_id;
 use crate::AppState;
 
@@ -14,6 +13,7 @@ pub struct ScanProgressPayload {
     pub project_id: i64,
     pub files_scanned: usize,
     pub current_file: String,
+    pub stage: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,100 +48,57 @@ pub async fn start_scan(
     let root_path = PathBuf::from(&project.root_path);
     let app_clone = app.clone();
 
-    // Run scanning in background thread
+    // Run full pipeline in background thread
     tokio::task::spawn_blocking(move || {
-        let start_time = Instant::now();
         let app_handle = app_clone;
+        let mut db_conn = match crate::core::store::connection::open_database(&db_path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to open DB for pipeline: {}", e);
+                return;
+            }
+        };
 
-        let scanned_res = scan_directory(
+        let start_time = Instant::now();
+        let app_progress = app_handle.clone();
+        let res = PipelineRunner::run(
+            &mut db_conn,
+            project_id,
+            run_id,
             &root_path,
-            &[],
             cancel_flag.clone(),
-            |progress| {
-                app_handle.emit("scan:progress", ScanProgressPayload {
+            move |prog| {
+                app_progress.emit("scan:progress", ScanProgressPayload {
                     project_id,
-                    files_scanned: progress.files_scanned,
-                    current_file: progress.current_file,
+                    files_scanned: prog.count,
+                    current_file: prog.message,
+                    stage: Some(prog.stage.as_str().to_string()),
                 }).ok();
             },
         );
 
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
-        let mut db_conn = match crate::core::store::connection::open_database(&db_path) {
-            Ok(c) => c,
+        let (final_status, total_files) = match res {
+            Ok(report) => ("completed".to_string(), report.architecture_model.nodes.len()),
             Err(e) => {
-                eprintln!("Failed to open DB for scan results: {}", e);
-                return;
+                let is_cancelled = cancel_flag.load(Ordering::Relaxed);
+                let st = if is_cancelled { "cancelled" } else { "failed" };
+                db_conn.execute(
+                    "UPDATE analysis_runs SET status = ?1, error_summary = ?2 WHERE id = ?3",
+                    rusqlite::params![st, e, run_id],
+                ).ok();
+                (st.to_string(), 0)
             }
         };
 
-        match scanned_res {
-            Ok(files) => {
-                let is_cancelled = cancel_flag.load(Ordering::Relaxed);
-                let final_status = if is_cancelled { "cancelled" } else { "completed" };
-                let total_count = files.len();
-
-                // Compute incremental plan
-                let plan = match crate::core::scanner::incremental::IncrementalEngine::compute_plan(&db_conn, project_id, &files) {
-                    Ok(p) => p,
-                    Err(e) => {
-                        eprintln!("Failed to compute incremental plan: {}", e);
-                        return;
-                    }
-                };
-
-                // Apply plan deletions & wipe evidence for modified/deleted files
-                if let Err(e) = crate::core::scanner::incremental::IncrementalEngine::apply_plan_deletions(&mut db_conn, &plan) {
-                    eprintln!("Failed to apply plan deletions: {}", e);
-                }
-
-                // Batch insert or update only added and modified files
-                let mut to_update = Vec::new();
-                to_update.extend(plan.added);
-                for (_, mod_file) in plan.modified {
-                    to_update.push(mod_file);
-                }
-
-                if !to_update.is_empty() {
-                    if let Err(e) = batch_insert_or_update_files(&mut db_conn, project_id, run_id, &to_update) {
-                        eprintln!("Failed to persist scanned files: {}", e);
-                    }
-                }
-
-                // Update analysis_run record
-                db_conn.execute(
-                    "UPDATE analysis_runs 
-                     SET status = ?1, files_discovered = ?2, files_scanned = ?2, completed_at = CURRENT_TIMESTAMP, duration_ms = ?3 
-                     WHERE id = ?4",
-                    rusqlite::params![final_status, total_count as i64, duration_ms as i64, run_id],
-                ).ok();
-
-                app_handle.emit("scan:complete", ScanCompletePayload {
-                    project_id,
-                    analysis_run_id: run_id,
-                    total_files: total_count,
-                    duration_ms,
-                    status: final_status.to_string(),
-                }).ok();
-            }
-            Err(e) => {
-                db_conn.execute(
-                    "UPDATE analysis_runs 
-                     SET status = 'failed', completed_at = CURRENT_TIMESTAMP, duration_ms = ?1, error_summary = ?2 
-                     WHERE id = ?3",
-                    rusqlite::params![duration_ms as i64, e.to_string(), run_id],
-                ).ok();
-
-                app_handle.emit("scan:complete", ScanCompletePayload {
-                    project_id,
-                    analysis_run_id: run_id,
-                    total_files: 0,
-                    duration_ms,
-                    status: "failed".to_string(),
-                }).ok();
-            }
-        }
+        app_handle.emit("scan:complete", ScanCompletePayload {
+            project_id,
+            analysis_run_id: run_id,
+            total_files,
+            duration_ms,
+            status: final_status,
+        }).ok();
     });
 
     Ok(run_id)

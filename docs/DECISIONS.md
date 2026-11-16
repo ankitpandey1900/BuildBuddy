@@ -475,6 +475,25 @@ Enforced on every individual section and assembled document prior to returning o
 ### 8. Phase Scope Note
 The document viewer and editor UI (with interactive section preview, user edits preservation, and export controls) belongs to Task 8b (Documentation Workspace UI), not Task 8a-2 (High-Level Design & Architecture Documentation Generators).
 
+## 10. Automated Pipeline, Scan Traversal Pruning, and File Parse Status Lifecycle
+
+### 1. File Parse Status Lifecycle & Atomicity
+- **Pre-parse status**: Scanner classifies files as `pending` (for supported languages like TS/TSX/JS/JSX/Python) or `unsupported`. Scanner *never* sets `status = "parsed"` prior to actual AST parsing and symbol extraction.
+- **Parse completion**: File status transitions to `parsed` (or `partial`) strictly within the SQLite transaction in `persist_file_parse_result()`, ensuring that no file is marked parsed without its extracted symbols, calls, and imports persisted.
+- **Error handling**: If parsing or persistence fails, file status transitions to `error` and the failure message is recorded in the `error_message` column, surfaced directly in the file tree and inspector panel.
+
+### 2. Multi-Stage Automated Pipeline
+Scanning automatically triggers full codebase analysis without requiring manual UI step-chaining:
+`scanned` -> `parsing` -> `analyzing` -> `completed` (or `failed`).
+The pipeline runs in a background task via `PipelineRunner`, emitting structured progress updates (`scan:progress` with `stage`) and updating `analysis_runs.status` at each stage boundary.
+
+### 3. Immediate Pruning of Ignored Directories
+`scan_directory` in `crates/buildbuddy-core/src/scanner/walker.rs` uses `it.skip_current_dir()` when matching ignored directories. Ignored folders like `.git`, `node_modules`, and build output directories are pruned at their root in `< 1ms`, preventing scanning and hashing of internal repository blobs.
+
+### 4. Default Ignores for Native / Mobile Build Outputs
+Added default ignore patterns for mobile and native build directories: `.gradle`, `android/.gradle`, `android/build`, `android/app/build`, `ios/build`, `ios/Pods`, `Pods`, `DerivedData`, `ios/DerivedData`, `*.apk`, `*.aab`, `*.aar`, `*.dex`, `*.ipa`, `*.xcarchive`, `*.dSYM`. Configurable via `.buildbuddyignore`.
+
+
 
 
 

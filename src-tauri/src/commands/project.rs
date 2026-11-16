@@ -48,7 +48,14 @@ fn open_project_internal(state: &AppState, folder_path: &Path) -> Result<Option<
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "Project".to_string());
 
-    let root_path_str = canonical.to_string_lossy().replace('\\', "/");
+    let raw_str = canonical.to_string_lossy().replace('\\', "/");
+    let root_path_str = if let Some(stripped) = raw_str.strip_prefix("//?/") {
+        stripped.to_string()
+    } else if let Some(stripped) = raw_str.strip_prefix(r"\\?\") {
+        stripped.to_string()
+    } else {
+        raw_str
+    };
 
     let conn = state.conn().map_err(|e| e.to_string())?;
     let proj = create_or_get_project(&conn, &root_path_str, &name).map_err(|e| e.to_string())?;

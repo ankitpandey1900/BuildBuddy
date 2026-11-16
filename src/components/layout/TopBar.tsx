@@ -86,7 +86,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     >
                       <span className="font-medium text-meta">{p.name}</span>
                       <span className="text-micro font-mono text-text-muted truncate w-full group-hover:text-text-secondary">
-                        {p.root_path}
+                        {p.root_path.replace(/^(\\\\\?\\|\/\/\?\/)/, "")}
                       </span>
                     </button>
                   ))}
@@ -100,7 +100,15 @@ export const TopBar: React.FC<TopBarProps> = ({
         {isScanning ? (
           <div className="flex items-center gap-2 px-2 py-0.5 bg-accent/10 border border-accent/20 rounded-md text-caption text-accent-text font-mono">
             <RefreshCw className="w-3 h-3 animate-spin" />
-            <span>Scanning... ({scanProgress ? scanProgress.files_scanned : 0} files)</span>
+            <span>
+              {scanProgress?.stage === "parsing"
+                ? `Parsing... (${scanProgress.files_scanned} files)`
+                : scanProgress?.stage === "analyzing"
+                ? "Analyzing..."
+                : scanProgress?.stage === "scanned"
+                ? `Scanned ${scanProgress.files_scanned} files`
+                : `Scanning... (${scanProgress ? scanProgress.files_scanned : 0} files)`}
+            </span>
             <button
               onClick={onCancelScan}
               title="Cancel scan"

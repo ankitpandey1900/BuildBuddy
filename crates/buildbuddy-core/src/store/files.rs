@@ -17,6 +17,7 @@ pub struct FileRecord {
     pub content_hash: String,
     pub status: String,
     pub updated_at: String,
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,7 +85,7 @@ pub fn list_files_for_project(
 ) -> Result<Vec<FileRecord>> {
     let mut query = "SELECT id, project_id, relative_path, file_name, extension, language_id, 
                             size_bytes, line_count, function_count, class_count, import_count, 
-                            content_hash, status, updated_at 
+                            content_hash, status, updated_at, error_message 
                      FROM files WHERE project_id = ?1".to_string();
 
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(project_id)];
@@ -131,6 +132,7 @@ pub fn list_files_for_project(
             content_hash: row.get(11)?,
             status: row.get(12)?,
             updated_at: row.get(13)?,
+            error_message: row.get(14)?,
         })
     })?;
 
@@ -145,7 +147,7 @@ pub fn get_file_by_id(conn: &Connection, file_id: i64) -> Result<FileRecord> {
     conn.query_row(
         "SELECT id, project_id, relative_path, file_name, extension, language_id, 
                 size_bytes, line_count, function_count, class_count, import_count, 
-                content_hash, status, updated_at 
+                content_hash, status, updated_at, error_message 
          FROM files WHERE id = ?1",
         params![file_id],
         |row| {
@@ -164,6 +166,7 @@ pub fn get_file_by_id(conn: &Connection, file_id: i64) -> Result<FileRecord> {
                 content_hash: row.get(11)?,
                 status: row.get(12)?,
                 updated_at: row.get(13)?,
+                error_message: row.get(14)?,
             })
         },
     )

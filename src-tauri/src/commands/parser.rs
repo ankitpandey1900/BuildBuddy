@@ -114,6 +114,11 @@ pub async fn start_parse(
             for (file_id, result) in &parsed_results {
                 if let Err(e) = persist_file_parse_result(&mut db_conn, project_id, *file_id, result) {
                     eprintln!("Failed to persist parsed symbols for {}: {}", result.relative_path, e);
+                    let err_msg = format!("Failed to persist symbols: {}", e);
+                    let _ = db_conn.execute(
+                        "UPDATE files SET status = 'error', error_message = ?1 WHERE id = ?2",
+                        rusqlite::params![err_msg, *file_id],
+                    );
                 }
             }
 
@@ -236,6 +241,115 @@ mod tests {
         let to_parse_modified = get_pending_files_to_parse(&conn, proj.id).unwrap();
         assert_eq!(to_parse_modified.len(), 1);
         assert_eq!(to_parse_modified[0].relative_path, "src/unchanged1.ts");
+    }
+
+    #[test]
+    fn test_reproduce_contact_ts_symbol_loss() {
+        use crate::core::scanner::walker::scan_directory;
+        use crate::core::store::files::batch_insert_or_update_files;
+        use crate::core::store::symbols::get_symbols_for_file;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let contact_path = temp_dir.path().join("src/app/actions");
+        std::fs::create_dir_all(&contact_path).unwrap();
+        let file_path = contact_path.join("contact.ts");
+        std::fs::write(
+            &file_path,
+            r#""use server";
+
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY || "missing_key_fallback");
+
+export async function sendContactMessage(formData: FormData) {
+  const name = formData.get("name") as string;
+  const email = formData.get("email") as string;
+  const message = formData.get("message") as string;
+
+  if (!name || !email || !message) {
+    return { success: false, error: "All fields are required." };
+  }
+  return { success: true };
+}
+"#,
+        )
+        .unwrap();
+
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        let proj =
+            create_or_get_project(&conn, temp_dir.path().to_str().unwrap(), "tallymate_repro")
+                .unwrap();
+
+        // 1. Scanner runs
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let scanned = scan_directory(temp_dir.path(), &[], cancel.clone(), |_| {}).unwrap();
+        assert_eq!(scanned.len(), 1);
+
+        println!("Scanner set status to: '{}'", scanned[0].status);
+
+        // Create analysis_runs record as start_scan does
+        conn.execute(
+            "INSERT INTO analysis_runs (project_id, status) VALUES (?1, 'in_progress')",
+            params![proj.id],
+        )
+        .unwrap();
+        let run_id = conn.last_insert_rowid();
+
+        // 2. Scanner persists files to DB
+        batch_insert_or_update_files(&mut conn, proj.id, run_id, &scanned).unwrap();
+
+        let (file_id, db_status): (i64, String) = conn
+            .query_row(
+                "SELECT id, status FROM files WHERE project_id = ?1",
+                params![proj.id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+
+        // After scanner fix: the file is 'pending', ready to be parsed
+        assert_eq!(db_status, "pending", "Scanned parseable file must start as 'pending'");
+
+        // 3. Parser runs: get_pending_files_to_parse
+        let pending = get_pending_files_to_parse(&conn, proj.id).unwrap();
+        assert_eq!(pending.len(), 1, "Expected 1 pending file to parse");
+        assert_eq!(pending[0].file_id, file_id);
+
+        // Parse with worker pool
+        let pool = ParserWorkerPool::new(WorkerPoolConfig::default());
+        let cancel_parse = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let parse_results = pool
+            .parse_project_files(temp_dir.path(), pending, cancel_parse, |_| {})
+            .unwrap();
+        assert_eq!(parse_results.len(), 1);
+
+        // Persist symbols into SQLite
+        for (f_id, res) in &parse_results {
+            persist_file_parse_result(&mut conn, proj.id, *f_id, res).unwrap();
+        }
+
+        // 4. Verify file status in DB is now 'parsed'
+        let updated_status: String = conn
+            .query_row(
+                "SELECT status FROM files WHERE id = ?1",
+                params![file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(updated_status, "parsed", "File status must be updated to 'parsed' after persistence");
+
+        // 5. Symbols queried (as UI does via get_file_symbols)
+        let symbols = get_symbols_for_file(&conn, file_id).unwrap();
+        println!("Symbols persisted in DB: {}", symbols.len());
+        for sym in &symbols {
+            println!("  Found symbol: {} ({:?})", sym.name, sym.kind);
+        }
+
+        assert!(!symbols.is_empty(), "Symbols must not be empty after parsing!");
+        let has_send_contact = symbols.iter().any(|s| s.name == "sendContactMessage");
+        let has_resend = symbols.iter().any(|s| s.name == "resend");
+        assert!(has_send_contact, "Expected sendContactMessage to be extracted");
+        assert!(has_resend, "Expected resend to be extracted");
     }
 }
 

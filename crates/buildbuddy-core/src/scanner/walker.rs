@@ -49,11 +49,11 @@ where
     let mut scanned_files = Vec::new();
     let mut skipped = Vec::new();
 
-    let walker = WalkDir::new(root_path)
+    let mut it = WalkDir::new(root_path)
         .follow_links(false) // First step: don't automatically follow symlinks blindly
         .into_iter();
 
-    for entry_res in walker {
+    while let Some(entry_res) = it.next() {
         if cancel_flag.load(Ordering::Relaxed) {
             break;
         }
@@ -64,6 +64,7 @@ where
         };
 
         let path = entry.path();
+        let is_dir = entry.file_type().is_dir();
 
         // Check symlinks: must not point outside project root
         if entry.file_type().is_symlink() {
@@ -87,10 +88,11 @@ where
             }
         }
 
-        let is_dir = entry.file_type().is_dir();
-
         // Check ignore rules
         if filter.is_ignored(path, is_dir) {
+            if is_dir {
+                it.skip_current_dir();
+            }
             continue;
         }
 
@@ -130,7 +132,7 @@ where
         let content_hash = hash_file(path).unwrap_or_default();
 
         let status = if classify_file(path).is_some() {
-            "parsed".to_string()
+            "pending".to_string()
         } else {
             "unsupported".to_string()
         };
@@ -235,6 +237,45 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_measure_tallymate_unsupported_count() {
+        use std::collections::HashMap;
+        let tallymate_path = Path::new(r"D:\Projects\Vibe Code\09_Tallymate");
+        if !tallymate_path.exists() {
+            return;
+        }
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let scanned = scan_directory(tallymate_path, &[], cancel, |_| {}).unwrap();
+
+        let mut unsupported_by_ext: HashMap<String, usize> = HashMap::new();
+        let mut parseable_count = 0;
+        let mut unsupported_count = 0;
+
+        for file in &scanned {
+            if file.status == "pending" {
+                parseable_count += 1;
+            } else if file.status == "unsupported" {
+                unsupported_count += 1;
+                let ext = file.extension.clone().unwrap_or_else(|| "(none)".to_string());
+                *unsupported_by_ext.entry(ext).or_insert(0) += 1;
+            }
+        }
+
+        let mut ext_list: Vec<(String, usize)> = unsupported_by_ext.into_iter().collect();
+        ext_list.sort_by(|a, b| b.1.cmp(&a.1));
+
+        println!("\n=== TALLYMATE SCAN METRICS AFTER FIX ===");
+        println!("Total scanned files: {}", scanned.len());
+        println!("Parseable (pending) files: {}", parseable_count);
+        println!("Unsupported files: {}", unsupported_count);
+        println!("Top 10 unsupported extensions:");
+        for (i, (ext, count)) in ext_list.iter().take(10).enumerate() {
+            println!("  {}. {}: {}", i + 1, ext, count);
+        }
+        println!("========================================\n");
     }
 }
 

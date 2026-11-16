@@ -757,13 +757,30 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
                 <span className="text-text-muted text-micro uppercase">Status</span>
                 <Badge
-                  variant={selectedFile.status === "parsed" ? "confirmed" : "neutral"}
+                  variant={
+                    selectedFile.status === "parsed"
+                      ? "confirmed"
+                      : selectedFile.status === "error"
+                      ? "unknown"
+                      : "neutral"
+                  }
                   size="sm"
                 >
                   {selectedFile.status}
                 </Badge>
               </div>
             </div>
+
+            {selectedFile.status === "error" && selectedFile.error_message && (
+              <div className="flex flex-col gap-1">
+                <span className="text-status-error text-micro uppercase font-mono font-medium">
+                  Error Details
+                </span>
+                <div className="p-2 bg-status-error/10 border border-status-error/20 rounded font-mono text-micro text-status-error break-all select-text">
+                  {selectedFile.error_message}
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5 text-text-muted text-micro uppercase font-mono">

@@ -8,6 +8,7 @@ pub mod vcs;
 pub mod arch;
 pub mod diagram;
 pub mod docs;
+pub mod pipeline;
 
 pub fn verify_tree_sitter_compatibility() -> bool {
     let mut parser = tree_sitter::Parser::new();

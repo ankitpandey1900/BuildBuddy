@@ -90,8 +90,11 @@
   background: var(--border-strong);
 }
 
-/* Accessible Focus Ring */
+/* Accessible Focus Ring: 1px neutral border default, 2px ring on :focus-visible only */
 .focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 1px;
 }

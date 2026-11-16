@@ -191,19 +191,27 @@ pub fn persist_file_parse_result(
     crate::store::calls::persist_file_calls_and_metrics_tx(&tx, project_id, file_id, result)?;
 
     // 6. Update file counts and status
+    let err_msg = if !result.errors.is_empty() {
+        Some(result.errors.join("; "))
+    } else {
+        None
+    };
+
     tx.execute(
         "UPDATE files SET
             function_count = ?1,
             class_count = ?2,
             import_count = ?3,
             status = ?4,
+            error_message = ?5,
             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?5",
+         WHERE id = ?6",
         params![
             func_count,
             class_count,
             result.imports.len() as i64,
             result.status.as_str(),
+            err_msg,
             file_id,
         ],
     )?;

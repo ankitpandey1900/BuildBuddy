@@ -17,7 +17,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
             started_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
             completed_at DATETIME,
-            status TEXT CHECK(status IN ('in_progress', 'completed', 'failed', 'cancelled')) NOT NULL,
+            status TEXT CHECK(status IN ('in_progress', 'scanned', 'parsing', 'analyzing', 'completed', 'failed', 'cancelled')) NOT NULL,
             is_incremental INTEGER DEFAULT 0 NOT NULL,
             files_discovered INTEGER DEFAULT 0 NOT NULL,
             files_scanned INTEGER DEFAULT 0 NOT NULL,
@@ -71,7 +71,8 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             class_count INTEGER DEFAULT 0 NOT NULL,
             import_count INTEGER DEFAULT 0 NOT NULL,
             content_hash TEXT NOT NULL,
-            status TEXT CHECK(status IN ('pending', 'parsed', 'ignored', 'error', 'unsupported')) NOT NULL,
+            status TEXT CHECK(status IN ('pending', 'parsed', 'partial', 'ignored', 'error', 'unsupported', 'skipped_too_large', 'timeout')) NOT NULL,
+            error_message TEXT,
             last_analysis_run_id INTEGER REFERENCES analysis_runs(id) ON DELETE SET NULL,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
             UNIQUE(project_id, relative_path)
@@ -390,6 +391,10 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_doc_revisions_order ON document_revisions(document_id, revision_number DESC);
         "
     )?;
+
+    // Backward-compatibility: add error_message column to files if upgrading existing DB
+    conn.execute("ALTER TABLE files ADD COLUMN error_message TEXT", []).ok();
+
     Ok(())
 }
 

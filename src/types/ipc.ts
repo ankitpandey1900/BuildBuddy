@@ -22,6 +22,7 @@ export interface FileRecord {
   content_hash: string;
   status: string;
   updated_at: string;
+  error_message?: string | null;
 }
 
 export interface FileContentDto {
@@ -227,6 +228,7 @@ export interface ScanProgressPayload {
   project_id: number;
   files_scanned: number;
   current_file: string;
+  stage?: string;
 }
 
 export interface ScanCompletePayload {

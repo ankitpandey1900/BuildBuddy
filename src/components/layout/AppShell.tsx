@@ -60,7 +60,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   children,
 }) => {
   return (
-    <div className="h-screen w-screen flex flex-col bg-canvas text-text-primary overflow-hidden font-sans">
+    <div className="h-screen w-full flex flex-col bg-canvas text-text-primary overflow-hidden font-sans">
       <TopBar
         currentProject={currentProject}
         recentProjects={recentProjects}

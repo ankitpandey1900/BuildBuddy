@@ -147,13 +147,13 @@ export const FileTree: React.FC<FileTreeProps> = ({
         </div>
 
         {/* Language Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar text-caption font-mono">
+        <div className="flex items-center gap-1 overflow-x-auto py-1 text-caption font-mono scrollbar-none">
           <button
             onClick={() => onLanguageFilterChange("all")}
-            className={`px-1.5 py-0.5 rounded-sm transition-colors ${
+            className={`flex-shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-sm transition-colors border ${
               languageFilter === "all"
-                ? "bg-accent/20 text-accent font-medium border border-accent/30"
-                : "text-text-muted hover:text-text-primary"
+                ? "bg-accent/20 text-accent font-medium border-accent/30"
+                : "text-text-muted hover:text-text-primary border-transparent hover:border-border-default"
             }`}
           >
             All
@@ -162,10 +162,10 @@ export const FileTree: React.FC<FileTreeProps> = ({
             <button
               key={ext}
               onClick={() => onLanguageFilterChange(ext)}
-              className={`px-1.5 py-0.5 rounded-sm uppercase transition-colors ${
+              className={`flex-shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-sm uppercase transition-colors border ${
                 languageFilter === ext
-                  ? "bg-accent/20 text-accent font-medium border border-accent/30"
-                  : "text-text-muted hover:text-text-primary"
+                  ? "bg-accent/20 text-accent font-medium border-accent/30"
+                  : "text-text-muted hover:text-text-primary border-transparent hover:border-border-default"
               }`}
             >
               .{ext}

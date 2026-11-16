@@ -32,6 +32,23 @@ impl IgnoreFilter {
             "package-lock.json",
             "pnpm-lock.yaml",
             "yarn.lock",
+            // Android & iOS build outputs
+            ".gradle",
+            "android/.gradle",
+            "android/build",
+            "android/app/build",
+            "ios/build",
+            "ios/Pods",
+            "Pods",
+            "DerivedData",
+            "ios/DerivedData",
+            "*.apk",
+            "*.aab",
+            "*.aar",
+            "*.dex",
+            "*.ipa",
+            "*.xcarchive",
+            "*.dSYM",
         ];
 
         for pattern in default_ignores {
@@ -83,6 +100,12 @@ mod tests {
         assert!(filter.is_ignored(dir.path().join("target").as_path(), true));
         assert!(filter.is_ignored(dir.path().join(".venv").as_path(), true));
         assert!(filter.is_ignored(dir.path().join("file.pyc").as_path(), false));
+        assert!(filter.is_ignored(dir.path().join(".gradle").as_path(), true));
+        assert!(filter.is_ignored(dir.path().join("android/build").as_path(), true));
+        assert!(filter.is_ignored(dir.path().join("ios/Pods").as_path(), true));
+        assert!(filter.is_ignored(dir.path().join("DerivedData").as_path(), true));
+        assert!(filter.is_ignored(dir.path().join("app.apk").as_path(), false));
+        assert!(filter.is_ignored(dir.path().join("app.ipa").as_path(), false));
 
         // Normal files should not be ignored
         assert!(!filter.is_ignored(dir.path().join("src/main.rs").as_path(), false));
