@@ -1,0 +1,9 @@
+{
+  "name": "docs-secret",
+  "version": "1.0.0",
+  "description": "Payment gateway client using sk_test_MOCK_API_KEY_FOR_TESTS",
+  "main": "src/index.ts",
+  "dependencies": {
+    "stripe": "^14.0.0"
+  }
+}

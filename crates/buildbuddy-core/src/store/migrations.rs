@@ -349,6 +349,45 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_diagrams_project ON diagrams(project_id);
+
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            doc_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            UNIQUE(project_id, doc_type)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_documents_project ON documents(project_id, doc_type);
+
+        CREATE TABLE IF NOT EXISTS document_sections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            section_key TEXT NOT NULL,
+            title TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0 NOT NULL,
+            content TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            state TEXT CHECK(state IN ('generated', 'user_edited', 'stale')) NOT NULL DEFAULT 'generated',
+            generated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            evidence_keys TEXT DEFAULT '[]' NOT NULL,
+            UNIQUE(document_id, section_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_doc_sections_lookup ON document_sections(document_id, sort_order);
+
+        CREATE TABLE IF NOT EXISTS document_revisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            revision_number INTEGER NOT NULL,
+            content_markdown TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            UNIQUE(document_id, revision_number)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_doc_revisions_order ON document_revisions(document_id, revision_number DESC);
         "
     )?;
     Ok(())
@@ -395,6 +434,9 @@ mod tests {
         assert!(tables.contains(&"entry_points".to_string()));
         assert!(tables.contains(&"modules".to_string()));
         assert!(tables.contains(&"diagrams".to_string()));
+        assert!(tables.contains(&"documents".to_string()));
+        assert!(tables.contains(&"document_sections".to_string()));
+        assert!(tables.contains(&"document_revisions".to_string()));
     }
 }
 

@@ -398,6 +398,51 @@ Benchmarked using Vitest with explicit high-resolution timing (`performance.now(
   - Export functions (`exportToMermaid`, `serializeToSvg`, `serializeToPng`) are loaded via dynamic `import()`.
   - Main bundle size reduced from **2,656.46 kB** to **923.23 kB** (65% reduction).
 
+---
+
+## 13. Document Persistence, Deterministic Generators & Banned-Phrase Lint (Task 8a-1)
+
+### 1. Document Storage Model & Migrations
+Document tables are defined in `crates/buildbuddy-core/src/store/migrations.rs`:
+- `documents`: Stores per-project document records (`id`, `project_id`, `doc_type`, `title`, `created_at`, `updated_at`). Unique on `(project_id, doc_type)`.
+- `document_sections`: Stores modular sections (`id`, `document_id`, `section_key`, `title`, `sort_order`, `content`, `content_hash`, `state`, `generated_at`, `evidence_keys`). Unique on `(document_id, section_key)`. State is constrained to `('generated', 'user_edited', 'stale')`.
+- `document_revisions`: Stores historical revision snapshots (`id`, `document_id`, `revision_number`, `content_markdown`, `created_at`). Unique on `(document_id, revision_number)`.
+
+### 2. Canonical Evidence Keys
+- Format: `{relative_path}:{start_line}-{end_line}:{evidence_type}`.
+- Example: `package.json:10-10:manifest_entry`, `src/client/main.tsx:7-7:entry_point`.
+- Strictly no SQLite internal row IDs or ephemeral memory addresses in evidence keys or markdown body.
+
+### 3. Writing Rules & Determinism
+- **Natural Engineering Style**: Subject-first prose, concise sections, tables for structured data.
+- **Missing Data**: Explicit `"Not detected"` whenever underlying data is absent.
+- **Confidence Badges**: Explicitly formatted as `[confirmed]`, `[static]`, `[inferred]`, `[heuristic]`.
+- **Determinism**: Queries enforce explicit secondary sort keys (e.g. `package_name ASC, manifest_path ASC`, `file_path ASC, start_line ASC`). Reversing or shuffling file discovery/insertion produces byte-identical Markdown output.
+- **Timestamps & IDs**: No dynamic timestamps (`DateTime::now()`) and no database row IDs appear anywhere in the generated Markdown text. Timestamps are restricted to SQLite metadata columns.
+
+### 4. Secret Sanitization
+Implemented in `crates/buildbuddy-core/src/docs/model.rs` via `redact_secrets()`:
+- Automatically detects and replaces sensitive credentials with `[REDACTED SECRET]`.
+- Matches Stripe keys (`sk_live_...`, `sk_test_...`, `pk_live_...`, `pk_test_...`), AWS keys (`AKIA...`), and GitHub tokens (`ghp_...`).
+- Tested with `fixtures/docs-secret` ensuring no fake secret ever reaches markdown output.
+
+### 5. Prohibited Marketing / Filler Phrases Lint
+Implemented in `crates/buildbuddy-core/src/docs/lint.rs` (`check_banned_phrases()`):
+Comparison is case-insensitive, reporting exact line and column numbers. The prohibited phrases list is:
+1. `"dive into"`
+2. `"it is worth noting"`
+3. `"comprehensive"`
+4. `"in today's"`
+5. `"rapidly evolving"`
+6. `"robust"`
+7. `"seamless"`
+8. `"leverage"`
+9. `"delve"`
+10. `"this document aims"`
+
+The lint is enforced on every individual section and assembled document prior to returning or persisting.
+
+
 
 
 
