@@ -27,7 +27,7 @@ Not detected
 
 ## Potentially Unused Dependencies
 
-| Package | Version | Type | Manifest File | Confidence |
+| Package | Version | Type | Manifest File | Status |
 | --- | --- | --- | --- | --- |
-| typescript | ^5.0.0 | dev | package.json:15 | [heuristic] |
+| typescript | ^5.0.0 | dev | package.json:15 | tooling, not imported by design |
 

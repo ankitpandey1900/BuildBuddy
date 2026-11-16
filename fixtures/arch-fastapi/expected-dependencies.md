@@ -26,7 +26,7 @@ Not detected
 
 ## Potentially Unused Dependencies
 
-| Package | Version | Type | Manifest File | Confidence |
+| Package | Version | Type | Manifest File | Status |
 | --- | --- | --- | --- | --- |
-| uvicorn | ==0.30.0 | direct | requirements.txt:2 | [heuristic] |
+| uvicorn | ==0.30.0 | direct | requirements.txt:2 | tooling, not imported by design |
 

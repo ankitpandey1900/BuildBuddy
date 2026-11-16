@@ -408,27 +408,44 @@ Document tables are defined in `crates/buildbuddy-core/src/store/migrations.rs`:
 - `document_sections`: Stores modular sections (`id`, `document_id`, `section_key`, `title`, `sort_order`, `content`, `content_hash`, `state`, `generated_at`, `evidence_keys`). Unique on `(document_id, section_key)`. State is constrained to `('generated', 'user_edited', 'stale')`.
 - `document_revisions`: Stores historical revision snapshots (`id`, `document_id`, `revision_number`, `content_markdown`, `created_at`). Unique on `(document_id, revision_number)`.
 
-### 2. Canonical Evidence Keys
+### 2. Canonical Evidence Keys & Real Evidence Types
 - Format: `{relative_path}:{start_line}-{end_line}:{evidence_type}`.
-- Example: `package.json:10-10:manifest_entry`, `src/client/main.tsx:7-7:entry_point`.
-- Strictly no SQLite internal row IDs or ephemeral memory addresses in evidence keys or markdown body.
+- Allowed evidence types strictly mirror repository artifacts: `manifest_entry`, `import_stmt`, `entry_point`, `ast_node`, `file_content`.
+- Never use `"heuristic"` as an evidence type (heuristic is a confidence category, not a physical code evidence type).
+- Strictly no SQLite internal row IDs or memory addresses in evidence keys or markdown body.
 
-### 3. Writing Rules & Determinism
-- **Natural Engineering Style**: Subject-first prose, concise sections, tables for structured data.
-- **Missing Data**: Explicit `"Not detected"` whenever underlying data is absent.
-- **Confidence Badges**: Explicitly formatted as `[confirmed]`, `[static]`, `[inferred]`, `[heuristic]`.
-- **Determinism**: Queries enforce explicit secondary sort keys (e.g. `package_name ASC, manifest_path ASC`, `file_path ASC, start_line ASC`). Reversing or shuffling file discovery/insertion produces byte-identical Markdown output.
-- **Timestamps & IDs**: No dynamic timestamps (`DateTime::now()`) and no database row IDs appear anywhere in the generated Markdown text. Timestamps are restricted to SQLite metadata columns.
+### 3. Confidence Classification Rules
+- `[confirmed]`: Direct runtime verification or physically declared manifest dependency items (e.g. `package.json` dependencies).
+- `[static]`: Proved by static AST or compiler analysis of project source code.
+  - Framework detections (supported by manifest entry + AST imports/config file).
+  - Entry points (AST detection of server listen/app instances or package.json scripts).
+  - Circular dependency cycles (derived from static import graph cycle analysis).
+- `[inferred]`: Inferred from heuristics without direct runtime or syntactic proof (e.g. potentially unused dependencies).
+- `[unknown]`: Unresolved or unverified references.
 
-### 4. Secret Sanitization
-Implemented in `crates/buildbuddy-core/src/docs/model.rs` via `redact_secrets()`:
-- Automatically detects and replaces sensitive credentials with `[REDACTED SECRET]`.
-- Matches Stripe keys (`sk_live_...`, `sk_test_...`, `pk_live_...`, `pk_test_...`), AWS keys (`AKIA...`), and GitHub tokens (`ghp_...`).
-- Tested with `fixtures/docs-secret` ensuring no fake secret ever reaches markdown output.
+### 4. Purpose Section Extraction Rules
+- Quotes the first sentence of the `README` or manifest description verbatim, labeled `"from README (path:line)"` or `"from manifest (path:line)"`.
+- The extracted sentence is subjected to `check_banned_phrases()`. If it contains any prohibited marketing phrases, BuildBuddy renders `"Not detected (README present at <path>)"` without paraphrasing.
+- If all candidate sentences contain detected secrets, they are dropped and rendered as `"Not detected (README present at <path>)"`.
 
-### 5. Prohibited Marketing / Filler Phrases Lint
+### 5. Generic Secret Detection & Whole-Sentence Dropping
+Implemented in `crates/buildbuddy-core/src/docs/model.rs` (`sentence_contains_secret()` and `drop_secret_sentences()`):
+- Detects 5 categories of sensitive credentials:
+  1. Known prefix keys: `sk_live_`, `sk_test_`, `pk_live_`, `pk_test_`, `ghp_`, `gho_`, `xoxb-`, `xoxp-`, `AKIA[0-9A-Z]{16}`.
+  2. Sensitive assignments: `api_key = "..."`, `password: "..."`, `secret = '...'`, `auth_token = "..."`.
+  3. Bearer authorization tokens: `Bearer [A-Za-z0-9_\-\.]{16,}`.
+  4. Private key headers: `-----BEGIN RSA PRIVATE KEY-----`, `-----BEGIN PRIVATE KEY-----`.
+  5. High-entropy long hex strings (>= 32 chars) and base64 strings (>= 40 chars).
+- **Rule**: If a sentence contains any detected secret, the **entire sentence is dropped** from the generated output rather than partially masking it.
+
+### 6. Tooling Dependencies Classification
+Implemented in `crates/buildbuddy-core/src/docs/dependencies.rs` via `TOOLING_PACKAGES`:
+Tooling dependencies not imported in application source code are classified as `"tooling, not imported by design"` rather than reported as unused application code. The tooling list comprises:
+`typescript`, `eslint`, `prettier`, `vite`, `vitest`, `jest`, `webpack`, `rollup`, `ts-node`, `babel`, `tailwindcss`, `postcss`, `autoprefixer`, `pytest`, `mypy`, `black`, `flake8`, `isort`, `ruff`, `pylint`, `tox`, `coverage`, `nodemon`, `concurrently`, `rimraf`, `cross-env`, `uvicorn`.
+
+### 7. Prohibited Marketing / Filler Phrases Lint
 Implemented in `crates/buildbuddy-core/src/docs/lint.rs` (`check_banned_phrases()`):
-Comparison is case-insensitive, reporting exact line and column numbers. The prohibited phrases list is:
+Case-insensitive check with line/column reporting on the 10 prohibited phrases:
 1. `"dive into"`
 2. `"it is worth noting"`
 3. `"comprehensive"`
@@ -439,8 +456,10 @@ Comparison is case-insensitive, reporting exact line and column numbers. The pro
 8. `"leverage"`
 9. `"delve"`
 10. `"this document aims"`
+Enforced on every individual section and assembled document prior to returning or persisting.
 
-The lint is enforced on every individual section and assembled document prior to returning or persisting.
+### 8. Phase Scope Note
+The document viewer and editor UI (with interactive section preview, user edits preservation, and export controls) belongs to Task 8b (Documentation Workspace UI), not Task 8a-2 (High-Level Design & Architecture Documentation Generators).
 
 
 

@@ -20,7 +20,7 @@ Not detected
 
 ## Potentially Unused Dependencies
 
-| Package | Version | Type | Manifest File | Confidence |
+| Package | Version | Type | Manifest File | Status |
 | --- | --- | --- | --- | --- |
-| stripe | ^14.0.0 | direct | package.json:7 | [heuristic] |
+| stripe | ^14.0.0 | direct | package.json:7 | potentially unused [inferred] |
 

@@ -202,7 +202,7 @@ fn analyze_fixture_and_setup_db(dir: &Path, reverse_files: bool) -> (Connection,
             "Circular cycle detected",
             &desc,
             "medium",
-            "confirmed",
+            "static",
             None,
             &meta,
         ).unwrap();
@@ -389,7 +389,8 @@ fn test_docs_secret_redaction() {
     // Hard check: sk_live_ must NEVER appear in output
     assert!(!overview_md.contains("sk_live_"), "Fake API key leaked into overview markdown!");
     assert!(!dep_inv_md.contains("sk_live_"), "Fake API key leaked into dependencies markdown!");
-    assert!(overview_md.contains("[REDACTED SECRET]"), "Secret was not redacted properly!");
+    let purpose_sec = overview.sections.iter().find(|s| s.section_key == "purpose").unwrap();
+    assert_eq!(purpose_sec.content.trim(), "Not detected (README present at README.md)");
 }
 
 #[test]

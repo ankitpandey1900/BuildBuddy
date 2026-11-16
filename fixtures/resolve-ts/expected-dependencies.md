@@ -28,11 +28,11 @@
 
 | Finding | Cycle Description | Severity | Confidence |
 | --- | --- | --- | --- |
-| Circular cycle detected | src/cycle_a.ts <-> src/cycle_b.ts | medium | [confirmed] |
+| Circular cycle detected | src/cycle_a.ts <-> src/cycle_b.ts | medium | [static] |
 
 ## Potentially Unused Dependencies
 
-| Package | Version | Type | Manifest File | Confidence |
+| Package | Version | Type | Manifest File | Status |
 | --- | --- | --- | --- | --- |
-| vitest | ^1.0.0 | dev | package.json:8 | [heuristic] |
+| vitest | ^1.0.0 | dev | package.json:8 | tooling, not imported by design |
 

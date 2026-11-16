@@ -3,6 +3,36 @@ use rusqlite::{params, Connection, Result};
 
 use crate::docs::model::{DocumentSection, DocumentType, GeneratedDocument};
 
+pub const TOOLING_PACKAGES: &[&str] = &[
+    "typescript",
+    "eslint",
+    "prettier",
+    "vite",
+    "vitest",
+    "jest",
+    "webpack",
+    "rollup",
+    "ts-node",
+    "babel",
+    "tailwindcss",
+    "postcss",
+    "autoprefixer",
+    "pytest",
+    "mypy",
+    "black",
+    "flake8",
+    "isort",
+    "ruff",
+    "pylint",
+    "tox",
+    "coverage",
+    "nodemon",
+    "concurrently",
+    "rimraf",
+    "cross-env",
+    "uvicorn",
+];
+
 pub struct DependencyInventoryGenerator;
 
 impl DependencyInventoryGenerator {
@@ -237,7 +267,7 @@ impl DependencyInventoryGenerator {
                 if let Some(cycle) = meta.get("cycle").and_then(|c| c.as_array()) {
                     for node in cycle {
                         if let Some(node_str) = node.as_str() {
-                            let ev_key = format!("{}:1-1:heuristic", node_str);
+                            let ev_key = format!("{}:1-1:import_stmt", node_str);
                             if !evidence_keys.contains(&ev_key) {
                                 evidence_keys.push(ev_key);
                             }
@@ -329,24 +359,31 @@ impl DependencyInventoryGenerator {
             let pkg_hyphen = pkg_lower.replace('_', "-");
             let pkg_under = pkg_lower.replace('-', "_");
 
-            let is_unused_by_heuristic = !imported_pkgs.contains(&pkg_lower)
-                && !imported_pkgs.contains(&pkg_hyphen)
-                && !imported_pkgs.contains(&pkg_under)
-                && !(pkg_lower.starts_with("@types/") && imported_pkgs.contains(&pkg_lower[7..]));
+            let is_imported = imported_pkgs.contains(&pkg_lower)
+                || imported_pkgs.contains(&pkg_hyphen)
+                || imported_pkgs.contains(&pkg_under)
+                || (pkg_lower.starts_with("@types/") && imported_pkgs.contains(&pkg_lower[7..]));
 
             let is_in_findings = finding_pkgs.contains(&pkg_lower)
                 || finding_pkgs.contains(&pkg_hyphen)
                 || finding_pkgs.contains(&pkg_under);
 
-            if is_in_findings || (finding_pkgs.is_empty() && is_unused_by_heuristic) {
+            if is_in_findings || (finding_pkgs.is_empty() && !is_imported) {
                 let line_val = line_opt.unwrap_or(1);
-                let ev_key = format!("{}:{}-{}:heuristic", rel_path, line_val, line_val);
+                let ev_key = format!("{}:{}-{}:manifest_entry", rel_path, line_val, line_val);
                 evidence_keys.push(ev_key);
 
                 let ver_str = ver.unwrap_or_else(|| "*".to_string());
+                let is_tooling = TOOLING_PACKAGES.iter().any(|&tool| pkg_lower.contains(tool));
+                let status_label = if is_tooling {
+                    "tooling, not imported by design"
+                } else {
+                    "potentially unused [inferred]"
+                };
+
                 table_rows.push(format!(
-                    "| {} | {} | {} | {}:{} | [heuristic] |",
-                    pkg, ver_str, dep_type, rel_path, line_val
+                    "| {} | {} | {} | {}:{} | {} |",
+                    pkg, ver_str, dep_type, rel_path, line_val, status_label
                 ));
             }
         }
@@ -356,7 +393,7 @@ impl DependencyInventoryGenerator {
         }
 
         let mut lines = Vec::new();
-        lines.push("| Package | Version | Type | Manifest File | Confidence |".to_string());
+        lines.push("| Package | Version | Type | Manifest File | Status |".to_string());
         lines.push("| --- | --- | --- | --- | --- |".to_string());
         lines.extend(table_rows);
 

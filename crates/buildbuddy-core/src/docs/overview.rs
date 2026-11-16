@@ -3,7 +3,8 @@ use std::fs;
 use std::path::Path;
 use rusqlite::{params, Connection, Result};
 
-use crate::docs::model::{redact_secrets, DocumentSection, DocumentType, GeneratedDocument};
+use crate::docs::lint::check_banned_phrases;
+use crate::docs::model::{sentence_contains_secret, split_into_sentences, DocumentSection, DocumentType, GeneratedDocument};
 
 pub struct ProjectOverviewGenerator;
 
@@ -129,41 +130,46 @@ impl ProjectOverviewGenerator {
             let rel_path: String = row.get(0)?;
             let abs_path = Path::new(root_path).join(&rel_path);
             if let Ok(content) = fs::read_to_string(&abs_path) {
-                // Find first non-empty paragraph (skipping Markdown headers)
                 let lines: Vec<&str> = content.lines().collect();
-                let mut start_idx = None;
-                let mut end_idx = None;
 
                 for (idx, line) in lines.iter().enumerate() {
                     let trimmed = line.trim();
-                    if trimmed.is_empty() || trimmed.starts_with('#') {
-                        if start_idx.is_some() {
-                            end_idx = Some(idx);
-                            break;
-                        }
+                    if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with("<!--") {
                         continue;
                     }
 
-                    if start_idx.is_none() {
-                        start_idx = Some(idx);
+                    let sentences = split_into_sentences(trimmed);
+                    for s in sentences {
+                        let clean_s = s.trim();
+                        if clean_s.is_empty() {
+                            continue;
+                        }
+
+                        // If sentence contains secret, drop whole sentence
+                        if sentence_contains_secret(clean_s) {
+                            continue;
+                        }
+
+                        // Run banned-phrase lint on verbatim quote
+                        if check_banned_phrases(clean_s).is_err() {
+                            return Ok((
+                                format!("Not detected (README present at {})", rel_path),
+                                Vec::new(),
+                            ));
+                        }
+
+                        let line_num = idx + 1;
+                        let text = format!("\"{}\" from README ({}:{})", clean_s, rel_path, line_num);
+                        let ev_key = format!("{}:{}-{}:file_content", rel_path, line_num, line_num);
+                        return Ok((text, vec![ev_key]));
                     }
                 }
 
-                if let Some(start) = start_idx {
-                    let end = end_idx.unwrap_or(lines.len());
-                    let paragraph_lines: Vec<&str> = lines[start..end]
-                        .iter()
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-
-                    if !paragraph_lines.is_empty() {
-                        let text = paragraph_lines.join(" ");
-                        let redacted = redact_secrets(&text);
-                        let ev_key = format!("{}:{}-{}:file_content", rel_path, start + 1, end);
-                        return Ok((redacted, vec![ev_key]));
-                    }
-                }
+                // If all candidate sentences were dropped (e.g. contained secrets or failed)
+                return Ok((
+                    format!("Not detected (README present at {})", rel_path),
+                    Vec::new(),
+                ));
             }
         }
 
@@ -188,9 +194,34 @@ impl ProjectOverviewGenerator {
                                     break;
                                 }
                             }
-                            let redacted = redact_secrets(trimmed);
-                            let ev_key = format!("{}:{}-{}:manifest_entry", rel_path, line_num, line_num);
-                            return Ok((redacted, vec![ev_key]));
+
+                            let sentences = split_into_sentences(trimmed);
+                            for s in sentences {
+                                let clean_s = s.trim();
+                                if clean_s.is_empty() {
+                                    continue;
+                                }
+
+                                if sentence_contains_secret(clean_s) {
+                                    continue;
+                                }
+
+                                if check_banned_phrases(clean_s).is_err() {
+                                    return Ok((
+                                        format!("Not detected (manifest present at {})", rel_path),
+                                        Vec::new(),
+                                    ));
+                                }
+
+                                let text = format!("\"{}\" from manifest ({}:{})", clean_s, rel_path, line_num);
+                                let ev_key = format!("{}:{}-{}:manifest_entry", rel_path, line_num, line_num);
+                                return Ok((text, vec![ev_key]));
+                            }
+
+                            return Ok((
+                                format!("Not detected (manifest present at {})", rel_path),
+                                Vec::new(),
+                            ));
                         }
                     }
                 }
@@ -498,7 +529,7 @@ impl ProjectOverviewGenerator {
             ).ok();
 
             if let Some(f) = first_file {
-                let ev_key = format!("{}:1-1:heuristic", f);
+                let ev_key = format!("{}:1-1:ast_node", f);
                 evidence_keys.push(ev_key);
             }
 

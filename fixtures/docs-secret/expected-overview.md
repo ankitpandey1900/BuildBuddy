@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Payment processing client configured with key [REDACTED SECRET].
+Not detected (README present at README.md)
 
 ## Languages
 

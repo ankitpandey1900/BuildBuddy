@@ -136,7 +136,6 @@ impl GeneratedDocument {
         // Check assembled document
         let full_md = self.render_markdown();
         if let Err(v) = check_banned_phrases(&full_md) {
-            // Deduplicate if already present
             for item in v {
                 if !violations.contains(&item) {
                     violations.push(item);
@@ -152,60 +151,159 @@ impl GeneratedDocument {
     }
 }
 
-/// Redacts sensitive secret tokens (e.g. Stripe, AWS, GitHub tokens) from text.
-pub fn redact_secrets(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let chars: Vec<char> = input.chars().collect();
+/// Generic detection of credentials and sensitive secrets.
+/// Covers:
+/// 1. Known key/token prefixes (sk_live_, sk_test_, pk_live_, pk_test_, ghp_, gho_, xoxb-, xoxp-, AKIA...)
+/// 2. Key/token/secret/password variable or JSON property assignments
+/// 3. Bearer authorization tokens
+/// 4. Private key headers (PEM blocks)
+/// 5. Long hex strings (>= 32 chars) and long base64 strings (>= 40 chars)
+pub fn sentence_contains_secret(sentence: &str) -> bool {
+    let lower = sentence.to_lowercase();
+
+    // 1. Known prefix keys
+    let prefixes = [
+        "sk_live_",
+        "sk_test_",
+        "pk_live_",
+        "pk_test_",
+        "ghp_",
+        "gho_",
+        "ghu_",
+        "ghs_",
+        "ghr_",
+        "github_pat_",
+        "xoxb-",
+        "xoxp-",
+        "xoxa-",
+        "xoxr-",
+    ];
+    for pfx in prefixes {
+        if lower.contains(pfx) {
+            return true;
+        }
+    }
+
+    // AWS Access Key ID (AKIA followed by 16 uppercase alphanumeric chars)
+    if let Some(pos) = sentence.find("AKIA") {
+        if sentence.len() >= pos + 20 {
+            let candidate = &sentence[pos + 4..pos + 20];
+            if candidate.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+                return true;
+            }
+        }
+    }
+
+    // 2. Private key headers
+    if sentence.contains("-----BEGIN") && (sentence.contains("PRIVATE KEY") || sentence.contains("CERTIFICATE")) {
+        return true;
+    }
+
+    // 3. Bearer token
+    if let Some(pos) = lower.find("bearer ") {
+        let rest = sentence[pos + 7..].trim_start();
+        let token: String = rest
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '_' || *c == '-')
+            .collect();
+        if token.len() >= 16 {
+            return true;
+        }
+    }
+
+    // 4. Assignments: key/token/secret/password = "..."
+    let sensitive_keywords = [
+        "api_key",
+        "apikey",
+        "secret",
+        "password",
+        "auth_token",
+        "access_token",
+        "client_secret",
+        "private_key",
+    ];
+    for kw in sensitive_keywords {
+        if let Some(pos) = lower.find(kw) {
+            let after_kw = sentence[pos + kw.len()..].trim_start();
+            if after_kw.starts_with('=') || after_kw.starts_with(':') {
+                let value_part = after_kw[1..].trim();
+                let val_token = if value_part.starts_with('"') || value_part.starts_with('\'') {
+                    let quote = value_part.chars().next().unwrap();
+                    value_part[1..].split(quote).next().unwrap_or("")
+                } else {
+                    value_part.split_whitespace().next().unwrap_or("")
+                };
+                if val_token.len() >= 8 && !val_token.contains(' ') {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 5. Long hex (>= 32 chars) and long base64 (>= 40 chars)
+    for word in sentence.split(|c: char| !c.is_alphanumeric() && c != '+' && c != '/' && c != '=' && c != '_' && c != '-') {
+        let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        if clean_word.len() >= 32 && clean_word.chars().all(|c| c.is_ascii_hexdigit()) {
+            return true;
+        }
+        if clean_word.len() >= 40 && clean_word.chars().all(|c| c.is_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '_' || c == '-') {
+            let has_upper = clean_word.chars().any(|c| c.is_ascii_uppercase());
+            let has_lower = clean_word.chars().any(|c| c.is_ascii_lowercase());
+            let has_digit = clean_word.chars().any(|c| c.is_ascii_digit());
+            if (has_upper && has_lower && has_digit) || clean_word.contains('+') || clean_word.contains('/') || clean_word.contains('=') {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Splits text into individual sentences based on standard sentence delimiters.
+pub fn split_into_sentences(text: &str) -> Vec<String> {
+    let mut sentences = Vec::new();
+    let mut current = String::new();
+    let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
     let mut i = 0;
 
     while i < n {
-        // sk_live_ / sk_test_ / pk_live_ / pk_test_
-        if i + 8 <= n {
-            let pfx: String = chars[i..i + 8].iter().collect();
-            if pfx == "sk_live_" || pfx == "sk_test_" || pfx == "pk_live_" || pfx == "pk_test_" {
-                let mut j = i + 8;
-                while j < n && (chars[j].is_alphanumeric() || chars[j] == '_') {
-                    j += 1;
+        current.push(chars[i]);
+        if chars[i] == '.' || chars[i] == '!' || chars[i] == '?' {
+            if i + 1 == n || chars[i + 1].is_whitespace() {
+                let trimmed = current.trim();
+                if !trimmed.is_empty() {
+                    sentences.push(trimmed.to_string());
                 }
-                result.push_str("[REDACTED SECRET]");
-                i = j;
-                continue;
+                current.clear();
             }
-        }
-
-        // ghp_ (GitHub personal access token)
-        if i + 4 <= n {
-            let pfx: String = chars[i..i + 4].iter().collect();
-            if pfx == "ghp_" {
-                let mut j = i + 4;
-                while j < n && (chars[j].is_alphanumeric() || chars[j] == '_') {
-                    j += 1;
-                }
-                result.push_str("[REDACTED SECRET]");
-                i = j;
-                continue;
+        } else if chars[i] == '\n' {
+            let trimmed = current.trim();
+            if !trimmed.is_empty() {
+                sentences.push(trimmed.to_string());
             }
+            current.clear();
         }
-
-        // AKIA (AWS access key ID, 20 chars total)
-        if i + 20 <= n {
-            let pfx: String = chars[i..i + 4].iter().collect();
-            if pfx == "AKIA" {
-                let rest: Vec<char> = chars[i + 4..i + 20].to_vec();
-                if rest.iter().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
-                    result.push_str("[REDACTED SECRET]");
-                    i += 20;
-                    continue;
-                }
-            }
-        }
-
-        result.push(chars[i]);
         i += 1;
     }
 
-    result
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        sentences.push(trimmed.to_string());
+    }
+
+    sentences
+}
+
+/// If a sentence contains a detected secret, drops the entire sentence from the text.
+pub fn drop_secret_sentences(text: &str) -> String {
+    let sentences = split_into_sentences(text);
+    let clean_sentences: Vec<String> = sentences
+        .into_iter()
+        .filter(|s| !sentence_contains_secret(s))
+        .collect();
+
+    clean_sentences.join(" ")
 }
 
 #[cfg(test)]
@@ -213,18 +311,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_secret_redaction_sk_live() {
-        let text = "Stripe secret is sk_test_MOCK_API_KEY_FOR_TESTS in config.";
-        let redacted = redact_secrets(text);
-        assert!(!redacted.contains("sk_test_MOCK_API_KEY_FOR_TESTS"));
-        assert!(redacted.contains("[REDACTED SECRET]"));
-        assert_eq!(redacted, "Stripe secret is [REDACTED SECRET] in config.");
+    fn test_secret_detection_5_shapes() {
+        // Shape 1: Prefix key
+        let s1 = "Configured with stripe key sk_test_MOCK_API_KEY_FOR_TESTS.";
+        assert!(sentence_contains_secret(s1), "Shape 1: prefix key must be detected");
+
+        // Shape 2: Keyword assignment
+        let s2 = "Database authentication password: \"super_secret_pwd_999\".";
+        assert!(sentence_contains_secret(s2), "Shape 2: assignment must be detected");
+
+        // Shape 3: Bearer token
+        let s3 = "Use Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.token.";
+        assert!(sentence_contains_secret(s3), "Shape 3: bearer token must be detected");
+
+        // Shape 4: Private key header
+        let s4 = "-----BEGIN RSA PRIVATE KEY----- MIIEowIBAAKCAQEA0 -----END RSA PRIVATE KEY-----";
+        assert!(sentence_contains_secret(s4), "Shape 4: private key header must be detected");
+
+        // Shape 5: Long hex / base64 string
+        let s5 = "Access hash is 4f8a3b1c9d2e7f60a5b4c3d2e1f0a9b8c7d6e5f4.";
+        assert!(sentence_contains_secret(s5), "Shape 5: long hex string must be detected");
     }
 
     #[test]
-    fn test_secret_redaction_aws() {
-        let text = "AWS_KEY=AKIAIOSFODNN7EXAMPLE";
-        let redacted = redact_secrets(text);
-        assert_eq!(redacted, "AWS_KEY=[REDACTED SECRET]");
+    fn test_drop_whole_sentence_containing_secret() {
+        let input = "BuildBuddy parses code offline. Secret key is sk_test_MOCK_API_KEY_FOR_TESTS. Generates markdown reports.";
+        let cleaned = drop_secret_sentences(input);
+        assert!(!cleaned.contains("sk_live_"));
+        assert!(!cleaned.contains("Secret key is"));
+        assert_eq!(cleaned, "BuildBuddy parses code offline. Generates markdown reports.");
     }
 }
