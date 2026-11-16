@@ -1,6 +1,9 @@
 pub mod model;
 pub mod builders;
 pub mod progressive;
+pub mod export;
+
+pub use export::{save_export_file, validate_export_path};
 
 pub use model::{
     node_size_for_kind, AggregatedEdge, CollapsedOverview, DiagramConfidence, DiagramEdge,

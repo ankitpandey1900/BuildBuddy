@@ -4,12 +4,18 @@ import { ExplorerView } from "@/components/explorer/ExplorerView";
 import { DependenciesView } from "@/components/dependencies/DependenciesView";
 import { CodeIntelligenceView } from "@/components/intelligence/CodeIntelligenceView";
 import { OverviewView } from "@/components/overview/OverviewView";
-import { ArchitectureView } from "@/components/architecture/ArchitectureView";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
 import type { SelectedDiagramElement } from "@/types/diagram";
 import { Network, Database, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
+
+// Lazy-load Architecture screen with dynamic import() to keep main bundle lean
+const ArchitectureView = React.lazy(() =>
+  import("@/components/architecture/ArchitectureView").then((m) => ({
+    default: m.ArchitectureView,
+  }))
+);
 
 export const App: React.FC = () => {
   const project = useProjectState();
@@ -61,16 +67,24 @@ export const App: React.FC = () => {
         );
       case "architecture":
         return (
-          <ArchitectureView
-            projectId={project.currentProject?.id}
-            projectRootPath={project.currentProject?.root_path}
-            theme={ui.theme}
-            onSelectDiagramElement={handleSelectDiagramElement}
-            onNavigateToSource={(filePath, line) => {
-              project.openFileAtLine(filePath, line);
-              ui.setActiveView("explorer");
-            }}
-          />
+          <React.Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center font-mono text-xs text-text-muted">
+                Loading Architecture Screen...
+              </div>
+            }
+          >
+            <ArchitectureView
+              projectId={project.currentProject?.id}
+              projectRootPath={project.currentProject?.root_path}
+              theme={ui.theme}
+              onSelectDiagramElement={handleSelectDiagramElement}
+              onNavigateToSource={(filePath, line) => {
+                project.openFileAtLine(filePath, line);
+                ui.setActiveView("explorer");
+              }}
+            />
+          </React.Suspense>
         );
       case "dependencies":
         return (

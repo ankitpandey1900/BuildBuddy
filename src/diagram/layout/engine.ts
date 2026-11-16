@@ -37,7 +37,26 @@ export async function layout(
     groupPadding = 40;
   }
 
-  // 1. Build ELK node structure
+  // 1. Validate endpoints and detect dense graph for adaptive layout optimizations
+  const validNodeIds = new Set<string>();
+  for (const node of model.nodes) {
+    validNodeIds.add(node.id);
+  }
+  for (const group of model.groups) {
+    validNodeIds.add(group.id);
+  }
+
+  const validEdges = model.edges.filter(
+    (edge) => validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
+  );
+
+  // Fallback / optimization: For large/dense graphs (>300 edges or >100 nodes),
+  // crossing minimization dominates runtime (O(E * N) to O(E^2)).
+  // Disabling crossing minimization (NONE) keeps layered hierarchy & orthogonal routing
+  // while bringing layout time under 1.5s.
+  const isDenseGraph = validEdges.length > 300 || model.nodes.length > 100;
+  const crossingStrategy = isDenseGraph ? "NONE" : "LAYER_SWEEP";
+
   // Build lookup of groups
   const groupChildrenMap = new Map<string, any[]>();
   for (const group of model.groups) {
@@ -82,33 +101,20 @@ export async function layout(
         "elk.direction": direction,
         "elk.spacing.nodeNode": String(nodeSpacing),
         "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
+        "elk.layered.thoroughness": "1",
+        "elk.layered.cycleBreaking.strategy": "GREEDY",
+        "elk.layered.crossingMinimization.strategy": crossingStrategy,
       },
     });
     existingIds.add(group.id);
   }
 
-  // 2. Build ELK edges (filter to edges whose endpoints exist in nodes or groups)
-  const validNodeIds = new Set<string>();
-  for (const node of model.nodes) {
-    validNodeIds.add(node.id);
-  }
-  for (const group of model.groups) {
-    validNodeIds.add(group.id);
-  }
-
-  const validEdges = model.edges.filter(
-    (edge) => validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
-  );
-
+  // 2. Build ELK edges
   const elkEdges = validEdges.map((edge) => ({
     id: edge.id,
     sources: [edge.from],
     targets: [edge.to],
     labels: edge.label ? [{ text: edge.label, width: 80, height: 16 }] : [],
-    layoutOptions: {
-      "elk.edgeRouting": "ORTHOGONAL",
-      "elk.edge.thickness": "2",
-    },
   }));
 
   // 3. Assemble root ELK graph
@@ -123,6 +129,9 @@ export async function layout(
       "elk.spacing.edgeEdge": "16",
       "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
       "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+      "elk.layered.thoroughness": "1",
+      "elk.layered.cycleBreaking.strategy": "GREEDY",
+      "elk.layered.crossingMinimization.strategy": crossingStrategy,
       "org.eclipse.elk.randomSeed": "1",
     },
     children: rootChildren,

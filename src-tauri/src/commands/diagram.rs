@@ -2,12 +2,14 @@ use buildbuddy_core::diagram::builders::{
     build_architecture_overview_diagram, build_class_diagram, build_file_dependency_diagram,
     build_module_dependency_diagram,
 };
+use buildbuddy_core::diagram::export::save_export_file;
 use buildbuddy_core::diagram::model::{
     CollapsedOverview, DiagramModel, DiagramType, DrillDownResult, DroppedEdge,
 };
 use buildbuddy_core::diagram::progressive::{apply_progressive_disclosure, drill_down as core_drill_down};
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tauri::State;
 
 use crate::AppState;
@@ -117,6 +119,31 @@ pub async fn drill_down(
 ) -> Result<DrillDownResult, String> {
     let conn = state.conn().map_err(|e| e.to_string())?;
     drill_down_impl(&conn, &group_id, project_id, diagram_type.as_deref())
+}
+
+#[tauri::command]
+pub async fn export_diagram_file(
+    target_path: String,
+    project_id: i64,
+    content: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    let root_path: String = conn
+        .query_row(
+            "SELECT root_path FROM projects WHERE id = ?1",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Project not found: {}", e))?;
+
+    let saved = save_export_file(
+        Path::new(&target_path),
+        Path::new(&root_path),
+        content.as_bytes(),
+    )?;
+
+    Ok(saved.to_string_lossy().to_string())
 }
 
 #[cfg(test)]

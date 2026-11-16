@@ -247,13 +247,11 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
-                  setExportOpen(false);
-                  onExport("pdf");
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-hover text-text-primary"
+                disabled
+                className="w-full text-left px-3 py-1.5 text-text-muted opacity-50 cursor-not-allowed"
+                title="Vector PDF generation is stubbed (requires external PDF generator library)"
               >
-                PDF (Vector Document)
+                PDF (Vector - Stubbed)
               </button>
               <button
                 type="button"

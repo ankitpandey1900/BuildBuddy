@@ -4,58 +4,6 @@ import { ArchitectureView } from "../ArchitectureView";
 import type { PositionedModel } from "../../../types/diagram";
 import * as tauriLib from "../../../lib/tauri";
 
-// Mock DOM Matrix, ResizeObserver, offsetWidth, offsetHeight for React Flow in jsdom
-if (typeof (globalThis as any).DOMMatrixReadOnly === "undefined") {
-  (globalThis as any).DOMMatrixReadOnly = class DOMMatrixReadOnly {
-    m22 = 1;
-    constructor(_transform?: string) {}
-  };
-}
-
-Object.defineProperties(window.HTMLElement.prototype, {
-  offsetWidth: {
-    get() {
-      return parseFloat(this.style.width) || 120;
-    },
-  },
-  offsetHeight: {
-    get() {
-      return parseFloat(this.style.height) || 40;
-    },
-  },
-});
-
-window.Element.prototype.getBoundingClientRect = function () {
-  const width = parseFloat((this as HTMLElement).style?.width) || 120;
-  const height = parseFloat((this as HTMLElement).style?.height) || 40;
-  return {
-    x: 0,
-    y: 0,
-    width,
-    height,
-    top: 0,
-    left: 0,
-    right: width,
-    bottom: height,
-    toJSON() {
-      return this;
-    },
-  };
-};
-
-class MockResizeObserver {
-  callback: ResizeObserverCallback;
-  constructor(cb: ResizeObserverCallback) {
-    this.callback = cb;
-  }
-  observe(target: Element) {
-    this.callback([{ target } as any], this as any);
-  }
-  unobserve() {}
-  disconnect() {}
-}
-globalThis.ResizeObserver = MockResizeObserver as any;
-
 describe("ArchitectureView React Flow Integration", () => {
   const goldenPositionedModel: PositionedModel = {
     diagram_type: "architecture_overview",

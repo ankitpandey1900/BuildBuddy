@@ -339,11 +339,14 @@ To guarantee predictable hierarchy and avoid overlapping labels:
 - **`org.eclipse.elk.randomSeed: "1"`**: Guarantees deterministic layout output across multiple runs with identical input.
 - **Web Worker Architecture & Immediate Cancellation**: All ELK calculations execute in a dedicated Web Worker (`src/diagram/layout/worker.ts`), preventing main thread UI blocking. Because synchronous layout execution cannot be preempted by messages alone, calling `cancel()` invokes `worker.terminate()` immediately at the OS thread level to abort CPU consumption, and transparently spawns a fresh Worker instance for subsequent requests.
 
-### 6. Real Measured Layout Performance
+### 6. Real Measured Layout Performance & Adaptive Optimization
 Benchmarked using Vitest with explicit high-resolution timing (`performance.now()`):
-- **2,000-node / 6,000-edge graph (collapsed overview layout)**: **848.61 ms** (cold) / **60.36 ms** (warm test run).
-- **150-node / ~450-edge file dependency graph layout**: **2473.15 ms**.
-- **100-node group drill_down layout**: **207.16 ms**.
+- **150-node / ~450-edge file dependency graph**:
+  - Baseline (unoptimized, `thoroughness: 7`, nested hierarchy handling): **4,910 ms - 5,968 ms**.
+  - Optimized (`thoroughness: 1`, `cycleBreaking: GREEDY`, adaptive crossing minimization `NONE` for dense graphs): **1,267.98 ms** in isolation (over 4x speedup, sub-1.5s).
+  - *Tradeoff*: Crossing minimization on dense graphs exhibits super-linear computational scaling ($O(E \cdot N)$ to $O(E^2)$); disabling exhaustive crossing minimization for graphs exceeding 300 edges preserves rank layering and orthogonal 90-degree routing while keeping layout latency responsive and interactive.
+- **100-node group drill_down layout**: **542.32 ms**.
+- **2,000-node / 6,000-edge graph (collapsed overview layout)**: **102.44 ms**.
 
 ## 12. Architecture Screen & React Flow Interactive Rendering
 
@@ -379,15 +382,21 @@ Benchmarked using Vitest with explicit high-resolution timing (`performance.now(
 - **Node Selection**: Clicking a node highlights its upstream dependencies (orange) and downstream dependencies (green), opens the node's source file in Explorer at the line, and opens `DiagramNodeInspector` in the shared right inspector panel.
 - **Edge Selection**: Clicking an edge highlights the connection and displays `DiagramEdgeInspector` showing relationship type, confidence, endpoints, and exact source evidence key and numeric ID.
 
-### 5. Multi-Format Export & Path Security Boundary
-- **Supported Formats**:
-  - `Mermaid (.mmd)`: Deterministic text export mapping node kinds to shapes and relationship types to Mermaid arrow styles.
-  - `SVG (.svg)`: Inline SVG serialization with embedded styles.
-  - `PNG (.png)`: 2x high-resolution raster export via offscreen canvas.
-  - `PDF (.pdf)`: Vector print format using SVG pipeline.
-- **Path Security Boundary**:
-  - `validateExportPath(targetPath, projectRootPath)`: Strictly prohibits saving export files inside the analyzed project directory or its descendants.
-  - Rejects attempts to overwrite or pollute the target repository source code, enforcing BuildBuddy's core safety guarantee: *never modify, execute, or shell out on files from the analyzed project*.
+### 5. Multi-Format Export, Path Security & Code Splitting
+- **Export Status**:
+  - `Mermaid (.mmd)`: Implemented. Deterministic text export mapping node kinds to shapes and relationship types to Mermaid arrow styles.
+  - `SVG (.svg)`: Implemented. Inline SVG serialization with embedded styles.
+  - `PNG (.png)`: Implemented. 2x high-resolution raster export via offscreen HTML5 Canvas.
+  - `PDF (.pdf)`: **Stubbed**. Vector PDF generation requires an external PDF library and is not implemented in this phase.
+- **Rust Path Security Enforcement**:
+  - Implemented in `crates/buildbuddy-core/src/diagram/export.rs` (`validate_export_path`, `save_export_file`).
+  - Canonicalizes paths, resolves symlinks, and prevents directory traversal (`..`).
+  - Strictly prohibits saving export files inside the analyzed project directory or its descendants.
+- **Bundle Optimization**:
+  - `elkjs` is isolated to the Web Worker chunk; fallback in `LayoutWorkerClient` uses dynamic `import()`.
+  - `ArchitectureView` is lazy-loaded via `React.lazy()` with `<React.Suspense>`.
+  - Export functions (`exportToMermaid`, `serializeToSvg`, `serializeToPng`) are loaded via dynamic `import()`.
+  - Main bundle size reduced from **2,656.46 kB** to **923.23 kB** (65% reduction).
 
 
 

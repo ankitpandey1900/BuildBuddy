@@ -31,8 +31,6 @@ import type {
 import type { LayoutDirection } from "../../diagram/layout/types";
 import type { ExportFormat } from "../../types/export";
 import { LayoutWorkerClient } from "../../diagram/layout";
-import { exportToMermaid } from "../../diagram/export/mermaid";
-import { serializeToSvg, serializeToPng, downloadFile } from "../../diagram/export/image";
 import { getDiagram, drillDown } from "../../lib/tauri";
 
 import { DiagramNodeComponent, type DiagramNodeData } from "./nodes/DiagramNodeComponent";
@@ -333,12 +331,6 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         id: group.id,
         type: "groupNode",
         position: { x: group.x, y: group.y },
-        width: group.width,
-        height: group.height,
-        measured: {
-          width: group.width,
-          height: group.height,
-        },
         data: {
           ...group,
           width: group.width,
@@ -372,12 +364,6 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         id: node.id,
         type: "diagramNode",
         position: { x: node.x, y: node.y },
-        width: node.width,
-        height: node.height,
-        measured: {
-          width: node.width,
-          height: node.height,
-        },
         selected: selectedNodeId === node.id,
         data: {
           ...node,
@@ -387,8 +373,6 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
           onOpenSource: onNavigateToSource,
         } as DiagramNodeData,
         style: {
-          width: node.width,
-          height: node.height,
           zIndex: 1,
         },
       });
@@ -510,13 +494,15 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     [positionedModel, onSelectDiagramElement]
   );
 
-  // Export handler
+  // Export handler with dynamic import() for export libraries
   const handleExport = useCallback(
     async (format: ExportFormat) => {
       const filenameBase = `${diagramType}_${new Date().toISOString().slice(0, 10)}`;
 
       if (format === "mermaid") {
         if (!activeModel) return;
+        const { exportToMermaid } = await import("../../diagram/export/mermaid");
+        const { downloadFile } = await import("../../diagram/export/image");
         const mermaidText = exportToMermaid(activeModel, {
           direction: direction === "DOWN" ? "TD" : "LR",
         });
@@ -529,12 +515,14 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
 
       try {
         if (format === "svg") {
+          const { serializeToSvg, downloadFile } = await import("../../diagram/export/image");
           const svgContent = serializeToSvg(canvasContainer, {
             theme,
             projectRootPath,
           });
           downloadFile(svgContent, `${filenameBase}.svg`, "image/svg+xml");
         } else if (format === "png") {
+          const { serializeToPng, downloadFile } = await import("../../diagram/export/image");
           const pngUrl = await serializeToPng(canvasContainer, {
             scale: 2, // 2x high resolution
             theme,
@@ -542,11 +530,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
           });
           downloadFile(pngUrl, `${filenameBase}.png`, "image/png");
         } else if (format === "pdf") {
-          const svgContent = serializeToSvg(canvasContainer, {
-            theme,
-            projectRootPath,
-          });
-          downloadFile(svgContent, `${filenameBase}.pdf`, "application/pdf");
+          throw new Error("PDF export is stubbed: vector PDF generation library is not yet integrated. Please export as SVG or PNG.");
         }
       } catch (err) {
         console.error("Export error", err);

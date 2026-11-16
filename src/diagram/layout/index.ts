@@ -1,8 +1,6 @@
 import type { DiagramModel, PositionedModel } from "../../types/diagram";
-import { layout } from "./engine";
 import type { LayoutOptions, LayoutWorkerRequest, LayoutWorkerResponse } from "./types";
 
-export { layout } from "./engine";
 export * from "./types";
 
 export type WorkerFactory = () => Worker;
@@ -79,9 +77,10 @@ export class LayoutWorkerClient {
     const id = `layout_req_${++this.requestCounter}`;
 
     if (!this.worker) {
-      // Direct synchronous execution fallback
+      // Dynamic fallback when Web Worker is unavailable (e.g. some node environments)
       let cancelled = false;
       const promise = (async () => {
+        const { layout } = await import("./engine");
         const res = await layout(model, options);
         if (cancelled) {
           throw new Error("Layout calculation was cancelled");

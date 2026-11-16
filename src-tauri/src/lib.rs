@@ -72,6 +72,7 @@ pub fn run() {
             commands::arch::analyze_architecture,
             commands::diagram::get_diagram,
             commands::diagram::drill_down,
+            commands::diagram::export_diagram_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");

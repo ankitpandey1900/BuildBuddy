@@ -1,75 +1,146 @@
-/**
- * Architecture Screen E2E Test Suite (Playwright)
- *
- * NOTE ON EXECUTION STATUS IN THIS ENVIRONMENT:
- * Playwright (@playwright/test) is not installed in package.json devDependencies
- * and headless browser drivers (Chromium/WebKit/Firefox) are not provisioned in
- * this offline sandbox environment. As mandated by PRD / task instructions,
- * this file is checked in as the reference E2E specification for CI/CD environments
- * with Playwright installed. It is documented honestly as untested in this runtime.
- */
+import { test, expect } from "@playwright/test";
 
-import { describe, it, expect } from "vitest";
+test.describe("Architecture Screen E2E", () => {
+  test.beforeEach(async ({ page }) => {
+    // Mock Tauri IPC invoke layer before page loads
+    await page.addInitScript(() => {
+      (window as any).__TAURI_INTERNALS__ = {
+        invoke: async (cmd: string, args: any) => {
+          if (cmd === "get_projects") {
+            return [
+              {
+                id: 1,
+                name: "arch-react-express",
+                root_path: "/fixtures/arch-react-express",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                settings_json: "{}",
+              },
+            ];
+          }
+          if (cmd === "get_active_project" || cmd === "select_and_open_project" || cmd === "open_project_by_path") {
+            return {
+              id: 1,
+              name: "arch-react-express",
+              root_path: "/fixtures/arch-react-express",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              settings_json: "{}",
+            };
+          }
+          if (cmd === "get_overview_data") {
+            return {
+              counts: { total_files: 10, total_modules: 2, total_symbols: 15, unclassified_files: 0 },
+              languages: [{ language: "TypeScript", file_count: 8, percentage: 80.0 }],
+              frameworks: [],
+              entry_points: [],
+              modules: [],
+              completion: { status: "complete", analyzed_files: 10, total_files: 10, error_count: 0 },
+            };
+          }
+          if (cmd === "get_diagram") {
+            return {
+              model: {
+                diagram_type: args?.diagramType || "architecture_overview",
+                nodes: [
+                  {
+                    id: "file:src/index.ts",
+                    kind: "file",
+                    label: "index.ts",
+                    x: 100,
+                    y: 100,
+                    width: 180,
+                    height: 40,
+                    source_ref: { file_path: "src/index.ts", start_line: 1, end_line: 25 },
+                  },
+                  {
+                    id: "file:src/App.tsx",
+                    kind: "component",
+                    label: "App.tsx",
+                    x: 350,
+                    y: 100,
+                    width: 200,
+                    height: 50,
+                    source_ref: { file_path: "src/App.tsx", start_line: 5, end_line: 50 },
+                  },
+                ],
+                edges: [
+                  {
+                    id: "edge:1",
+                    from: "file:src/index.ts",
+                    to: "file:src/App.tsx",
+                    relationship: "import",
+                    confidence: "static",
+                    evidence_id: 101,
+                    evidence_key: "src/index.ts:1-1:import_stmt",
+                    label: "imports",
+                  },
+                ],
+                groups: [],
+              },
+              dropped_edges: [],
+              collapsed_overview: null,
+            };
+          }
+          return null;
+        },
+        plugins: {},
+      };
+    });
+  });
 
-export const architectureE2ETests = {
-  name: "Architecture Screen E2E Tests",
-  scenarios: [
-    {
-      name: "Navigate to Architecture view and render overview diagram",
-      steps: [
-        "1. Open BuildBuddy with fixture repo 'fixtures/arch-react-express'",
-        "2. Click 'Architecture' in the left navigation sidebar",
-        "3. Assert canvas with data-testid='architecture-screen' is visible",
-        "4. Assert diagram type selector is set to 'Architecture Overview'",
-        "5. Verify React Flow canvas contains nodes for modules and components",
-      ],
-    },
-    {
-      name: "Interactive node selection and source navigation",
-      steps: [
-        "1. Click on node 'file:src/index.ts'",
-        "2. Assert node receives accent border and active selection styling",
-        "3. Assert right InspectorPanel shows DiagramNodeInspector with 'index.ts' details",
-        "4. Verify 'Open in Explorer' button or double-click switches active view to Explorer at line 1",
-      ],
-    },
-    {
-      name: "Edge relationship inspection and provenance display",
-      steps: [
-        "1. Click on edge between index.ts and Button.tsx",
-        "2. Assert InspectorPanel renders DiagramEdgeInspector",
-        "3. Assert relationship badge displays 'import', confidence displays 'static'",
-        "4. Assert provenance evidence key is visible ('src/index.ts:1-1:import_stmt')",
-      ],
-    },
-    {
-      name: "Filtering and module isolation",
-      steps: [
-        "1. Click Filter toggle in the toolbar to open DiagramFilterPanel",
-        "2. Uncheck 'call' relationship checkbox",
-        "3. Assert all call edges are removed from the canvas",
-        "4. Select 'UI Components' from Module Isolation dropdown",
-        "5. Assert nodes outside UI Components are hidden from view",
-      ],
-    },
-    {
-      name: "Mermaid and image export security",
-      steps: [
-        "1. Click 'Export' dropdown in the toolbar",
-        "2. Select 'Mermaid (.mmd)'",
-        "3. Assert file download begins with valid filename",
-        "4. Attempt export with invalid path pointing inside analyzed project directory",
-        "5. Assert validateExportPath rejects the path and does not write to project folder",
-      ],
-    },
-  ],
-};
+  test("loads architecture view and displays toolbar and canvas", async ({ page }) => {
+    await page.goto("/");
+    // Click on Architecture in navigation
+    const archTab = page.locator("button, a").filter({ hasText: /^Architecture$/ });
+    if (await archTab.count() > 0) {
+      await archTab.first().click();
+    }
 
-describe("Architecture E2E Specification (Playwright)", () => {
-  it("documents Playwright test scenarios and environment status", () => {
-    // Playwright runtime is not installed in package.json devDependencies
-    // and browser binaries are not available in this headless sandbox.
-    expect(architectureE2ETests.scenarios.length).toBe(5);
+    // Verify architecture screen container is present
+    await expect(page.locator('[data-testid="architecture-screen"]')).toBeVisible();
+
+    // Verify diagram selector dropdown is present
+    const typeSelect = page.locator('select[aria-label="Diagram Type"]');
+    await expect(typeSelect).toBeVisible();
+
+    // Verify toolbar filter button
+    const filterBtn = page.locator('button[aria-label="Toggle diagram filters"]');
+    await expect(filterBtn).toBeVisible();
+    await filterBtn.click();
+
+    // Verify filter panel is visible
+    await expect(page.getByText("Relationship Types")).toBeVisible();
+    await expect(page.getByText("Confidence Levels")).toBeVisible();
+
+    // Toggle filter panel close
+    const closeFilterBtn = page.locator('button[aria-label="Close filter panel"]');
+    await closeFilterBtn.click();
+    await expect(page.getByText("Relationship Types")).not.toBeVisible();
+
+    // Verify Legend button
+    const legendBtn = page.locator('button[aria-label="Toggle diagram legend"]');
+    if (await legendBtn.count() > 0) {
+      await legendBtn.click();
+      await expect(page.getByText("RELATIONSHIPS")).toBeVisible();
+      await expect(page.getByText("CONFIDENCE")).toBeVisible();
+    }
+  });
+
+  test("allows switching diagram types", async ({ page }) => {
+    await page.goto("/");
+    const archTab = page.locator("button, a").filter({ hasText: /^Architecture$/ });
+    if (await archTab.count() > 0) {
+      await archTab.first().click();
+    }
+
+    const typeSelect = page.locator('select[aria-label="Diagram Type"]');
+    await expect(typeSelect).toBeVisible();
+
+    await typeSelect.selectOption("module_dependency");
+    await expect(typeSelect).toHaveValue("module_dependency");
+
+    await typeSelect.selectOption("class_diagram");
+    await expect(typeSelect).toHaveValue("class_diagram");
   });
 });
-
