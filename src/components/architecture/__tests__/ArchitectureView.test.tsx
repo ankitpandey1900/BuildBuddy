@@ -539,4 +539,58 @@ describe("ArchitectureView React Flow Integration", () => {
     expect(screen.getByText("Data")).toBeInTheDocument();
     expect(screen.getByText("Shared")).toBeInTheDocument();
   });
+
+  it("direction toggle: switches between TB and LR and updates direction state", async () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    // Initially in Top to Bottom (TB) mode
+    const directionBtn = screen.getByLabelText("Layout direction: Top to Bottom");
+    expect(directionBtn).toBeInTheDocument();
+    expect(directionBtn).toHaveTextContent("TB");
+
+    // Click to toggle to Left to Right (LR)
+    fireEvent.click(directionBtn);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Layout direction: Left to Right")).toBeInTheDocument();
+      expect(screen.getByText("LR")).toBeInTheDocument();
+    });
+
+    // Click again to toggle back to TB
+    fireEvent.click(screen.getByLabelText("Layout direction: Left to Right"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Layout direction: Top to Bottom")).toBeInTheDocument();
+      expect(screen.getByText("TB")).toBeInTheDocument();
+    });
+  });
+
+  it("zoom controls: renders zoom in, zoom out, percentage, and fit controls in toolbar and on canvas", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    // Toolbar zoom controls
+    const toolbarZoom = screen.getByTestId("toolbar-zoom-controls");
+    expect(toolbarZoom).toBeInTheDocument();
+
+    const zoomInBtns = screen.getAllByLabelText("Zoom in");
+    const zoomOutBtns = screen.getAllByLabelText("Zoom out");
+    const fitBtns = screen.getAllByLabelText("Fit graph to view");
+    const resetZoomBtns = screen.getAllByLabelText("Reset zoom to 100%");
+
+    // Rendered both in toolbar and in canvas panel
+    expect(zoomInBtns.length).toBeGreaterThanOrEqual(2);
+    expect(zoomOutBtns.length).toBeGreaterThanOrEqual(2);
+    expect(fitBtns.length).toBeGreaterThanOrEqual(2);
+    expect(resetZoomBtns.length).toBeGreaterThanOrEqual(2);
+
+    // Canvas zoom pill
+    const canvasPill = screen.getByTestId("diagram-zoom-controls-pill");
+    expect(canvasPill).toBeInTheDocument();
+
+    // Clicking zoom in and fit buttons
+    fireEvent.click(zoomInBtns[0]);
+    fireEvent.click(zoomOutBtns[0]);
+    fireEvent.click(fitBtns[0]);
+    fireEvent.click(resetZoomBtns[0]);
+  });
 });

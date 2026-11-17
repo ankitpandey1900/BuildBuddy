@@ -144,11 +144,13 @@ export const DiagramNodeComponent: React.FC<NodeProps> = ({ data, selected }) =>
       {/* Handles for orthogonal connections on all 4 faces */}
       <Handle
         type="target"
+        id="top"
         position={Position.Top}
         className="w-1.5 h-1.5 !bg-border-strong opacity-0 group-hover:opacity-100"
       />
       <Handle
         type="source"
+        id="bottom"
         position={Position.Bottom}
         className="w-1.5 h-1.5 !bg-border-strong opacity-0 group-hover:opacity-100"
       />

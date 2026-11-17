@@ -234,7 +234,19 @@ export async function layout(
     }
   }
 
-  collectEdgeSections(elkResult.edges);
+  function collectAllEdges(elkContainer: any) {
+    if (!elkContainer) return;
+    if (elkContainer.edges) {
+      collectEdgeSections(elkContainer.edges);
+    }
+    if (elkContainer.children) {
+      for (const child of elkContainer.children) {
+        collectAllEdges(child);
+      }
+    }
+  }
+
+  collectAllEdges(elkResult);
 
   // Position lookup for fallback routing
   const nodePosMap = new Map<string, { x: number; y: number; w: number; h: number }>();
@@ -248,21 +260,35 @@ export async function layout(
   const positionedEdges: PositionedEdge[] = model.edges.map((edge) => {
     let points = edgePointsMap.get(edge.id) ?? [];
     if (points.length === 0) {
-      // Fallback orthogonal route from source center to target center
+      // Fallback orthogonal route respecting layout direction
       const src = nodePosMap.get(edge.from);
       const tgt = nodePosMap.get(edge.to);
       if (src && tgt) {
-        const startX = src.x + src.w / 2;
-        const startY = src.y + src.h;
-        const endX = tgt.x + tgt.w / 2;
-        const endY = tgt.y;
-        const midY = (startY + endY) / 2;
-        points = [
-          { x: startX, y: startY },
-          { x: startX, y: midY },
-          { x: endX, y: midY },
-          { x: endX, y: endY },
-        ];
+        if (direction === "RIGHT") {
+          const startX = src.x + src.w;
+          const startY = src.y + src.h / 2;
+          const endX = tgt.x;
+          const endY = tgt.y + tgt.h / 2;
+          const midX = (startX + endX) / 2;
+          points = [
+            { x: startX, y: startY },
+            { x: midX, y: startY },
+            { x: midX, y: endY },
+            { x: endX, y: endY },
+          ];
+        } else {
+          const startX = src.x + src.w / 2;
+          const startY = src.y + src.h;
+          const endX = tgt.x + tgt.w / 2;
+          const endY = tgt.y;
+          const midY = (startY + endY) / 2;
+          points = [
+            { x: startX, y: startY },
+            { x: startX, y: midY },
+            { x: endX, y: midY },
+            { x: endX, y: endY },
+          ];
+        }
       }
     }
 

@@ -1,10 +1,17 @@
 import React, { useState } from "react";
-import { EdgeProps, BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from "@xyflow/react";
+import {
+  EdgeProps,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
+  Position,
+} from "@xyflow/react";
 import type { DiagramEdge, Point } from "../../../types/diagram";
 
 export interface OrthogonalEdgeData extends DiagramEdge {
   [key: string]: unknown;
   points?: Point[];
+  direction?: "DOWN" | "RIGHT";
   isHighlighted?: boolean;
   isUpstream?: boolean;
   isDownstream?: boolean;
@@ -17,6 +24,8 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
   sourceY,
   targetX,
   targetY,
+  sourcePosition,
+  targetPosition,
   data,
   selected,
 }) => {
@@ -26,6 +35,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
   const relationship = edgeData?.relationship || "import";
   const confidence = edgeData?.confidence || "static";
   const label = edgeData?.label;
+  const isHorizontal = edgeData?.direction === "RIGHT";
 
   // 1. Generate orthogonal path with rounded corners (borderRadius: 6)
   let pathD = "";
@@ -63,11 +73,16 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
     labelX = points[midIdx].x;
     labelY = points[midIdx].y;
   } else {
+    const defaultSourcePos = isHorizontal ? Position.Right : Position.Bottom;
+    const defaultTargetPos = isHorizontal ? Position.Left : Position.Top;
+
     const [smoothPath, sx, sy] = getSmoothStepPath({
       sourceX,
       sourceY,
+      sourcePosition: sourcePosition || defaultSourcePos,
       targetX,
       targetY,
+      targetPosition: targetPosition || defaultTargetPos,
       borderRadius: 6,
     });
     pathD = smoothPath;

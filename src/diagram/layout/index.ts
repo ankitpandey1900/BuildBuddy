@@ -44,6 +44,13 @@ export class LayoutWorkerClient {
     try {
       this.worker = this.workerFactory();
       this.worker.onmessage = this.handleMessage.bind(this);
+      this.worker.onerror = (err) => {
+        console.error("Layout worker encountered an error:", err);
+        for (const [, pending] of this.pendingRequests.entries()) {
+          pending.reject(new Error(err?.message || "Layout worker thread failed"));
+        }
+        this.pendingRequests.clear();
+      };
     } catch {
       this.worker = null;
     }

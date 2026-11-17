@@ -6,6 +6,7 @@ export interface DiagramControlsProps {
   onZoomOut: () => void;
   onFitView: () => void;
   onResetZoom?: () => void;
+  zoomPercent?: number;
   showFitAllPrompt?: boolean;
 }
 
@@ -14,11 +15,12 @@ export const DiagramControls: React.FC<DiagramControlsProps> = ({
   onZoomOut,
   onFitView,
   onResetZoom,
+  zoomPercent,
   showFitAllPrompt = false,
 }) => {
   return (
     <div
-      className="absolute bottom-4 left-4 z-20 flex flex-col items-center bg-surface border border-border-default rounded-md shadow-md p-0.5 select-none font-mono"
+      className="flex flex-col items-center bg-surface border border-border-default rounded-md shadow-md p-0.5 select-none font-mono"
       data-testid="diagram-zoom-controls-pill"
       role="toolbar"
       aria-label="Zoom and Viewport Controls"
@@ -29,10 +31,26 @@ export const DiagramControls: React.FC<DiagramControlsProps> = ({
         aria-label="Zoom in"
         onClick={onZoomIn}
         className="p-1.5 rounded hover:bg-hover text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-        title="Zoom In (+)"
+        title="Zoom In (Ctrl +)"
       >
         <Plus className="w-4 h-4" />
       </button>
+
+      {zoomPercent !== undefined && (
+        <>
+          <div className="w-3.5 h-[1px] bg-border-subtle my-0.5" />
+          <button
+            type="button"
+            tabIndex={0}
+            aria-label="Reset zoom to 100%"
+            onClick={onResetZoom}
+            className="px-1 py-0.5 rounded hover:bg-hover text-text-secondary hover:text-text-primary text-[10px] font-mono tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            title="Current Zoom (Click to reset to 100%)"
+          >
+            {zoomPercent}%
+          </button>
+        </>
+      )}
 
       <div className="w-3.5 h-[1px] bg-border-subtle my-0.5" />
 
@@ -42,7 +60,7 @@ export const DiagramControls: React.FC<DiagramControlsProps> = ({
         aria-label="Zoom out"
         onClick={onZoomOut}
         className="p-1.5 rounded hover:bg-hover text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-        title="Zoom Out (-)"
+        title="Zoom Out (Ctrl -)"
       >
         <Minus className="w-4 h-4" />
       </button>
@@ -59,12 +77,12 @@ export const DiagramControls: React.FC<DiagramControlsProps> = ({
             ? "bg-accent-subtle text-accent-text font-bold"
             : "hover:bg-hover text-text-primary"
         }`}
-        title="Fit All"
+        title="Fit All Graph Elements"
       >
         <Maximize2 className="w-4 h-4" />
       </button>
 
-      {onResetZoom && (
+      {onResetZoom && zoomPercent === undefined && (
         <>
           <div className="w-3.5 h-[1px] bg-border-subtle my-0.5" />
           <button

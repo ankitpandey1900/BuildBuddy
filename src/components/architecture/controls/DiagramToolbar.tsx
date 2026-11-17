@@ -12,6 +12,9 @@ import {
   FileCode,
   Compass,
   Box,
+  Plus,
+  Minus,
+  Maximize2,
 } from "lucide-react";
 import type { DiagramType } from "../../../types/diagram";
 import type { LayoutDirection } from "../../../diagram/layout/types";
@@ -31,6 +34,8 @@ export interface DiagramToolbarProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onFitView?: () => void;
+  onResetZoom?: () => void;
+  zoomPercent?: number;
   onExport: (format: ExportFormat) => void;
   isLayoutRunning: boolean;
   onCancelLayout?: () => void;
@@ -56,6 +61,11 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
   searchMatchCount,
   filterActiveCount,
   onToggleFilterPanel,
+  onZoomIn,
+  onZoomOut,
+  onFitView,
+  onResetZoom,
+  zoomPercent,
   onExport,
   isLayoutRunning,
   onCancelLayout,
@@ -192,6 +202,67 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
             </span>
           )}
         </button>
+
+        {/* Zoom Controls in Toolbar */}
+        {(onZoomIn || onZoomOut || onFitView) && (
+          <div
+            className="flex items-center space-x-0.5 bg-subtle border border-border-default rounded p-0.5"
+            role="toolbar"
+            aria-label="Diagram Zoom Controls"
+            data-testid="toolbar-zoom-controls"
+          >
+            {onZoomOut && (
+              <button
+                type="button"
+                aria-label="Zoom out"
+                onClick={onZoomOut}
+                className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
+                title="Zoom Out (Ctrl -)"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {zoomPercent !== undefined && onResetZoom && (
+              <button
+                type="button"
+                aria-label="Reset zoom to 100%"
+                onClick={onResetZoom}
+                className="px-1.5 py-0.5 rounded text-[11px] font-mono hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus min-w-[42px] text-center transition-colors"
+                title="Zoom Level (Click to reset to 100%)"
+              >
+                {zoomPercent}%
+              </button>
+            )}
+
+            {onZoomIn && (
+              <button
+                type="button"
+                aria-label="Zoom in"
+                onClick={onZoomIn}
+                className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
+                title="Zoom In (Ctrl +)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {onFitView && (
+              <>
+                <div className="w-[1px] h-3 bg-border-subtle mx-0.5" />
+                <button
+                  type="button"
+                  aria-label="Fit graph to view"
+                  onClick={onFitView}
+                  className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
+                  title="Fit to View"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Legend Toggle in Toolbar */}
         {onToggleLegend && (

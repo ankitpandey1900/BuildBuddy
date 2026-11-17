@@ -4,7 +4,9 @@ import {
   ReactFlowProvider,
   Background,
   MiniMap,
+  Panel,
   useReactFlow,
+  useViewport,
   type Node,
   type Edge,
 } from "@xyflow/react";
@@ -125,12 +127,27 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
 
   // Progressive disclosure & models
   const [rawModel, setRawModel] = useState<DiagramModel | null>(null);
-  const [activeModel, setActiveModel] = useState<DiagramModel | null>(null);
+  const [activeModel, setActiveModel] = useState<DiagramModel | null>(() => {
+    if (initialPositionedModel) {
+      return {
+        diagram_type: initialPositionedModel.diagram_type,
+        nodes: initialPositionedModel.nodes,
+        edges: initialPositionedModel.edges,
+        groups: initialPositionedModel.groups,
+      };
+    }
+    return null;
+  });
   const [positionedModel, setPositionedModel] = useState<PositionedModel | null>(
     initialPositionedModel || null
   );
+  const isInitialMount = useRef(Boolean(initialPositionedModel));
   const [isCollapsedOverview, setIsCollapsedOverview] = useState(false);
   const [totalRawNodeCount, setTotalRawNodeCount] = useState<number>(0);
+
+  // Viewport & zoom state
+  const { zoom } = useViewport();
+  const zoomPercent = Math.round(zoom * 100);
 
   // Layout worker state
   const [isLoading, setIsLoading] = useState(false);
@@ -170,6 +187,33 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
       }
     };
   }, []);
+
+  // Keyboard zoom navigation shortcuts: Ctrl/Cmd + / - / 0
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        reactFlow.zoomIn({ duration: 250 });
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.key === "_")) {
+        e.preventDefault();
+        reactFlow.zoomOut({ duration: 250 });
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        reactFlow.zoomTo(1.0, { duration: 300 });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reactFlow]);
 
   // Filter out dot-folders, node_modules, and build outputs from models
   const sanitizeModel = useCallback((model: DiagramModel): DiagramModel => {
@@ -234,10 +278,16 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     [sanitizeModel]
   );
 
-  // Trigger fetch when projectId or diagramType changes
+  // Trigger fetch when projectId or diagramType changes, or sync initialPositionedModel
   useEffect(() => {
     if (initialPositionedModel) {
       setPositionedModel(initialPositionedModel);
+      setActiveModel({
+        diagram_type: initialPositionedModel.diagram_type,
+        nodes: initialPositionedModel.nodes,
+        edges: initialPositionedModel.edges,
+        groups: initialPositionedModel.groups,
+      });
       return;
     }
     if (projectId) {
@@ -247,7 +297,14 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
 
   // Execute Layout in Web Worker whenever activeModel or direction changes
   useEffect(() => {
-    if (!activeModel || initialPositionedModel) return;
+    if (!activeModel) return;
+
+    // Skip recalculation on initial mount if initialPositionedModel is already provided and direction is default
+    if (isInitialMount.current && direction === "DOWN") {
+      isInitialMount.current = false;
+      return;
+    }
+    isInitialMount.current = false;
 
     if (cancelActiveLayoutRef.current) {
       cancelActiveLayoutRef.current();
@@ -313,12 +370,31 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
           }, 650);
         }, 50);
       })
-      .catch((err) => {
-        if (err?.message !== "Layout calculation was cancelled") {
-          console.error("Worker layout calculation error", err);
-          setError(`Layout computation failed: ${err?.message || err}`);
+      .catch(async (err) => {
+        if (err?.message === "Layout calculation was cancelled") {
+          setIsLayoutRunning(false);
+          return;
         }
-        setIsLayoutRunning(false);
+        // Fallback to direct in-process engine calculation if worker fails
+        try {
+          const { layout } = await import("../../diagram/layout/engine");
+          const fallbackPositioned = await layout(activeModel, {
+            direction,
+            preset: "layered",
+            nodeSpacing: 48,
+            groupPadding: 36,
+          });
+          setPositionedModel(fallbackPositioned);
+          setTimeout(() => {
+            reactFlow.fitView({ padding: 0.15, minZoom: 0.6, duration: 500 });
+          }, 50);
+        } catch (fallbackErr: any) {
+          console.error("Worker & fallback layout error", fallbackErr);
+          setError(`Layout computation failed: ${fallbackErr?.message || fallbackErr}`);
+        } finally {
+          setIsLayoutRunning(false);
+          cancelActiveLayoutRef.current = null;
+        }
       });
 
     return () => {
@@ -326,7 +402,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         cancelActiveLayoutRef.current();
       }
     };
-  }, [activeModel, direction, initialPositionedModel, reactFlow]);
+  }, [activeModel, direction, reactFlow]);
 
   // Handle drill down into a collapsed group
   const handleDrillDown = useCallback(
@@ -584,10 +660,13 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         type: "orthogonal",
         source: edge.from,
         target: edge.to,
+        sourceHandle: direction === "RIGHT" ? "right" : "bottom",
+        targetHandle: direction === "RIGHT" ? "left" : "top",
         selected: selectedEdgeId === edge.id,
         data: {
           ...edge,
           points: edge.points,
+          direction,
           isHighlighted: isConnected || isEdgeHovered,
           isUpstream: selectedNodeId ? edge.to === selectedNodeId : false,
           isDownstream: selectedNodeId ? edge.from === selectedNodeId : false,
@@ -600,6 +679,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   }, [
     positionedModel,
     flowNodes,
+    direction,
     filters.relationshipTypes,
     filters.confidences,
     connectedEdgeIds,
@@ -742,6 +822,14 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         searchMatchCount={searchMatches.length}
         filterActiveCount={filterActiveCount}
         onToggleFilterPanel={() => setIsFilterPanelOpen((v) => !v)}
+        onZoomIn={() => reactFlow.zoomIn({ duration: 250 })}
+        onZoomOut={() => reactFlow.zoomOut({ duration: 250 })}
+        onFitView={() => {
+          reactFlow.fitView({ padding: 0.15, minZoom: 0.1, duration: 500 });
+          setShowFitAllPrompt(false);
+        }}
+        onResetZoom={() => reactFlow.zoomTo(1.0, { duration: 300 })}
+        zoomPercent={zoomPercent}
         onExport={handleExport}
         isLayoutRunning={isLayoutRunning}
         onCancelLayout={() => {
@@ -926,16 +1014,19 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
             <Background color="var(--border-subtle, #21262D)" gap={20} size={1} />
 
             {/* Custom compact vertical zoom controls pill bottom-left */}
-            <DiagramControls
-              onZoomIn={() => reactFlow.zoomIn()}
-              onZoomOut={() => reactFlow.zoomOut()}
-              onFitView={() => {
-                reactFlow.fitView({ padding: 0.15, minZoom: 0.1, duration: 500 });
-                setShowFitAllPrompt(false);
-              }}
-              onResetZoom={() => reactFlow.zoomTo(1.0, { duration: 400 })}
-              showFitAllPrompt={showFitAllPrompt}
-            />
+            <Panel position="bottom-left" className="!m-4 !p-0">
+              <DiagramControls
+                zoomPercent={zoomPercent}
+                onZoomIn={() => reactFlow.zoomIn({ duration: 250 })}
+                onZoomOut={() => reactFlow.zoomOut({ duration: 250 })}
+                onFitView={() => {
+                  reactFlow.fitView({ padding: 0.15, minZoom: 0.1, duration: 500 });
+                  setShowFitAllPrompt(false);
+                }}
+                onResetZoom={() => reactFlow.zoomTo(1.0, { duration: 300 })}
+                showFitAllPrompt={showFitAllPrompt}
+              />
+            </Panel>
 
             {/* Floating "Fit All" button when clamped or overflowed */}
             {showFitAllPrompt && (
