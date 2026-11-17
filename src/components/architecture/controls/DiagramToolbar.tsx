@@ -4,12 +4,14 @@ import {
   X,
   Filter,
   Download,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
   ArrowDown,
   ArrowRight,
   Loader2,
+  Info,
+  Layers,
+  FileCode,
+  Compass,
+  Box,
 } from "lucide-react";
 import type { DiagramType } from "../../../types/diagram";
 import type { LayoutDirection } from "../../../diagram/layout/types";
@@ -26,19 +28,21 @@ export interface DiagramToolbarProps {
   searchMatchCount?: number;
   filterActiveCount: number;
   onToggleFilterPanel: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onFitView: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onFitView?: () => void;
   onExport: (format: ExportFormat) => void;
   isLayoutRunning: boolean;
   onCancelLayout?: () => void;
+  isLegendOpen?: boolean;
+  onToggleLegend?: () => void;
 }
 
-const DIAGRAM_TYPES: { type: DiagramType; label: string }[] = [
-  { type: "module_dependency", label: "Module Dependencies" },
-  { type: "file_dependency", label: "File Dependencies" },
-  { type: "architecture_overview", label: "Architecture Overview" },
-  { type: "class_diagram", label: "Class Diagram" },
+const DIAGRAM_SEGMENTS: { type: DiagramType; label: string; icon: React.FC<{ className?: string }> }[] = [
+  { type: "module_dependency", label: "Modules", icon: Layers },
+  { type: "file_dependency", label: "Files", icon: FileCode },
+  { type: "architecture_overview", label: "Overview", icon: Compass },
+  { type: "class_diagram", label: "Classes", icon: Box },
 ];
 
 export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
@@ -52,50 +56,67 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
   searchMatchCount,
   filterActiveCount,
   onToggleFilterPanel,
-  onZoomIn,
-  onZoomOut,
-  onFitView,
   onExport,
   isLayoutRunning,
   onCancelLayout,
+  isLegendOpen,
+  onToggleLegend,
 }) => {
   const [exportOpen, setExportOpen] = useState(false);
 
   return (
-    <header className="h-10 px-3 bg-surface border-b border-border-default flex items-center justify-between text-xs font-mono select-none z-10">
-      {/* Left: Diagram Type Selector & Direction */}
+    <header className="h-10 px-3 bg-surface border-b border-border-default flex items-center justify-between text-xs font-mono select-none z-10 flex-shrink-0">
+      {/* Left: Diagram Type Segmented Control & Direction */}
       <div className="flex items-center space-x-2">
-        <select
+        {/* Segmented Control */}
+        <div
+          role="radiogroup"
           aria-label="Diagram Type"
-          value={diagramType}
-          onChange={(e) => onSelectDiagramType(e.target.value as DiagramType)}
-          className="bg-subtle border border-border-default rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-border-focus font-medium"
+          className="flex items-center p-0.5 bg-subtle border border-border-default rounded-md"
         >
-          {DIAGRAM_TYPES.map((d) => (
-            <option key={d.type} value={d.type}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+          {DIAGRAM_SEGMENTS.map((seg) => {
+            const isSelected = diagramType === seg.type;
+            const Icon = seg.icon;
+            return (
+              <button
+                key={seg.type}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => onSelectDiagramType(seg.type)}
+                className={`flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] font-sans font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
+                  isSelected
+                    ? "bg-surface text-text-primary shadow-xs border border-border-default font-semibold"
+                    : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
+                }`}
+                title={seg.label}
+              >
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{seg.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
+        {/* Direction Toggle */}
         <button
           type="button"
           aria-label={`Layout direction: ${direction === "DOWN" ? "Top to Bottom" : "Left to Right"}`}
           onClick={onToggleDirection}
-          className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
-          title={`Switch direction (currently ${direction === "DOWN" ? "Top to Bottom" : "Left to Right"})`}
+          className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
+          title={`Switch layout direction (currently ${direction === "DOWN" ? "Top to Bottom" : "Left to Right"})`}
         >
           {direction === "DOWN" ? (
-            <ArrowDown className="w-3.5 h-3.5" />
+            <ArrowDown className="w-3.5 h-3.5 text-text-muted" />
           ) : (
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-3.5 h-3.5 text-text-muted" />
           )}
-          <span className="text-[11px]">{direction === "DOWN" ? "TB" : "LR"}</span>
+          <span className="text-[11px] font-mono">{direction === "DOWN" ? "TB" : "LR"}</span>
         </button>
       </div>
 
       {/* Middle: Node Search Bar */}
-      <div className="flex items-center space-x-1 max-w-xs w-full mx-2">
+      <div className="flex items-center space-x-1.5 max-w-xs w-full mx-3">
         <div className="relative w-full flex items-center">
           <Search className="w-3.5 h-3.5 absolute left-2 text-text-muted pointer-events-none" />
           <input
@@ -126,13 +147,13 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
         </div>
 
         {searchMatchCount !== undefined && searchQuery && (
-          <span className="text-[10px] text-text-muted flex-shrink-0">
+          <span className="text-[10px] text-text-muted flex-shrink-0 font-mono">
             {searchMatchCount} match{searchMatchCount === 1 ? "" : "es"}
           </span>
         )}
       </div>
 
-      {/* Right: Actions, Filters, Zoom, Export */}
+      {/* Right: Actions, Filters, Legend, Export */}
       <div className="flex items-center space-x-1.5">
         {/* Worker Layout Progress & Cancellation Indicator */}
         {isLayoutRunning && (
@@ -156,15 +177,15 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
           type="button"
           aria-label="Toggle diagram filters"
           onClick={onToggleFilterPanel}
-          className={`flex items-center space-x-1 px-2 py-1 rounded border transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
+          className={`flex items-center space-x-1.5 px-2 py-1 rounded border transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
             filterActiveCount > 0
               ? "bg-accent-subtle border-accent-default text-accent-text font-medium"
               : "bg-subtle border-border-default text-text-secondary hover:text-text-primary hover:bg-hover"
           }`}
-          title="Filter relationships & confidence"
+          title="Filter relationships, confidence & layers"
         >
           <Filter className="w-3.5 h-3.5" />
-          <span className="text-[11px]">Filter</span>
+          <span className="text-[11px] font-sans">Filter</span>
           {filterActiveCount > 0 && (
             <span className="px-1 py-0.2 bg-accent-default text-white rounded-full text-[9px]">
               {filterActiveCount}
@@ -172,36 +193,24 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
           )}
         </button>
 
-        {/* Zoom Controls */}
-        <div className="flex items-center bg-subtle border border-border-default rounded">
+        {/* Legend Toggle in Toolbar */}
+        {onToggleLegend && (
           <button
             type="button"
-            aria-label="Zoom in"
-            onClick={onZoomIn}
-            className="p-1 hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
-            title="Zoom in"
+            aria-label="Toggle diagram legend from toolbar"
+            data-testid="toolbar-legend-toggle"
+            onClick={onToggleLegend}
+            className={`flex items-center space-x-1 px-2 py-1 rounded border transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
+              isLegendOpen
+                ? "bg-accent-subtle border-accent-default text-accent-text"
+                : "bg-subtle border-border-default text-text-secondary hover:text-text-primary hover:bg-hover"
+            }`}
+            title="Toggle legend and line styles"
           >
-            <ZoomIn className="w-3.5 h-3.5" />
+            <Info className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-sans">Legend</span>
           </button>
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={onZoomOut}
-            className="p-1 hover:bg-hover text-text-secondary hover:text-text-primary border-l border-border-subtle focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
-            title="Zoom out"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Fit to screen"
-            onClick={onFitView}
-            className="p-1 hover:bg-hover text-text-secondary hover:text-text-primary border-l border-border-subtle focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
-            title="Fit to screen"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        )}
 
         {/* Export Dropdown */}
         <div className="relative">
@@ -211,16 +220,16 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
             aria-haspopup="true"
             aria-expanded={exportOpen}
             onClick={() => setExportOpen(!exportOpen)}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
+            className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="text-[11px]">Export</span>
+            <span className="text-[11px] font-sans">Export</span>
           </button>
 
           {exportOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-8 w-44 bg-surface border border-border-default rounded shadow-lg py-1 z-30 text-xs font-mono"
+              className="absolute right-0 top-8 w-44 bg-surface border border-border-default rounded-md shadow-lg py-1 z-30 text-xs font-mono"
             >
               <button
                 type="button"

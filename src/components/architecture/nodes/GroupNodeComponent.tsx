@@ -2,21 +2,39 @@ import React from "react";
 import { NodeProps } from "@xyflow/react";
 import { Folder, ChevronDown, ChevronRight } from "lucide-react";
 import type { DiagramGroup } from "../../../types/diagram";
+import {
+  classifyGroupLayer,
+  LAYER_STYLES,
+  type ArchitectureLayer,
+} from "../utils/layers";
 
 export interface GroupNodeData extends DiagramGroup {
   [key: string]: unknown;
   width?: number;
   height?: number;
   nodeCount?: number;
+  layer?: ArchitectureLayer;
   onToggleCollapse?: (groupId: string) => void;
+  onFocusGroup?: (groupId: string) => void;
 }
 
 export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
   const group = data as unknown as GroupNodeData;
+  const layer: ArchitectureLayer = group.layer || classifyGroupLayer(group);
+  const layerStyle = LAYER_STYLES[layer] || LAYER_STYLES.unclassified;
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (group.onToggleCollapse) {
+      group.onToggleCollapse(group.id);
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (group.onFocusGroup) {
+      group.onFocusGroup(group.id);
+    } else if (group.onToggleCollapse) {
       group.onToggleCollapse(group.id);
     }
   };
@@ -31,22 +49,32 @@ export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
 
   return (
     <div
+      onDoubleClick={handleDoubleClick}
       style={{
         width: group.width ? `${group.width}px` : "100%",
         height: group.height ? `${group.height}px` : "100%",
+        borderRadius: "8px",
       }}
-      className={`relative rounded border border-dashed border-border-default bg-subtle/30 p-2 select-none transition-colors ${
-        selected ? "border-accent-default ring-1 ring-accent-default" : ""
+      className={`relative border border-border-default bg-surface/50 p-2.5 select-none transition-colors ${
+        selected ? "border-accent-default ring-2 ring-accent-default/30" : "hover:border-border-strong"
       }`}
+      data-testid={`diagram-group-${group.id}`}
     >
-      <div className="flex items-center justify-between pb-1 mb-1 border-b border-border-subtle text-[11px] font-mono text-text-secondary">
-        <div className="flex items-center space-x-1.5 truncate">
-          <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-          <span className="font-semibold truncate" title={group.label}>
+      {/* Top-left label with count */}
+      <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-subtle/80 text-[12px] font-sans text-text-secondary">
+        <div className="flex items-center space-x-2 truncate">
+          <span
+            className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+            style={{ backgroundColor: layerStyle.accentColorDark }}
+          />
+          <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
+          <span className="font-semibold text-text-primary truncate" title={group.label}>
             {group.label}
           </span>
           {group.nodeCount !== undefined && (
-            <span className="text-[10px] text-text-muted">({group.nodeCount})</span>
+            <span className="text-[11px] font-mono text-text-muted bg-subtle px-1.5 py-0.2 rounded border border-border-subtle">
+              {group.nodeCount}
+            </span>
           )}
         </div>
 
@@ -56,7 +84,7 @@ export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
           aria-label={group.collapsed ? `Expand group ${group.label}` : `Collapse group ${group.label}`}
           onClick={handleToggle}
           onKeyDown={handleKeyDown}
-          className="p-0.5 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
+          className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
         >
           {group.collapsed ? (
             <ChevronRight className="w-3.5 h-3.5" />

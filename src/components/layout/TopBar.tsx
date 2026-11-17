@@ -42,12 +42,21 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
-    <header className="h-10 bg-surface border-b border-border-default px-3 flex items-center justify-between select-none z-20 flex-shrink-0">
+    <header className="h-10 bg-surface border-b border-border-default px-3 flex items-center justify-between select-none z-40 flex-shrink-0 relative">
+      {/* Click outside backdrop when dropdown is open */}
+      {dropdownOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setDropdownOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Left: Project Selector */}
-      <div className="flex items-center gap-2 relative">
+      <div className="flex items-center gap-2 relative z-50">
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-hover text-text-primary text-body font-medium transition-colors border border-transparent hover:border-border-default focus-ring"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md hover:bg-hover text-text-primary text-body font-medium transition-colors border border-transparent hover:border-border-default focus-ring"
         >
           <Folder className="w-4 h-4 text-accent" />
           <span className="truncate max-w-[200px]">
@@ -57,24 +66,24 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         {dropdownOpen && (
-          <div className="absolute top-9 left-0 w-72 bg-surface border border-border-default shadow-lg rounded-md p-1 z-50 text-meta">
+          <div className="absolute top-9 left-0 w-80 bg-surface border border-border-default shadow-xl rounded-md p-1.5 z-50 text-meta">
             <button
               onClick={() => {
                 setDropdownOpen(false);
                 onOpenFolder();
               }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary mb-1 border-b border-border-subtle"
+              className="w-full flex items-center gap-2 px-2.5 py-2 text-left rounded-sm hover:bg-hover text-text-primary mb-1 border-b border-border-subtle"
             >
               <FolderOpen className="w-4 h-4 text-accent" />
-              <span>Open Project Folder...</span>
+              <span className="font-medium">Open Project Folder...</span>
             </button>
 
             {recentProjects.length > 0 && (
               <>
-                <div className="px-2 py-1 text-micro font-mono text-text-muted uppercase tracking-wider">
+                <div className="px-2.5 py-1 text-micro font-mono text-text-muted uppercase tracking-wider">
                   Recent Workspaces
                 </div>
-                <div className="max-h-48 overflow-y-auto">
+                <div className="max-h-56 overflow-y-auto">
                   {recentProjects.map((p) => (
                     <button
                       key={p.id}
@@ -82,7 +91,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                         setDropdownOpen(false);
                         onReopenProject(p.root_path);
                       }}
-                      className="w-full flex flex-col items-start px-2 py-1 text-left rounded-sm hover:bg-hover text-text-primary group"
+                      className="w-full flex flex-col items-start px-2.5 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary group transition-colors"
                     >
                       <span className="font-medium text-meta">{p.name}</span>
                       <span className="text-micro font-mono text-text-muted truncate w-full group-hover:text-text-secondary">

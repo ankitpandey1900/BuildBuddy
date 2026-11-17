@@ -1,11 +1,13 @@
 import React from "react";
 import { Filter, X, RotateCcw } from "lucide-react";
 import type { RelationshipType, DiagramConfidence, DiagramGroup } from "../../../types/diagram";
+import { type ArchitectureLayer, LAYER_STYLES } from "../utils/layers";
 
 export interface DiagramFilterState {
   relationshipTypes: Set<RelationshipType>;
   confidences: Set<DiagramConfidence>;
   isolatedGroupId: string | null;
+  layers?: Set<ArchitectureLayer>;
 }
 
 export interface DiagramFilterPanelProps {
@@ -16,6 +18,7 @@ export interface DiagramFilterPanelProps {
   onToggleRelationship: (rel: RelationshipType) => void;
   onToggleConfidence: (conf: DiagramConfidence) => void;
   onSetIsolatedGroup: (groupId: string | null) => void;
+  onToggleLayer?: (layer: ArchitectureLayer) => void;
   onResetFilters: () => void;
 }
 
@@ -35,6 +38,16 @@ const ALL_CONFIDENCES: DiagramConfidence[] = [
   "unknown",
 ];
 
+const ALL_LAYERS: ArchitectureLayer[] = [
+  "frontend",
+  "shared",
+  "backend",
+  "data",
+  "config",
+  "external",
+  "unclassified",
+];
+
 export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
   isOpen,
   onClose,
@@ -43,6 +56,7 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
   onToggleRelationship,
   onToggleConfidence,
   onSetIsolatedGroup,
+  onToggleLayer,
   onResetFilters,
 }) => {
   if (!isOpen) return null;
@@ -51,12 +65,12 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
     <div
       role="region"
       aria-label="Diagram filters"
-      className="absolute top-12 right-4 z-20 w-72 bg-surface/98 backdrop-blur-sm border border-border-default rounded shadow-md p-3 text-xs font-mono select-none"
+      className="absolute top-12 right-4 z-30 w-80 bg-surface/98 backdrop-blur-sm border border-border-default rounded-md shadow-lg p-3 text-xs font-mono select-none"
     >
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-subtle">
         <div className="flex items-center space-x-1.5 font-semibold text-text-primary">
           <Filter className="w-3.5 h-3.5 text-text-muted" />
-          <span>Filter Diagram</span>
+          <span>Filter Diagram Elements</span>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -66,7 +80,7 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
             className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus"
             title="Reset all filters"
           >
-            <RotateCcw className="w-3 h-3" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -79,7 +93,7 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
         {/* Module Isolation */}
         {groups.length > 0 && (
           <div>
@@ -125,6 +139,7 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
                     checked={active}
                     onChange={() => onToggleRelationship(rel)}
                     className="sr-only"
+                    aria-label={rel}
                   />
                   <span className="truncate text-[11px]">{rel}</span>
                 </label>
@@ -155,6 +170,7 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
                     checked={active}
                     onChange={() => onToggleConfidence(conf)}
                     className="sr-only"
+                    aria-label={conf}
                   />
                   <span className="truncate text-[11px]">{conf}</span>
                 </label>
@@ -162,8 +178,45 @@ export const DiagramFilterPanel: React.FC<DiagramFilterPanelProps> = ({
             })}
           </div>
         </div>
+
+        {/* Architectural Layers */}
+        {onToggleLayer && filters.layers && (
+          <div>
+            <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1.5">
+              Architectural Layers
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ALL_LAYERS.map((lay) => {
+                const active = filters.layers?.has(lay) ?? true;
+                const style = LAYER_STYLES[lay];
+                return (
+                  <label
+                    key={lay}
+                    className={`flex items-center space-x-1.5 px-2 py-1 rounded cursor-pointer border transition-colors ${
+                      active
+                        ? "bg-subtle/80 border-border-strong text-text-primary font-medium"
+                        : "bg-surface border-border-subtle text-text-muted opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => onToggleLayer(lay)}
+                      className="sr-only"
+                      aria-label={style.label}
+                    />
+                    <span
+                      className="w-2 h-2 rounded-xs flex-shrink-0"
+                      style={{ backgroundColor: style.accentColorDark }}
+                    />
+                    <span className="truncate text-[11px]">{style.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-

@@ -79,6 +79,8 @@ export const App: React.FC = () => {
               projectRootPath={project.currentProject?.root_path}
               theme={ui.theme}
               onSelectDiagramElement={handleSelectDiagramElement}
+              onRunPipeline={project.triggerScan}
+              onTriggerScan={project.triggerScan}
               onNavigateToSource={(filePath, line) => {
                 project.openFileAtLine(filePath, line);
                 ui.setActiveView("explorer");

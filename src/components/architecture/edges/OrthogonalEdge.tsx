@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { EdgeProps, BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from "@xyflow/react";
 import type { DiagramEdge, Point } from "../../../types/diagram";
 
@@ -8,6 +8,7 @@ export interface OrthogonalEdgeData extends DiagramEdge {
   isHighlighted?: boolean;
   isUpstream?: boolean;
   isDownstream?: boolean;
+  onEdgeHover?: (edgeId: string | null) => void;
 }
 
 export const OrthogonalEdge: React.FC<EdgeProps> = ({
@@ -19,20 +20,45 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
   data,
   selected,
 }) => {
+  const [isLocalHovered, setIsLocalHovered] = useState(false);
   const edgeData = data as unknown as OrthogonalEdgeData | undefined;
   const points = edgeData?.points;
   const relationship = edgeData?.relationship || "import";
   const confidence = edgeData?.confidence || "static";
   const label = edgeData?.label;
 
-  // 1. Generate path from ELK bend points or fallback smooth step
+  // 1. Generate orthogonal path with rounded corners (borderRadius: 6)
   let pathD = "";
   let labelX = (sourceX + targetX) / 2;
   let labelY = (sourceY + targetY) / 2;
 
   if (points && points.length >= 2) {
-    pathD = `M ${points[0].x} ${points[0].y}` + points.slice(1).map((p) => ` L ${p.x} ${p.y}`).join("");
-    // Pick the midpoint of the bend points for the label
+    // Generate SVG path with rounded corners through bend points
+    const r = 6;
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1];
+
+      if (!next) {
+        d += ` L ${curr.x} ${curr.y}`;
+      } else {
+        // Round corner towards next
+        const dx1 = Math.sign(curr.x - prev.x);
+        const dy1 = Math.sign(curr.y - prev.y);
+        const dx2 = Math.sign(next.x - curr.x);
+        const dy2 = Math.sign(next.y - curr.y);
+
+        const beforeCornerX = curr.x - dx1 * r;
+        const beforeCornerY = curr.y - dy1 * r;
+        const afterCornerX = curr.x + dx2 * r;
+        const afterCornerY = curr.y + dy2 * r;
+
+        d += ` L ${beforeCornerX} ${beforeCornerY} Q ${curr.x} ${curr.y} ${afterCornerX} ${afterCornerY}`;
+      }
+    }
+    pathD = d;
     const midIdx = Math.floor(points.length / 2);
     labelX = points[midIdx].x;
     labelY = points[midIdx].y;
@@ -42,7 +68,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
       sourceY,
       targetX,
       targetY,
-      borderRadius: 4,
+      borderRadius: 6,
     });
     pathD = smoothPath;
     labelX = sx;
@@ -50,7 +76,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
   }
 
   // 2. Determine stroke styles per relationship & confidence
-  // NEVER rely on color alone: distinct dash patterns, widths, and text badges
+  // Never color alone: distinct dash patterns, widths, text badges
   let strokeDasharray: string | undefined = undefined;
   let strokeWidth = 1.5;
   let strokeColor = "var(--text-muted, #8B949E)";
@@ -74,17 +100,23 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
     strokeDasharray = "2,2"; // fine dotted style
   }
 
+  const isHovered = isLocalHovered || edgeData?.isHighlighted;
+
   if (selected) {
     strokeColor = "var(--accent-default, #388BFD)";
     strokeWidth = Math.max(strokeWidth, 2.5);
-  } else if (edgeData?.isHighlighted) {
-    strokeColor = edgeData.isUpstream
-      ? "var(--status-warning-text, #D29922)"
-      : "var(--status-success-text, #3FB950)";
+  } else if (isHovered) {
+    if (edgeData?.isUpstream) {
+      strokeColor = "var(--status-warning-text, #D29922)";
+    } else if (edgeData?.isDownstream) {
+      strokeColor = "var(--status-success-text, #3FB950)";
+    } else {
+      strokeColor = "var(--accent-default, #388BFD)";
+    }
     strokeWidth = Math.max(strokeWidth, 2);
   }
 
-  // Determine marker
+  // Marker
   let markerEnd: string | undefined = undefined;
   if (relationship === "inheritance") {
     markerEnd = "url(#bb-arrow-inheritance)";
@@ -94,8 +126,39 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
     markerEnd = "url(#bb-arrow-default)";
   }
 
+  const handleMouseEnter = () => {
+    setIsLocalHovered(true);
+    if (edgeData?.onEdgeHover) {
+      edgeData.onEdgeHover(id);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsLocalHovered(false);
+    if (edgeData?.onEdgeHover) {
+      edgeData.onEdgeHover(null);
+    }
+  };
+
+  // Edge labels only on hover or selection (or highlighted)
+  const isLabelVisible = selected || isHovered;
+
   return (
-    <>
+    <g
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="cursor-pointer"
+      data-testid={`diagram-edge-${id}`}
+    >
+      {/* Invisible wider hit-test stroke for effortless hovering */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={14}
+        className="cursor-pointer"
+      />
+
       <BaseEdge
         id={id}
         path={pathD}
@@ -104,24 +167,29 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           strokeWidth,
           strokeDasharray,
           cursor: "pointer",
+          transition: "stroke 150ms ease, stroke-width 150ms ease",
         }}
         markerEnd={markerEnd}
       />
 
-      {/* Edge label & Inferred badge */}
+      {/* Edge label & Inferred badge - visible on hover or selection */}
       <EdgeLabelRenderer>
         <div
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            pointerEvents: "all",
+            pointerEvents: isLabelVisible ? "all" : "none",
           }}
-          className="flex items-center space-x-1 select-none"
+          className={`flex items-center space-x-1 select-none transition-opacity duration-150 ${
+            isLabelVisible ? "opacity-100 z-30" : "opacity-0"
+          }`}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           {label && (
             <span
-              className={`px-1 py-0.5 text-[9px] font-mono rounded bg-surface border text-text-secondary ${
-                selected ? "border-accent-default font-semibold text-text-primary" : "border-border-subtle"
+              className={`px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface border shadow-xs text-text-primary ${
+                selected ? "border-accent-default font-semibold ring-1 ring-accent-default/30" : "border-border-default"
               }`}
               title={`${relationship}: ${label} (${confidence})`}
             >
@@ -132,7 +200,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           {confidence === "inferred" && (
             <span
               data-testid="edge-inferred-badge"
-              className="px-1 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded bg-subtle border border-dashed border-border-strong text-text-muted"
+              className="px-1 py-0.2 text-[9px] font-mono uppercase tracking-wider rounded bg-subtle border border-dashed border-border-strong text-text-muted"
               title="Confidence: Inferred (never merged with confirmed)"
             >
               inferred
@@ -142,7 +210,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           {confidence === "unknown" && (
             <span
               data-testid="edge-unknown-badge"
-              className="px-1 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded bg-subtle border border-dotted border-border-strong text-text-faint"
+              className="px-1 py-0.2 text-[9px] font-mono uppercase tracking-wider rounded bg-subtle border border-dotted border-border-strong text-text-faint"
               title="Confidence: Unknown"
             >
               unknown
@@ -150,6 +218,6 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           )}
         </div>
       </EdgeLabelRenderer>
-    </>
+    </g>
   );
 };

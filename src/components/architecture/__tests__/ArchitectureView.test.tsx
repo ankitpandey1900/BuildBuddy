@@ -430,4 +430,113 @@ describe("ArchitectureView React Flow Integration", () => {
     expect(screen.getByRole("menuitem", { name: /png/i })).not.toBeDisabled();
     expect(screen.getByRole("menuitem", { name: /mermaid/i })).not.toBeDisabled();
   });
+
+  it("empty state: renders 'No dependencies detected' with reason and pipeline button when diagram has no edges", () => {
+    const handleRunPipeline = vi.fn();
+    const emptyEdgesModel: PositionedModel = {
+      diagram_type: "module_dependency",
+      width: 800,
+      height: 600,
+      groups: [],
+      nodes: [
+        {
+          id: "file:src/isolated.ts",
+          kind: "file",
+          label: "isolated.ts",
+          x: 100,
+          y: 100,
+          width: 220,
+          height: 70,
+        },
+      ],
+      edges: [],
+    };
+
+    render(
+      <ArchitectureView
+        initialPositionedModel={emptyEdgesModel}
+        onRunPipeline={handleRunPipeline}
+      />
+    );
+
+    // Verify empty state is rendered, NOT a bare node row
+    expect(screen.getByTestId("no-dependencies-state")).toBeInTheDocument();
+    expect(screen.getByText("No dependencies detected")).toBeInTheDocument();
+    expect(screen.getByText(/0 dependencies detected. Run analysis pipeline/)).toBeInTheDocument();
+
+    const pipelineBtn = screen.getByTestId("run-pipeline-btn");
+    expect(pipelineBtn).toBeInTheDocument();
+    expect(pipelineBtn).toHaveTextContent("Run Analysis Pipeline");
+
+    fireEvent.click(pipelineBtn);
+    expect(handleRunPipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it("node card content: renders 13-14px bold name, secondary line, and metric chips with in/out counts", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const indexNode = screen.getByTestId("diagram-node-file:src/index.ts");
+    expect(indexNode).toBeInTheDocument();
+
+    // 3px left border accent
+    expect(indexNode).toHaveStyle({ borderLeftWidth: "3px" });
+
+    // 13-14px bold name
+    const titleEl = screen.getByText("index.ts");
+    expect(titleEl).toHaveClass("text-[13px]");
+    expect(titleEl).toHaveClass("font-semibold");
+    expect(titleEl).toHaveAttribute("title", "index.ts");
+
+    // Secondary line
+    expect(screen.getByText("2 fn · 25 lines")).toBeInTheDocument();
+
+    // Metric chips: in-degree and out-degree counts
+    // index.ts has outgoing edges to Button.tsx, BaseService (call + instantiation), core, react
+    expect(indexNode).toHaveTextContent("0"); // in-degree
+    expect(screen.getByTitle("5 outgoing dependencies")).toBeInTheDocument();
+  });
+
+  it("selection dimming: non-related nodes are dimmed to 35% opacity when a node is selected", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    const indexNode = screen.getByTestId("diagram-node-file:src/index.ts");
+    const buttonNode = screen.getByTestId("diagram-node-file:src/ui/Button.tsx");
+
+    // Before selection, none are dimmed
+    expect(indexNode).not.toHaveClass("opacity-35");
+    expect(buttonNode).not.toHaveClass("opacity-35");
+
+    // Click to select Button.tsx
+    fireEvent.click(buttonNode);
+
+    // Button.tsx is selected (has accent border)
+    expect(buttonNode).toHaveClass("border-accent-default");
+    expect(buttonNode).not.toHaveClass("opacity-35");
+
+    // index.ts is connected (it imports Button.tsx), so it is highlighted, NOT dimmed
+    expect(indexNode).not.toHaveClass("opacity-35");
+  });
+
+  it("legend panel: collapsible and lists line styles and layer colors with text descriptions", () => {
+    render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);
+
+    // Toggle legend open
+    const legendBtn = screen.getByLabelText("Toggle diagram legend");
+    fireEvent.click(legendBtn);
+
+    const legendPanel = screen.getByTestId("diagram-legend-panel");
+    expect(legendPanel).toBeInTheDocument();
+
+    // Text descriptions, not color alone
+    expect(screen.getAllByText("solid line").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("dotted line").length).toBeGreaterThan(0);
+    expect(screen.getByText("bold solid")).toBeInTheDocument();
+    expect(screen.getByText("triangle head")).toBeInTheDocument();
+
+    // Layer accents with text
+    expect(screen.getByText("Frontend")).toBeInTheDocument();
+    expect(screen.getByText("Backend")).toBeInTheDocument();
+    expect(screen.getByText("Data")).toBeInTheDocument();
+    expect(screen.getByText("Shared")).toBeInTheDocument();
+  });
 });

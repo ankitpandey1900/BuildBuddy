@@ -92,8 +92,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     .slice(0, 8);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-24 select-none">
-      <div className="w-[540px] bg-surface border border-border-default shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[460px]">
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-24 select-none"
+      onClick={onClose}
+      data-testid="command-palette-backdrop"
+    >
+      <div
+        className="w-[540px] bg-surface border border-border-default shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[460px]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Input */}
         <div className="h-11 border-b border-border-default px-3 flex items-center gap-2">
           <Search className="w-4 h-4 text-text-muted flex-shrink-0" />

@@ -84,9 +84,24 @@ export async function layout(
     }
   }
 
+  // Sort groups in layered top-to-bottom order: frontend, shared, backend, data, external
+  function getGroupLayerOrder(labelOrId: string): number {
+    const l = labelOrId.toLowerCase();
+    if (l.includes("front") || l.includes("ui") || l.includes("client") || l.includes("view")) return 1;
+    if (l.includes("share") || l.includes("util") || l.includes("common") || l.includes("lib")) return 2;
+    if (l.includes("back") || l.includes("server") || l.includes("api") || l.includes("service")) return 3;
+    if (l.includes("data") || l.includes("db") || l.includes("model") || l.includes("store")) return 4;
+    if (l.includes("extern") || l.includes("pkg") || l.includes("vendor")) return 5;
+    return 6;
+  }
+
+  const sortedGroups = [...model.groups].sort(
+    (a, b) => getGroupLayerOrder(a.label || a.id) - getGroupLayerOrder(b.label || b.id)
+  );
+
   // Add group nodes to rootChildren (skip if already added as a node)
   const existingIds = new Set(rootChildren.map((c) => c.id));
-  for (const group of model.groups) {
+  for (const group of sortedGroups) {
     if (existingIds.has(group.id)) {
       continue;
     }
@@ -104,6 +119,8 @@ export async function layout(
         "elk.layered.thoroughness": "1",
         "elk.layered.cycleBreaking.strategy": "GREEDY",
         "elk.layered.crossingMinimization.strategy": crossingStrategy,
+        "elk.layered.layering.strategy": "NETWORK_SIMPLEX",
+        "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       },
     });
     existingIds.add(group.id);
