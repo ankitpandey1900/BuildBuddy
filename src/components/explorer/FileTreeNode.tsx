@@ -75,7 +75,7 @@ export const FileTreeNode: React.FC<FileTreeNodeProps> = ({
         <div className="flex items-center gap-1.5 flex-shrink-0 text-caption font-mono text-text-muted">
           {file.status && file.status !== "parsed" && file.status !== "pending" && (
             <span
-              className={`text-[9px] px-1 py-0.2 rounded font-mono border uppercase tracking-wider ${
+              className={`text-[9px] px-1 py-0.2 rounded-sm font-sans font-medium border ${
                 file.status === "partial"
                   ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
                   : file.status === "unsupported"

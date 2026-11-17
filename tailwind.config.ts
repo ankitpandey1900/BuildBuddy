@@ -11,7 +11,7 @@ const config: Config = {
       colors: {
         canvas: "var(--bg-canvas)",
         surface: "var(--bg-surface)",
-        subtle: "var(--bg-subtle)",
+        subtle: "var(--bg-subtle, var(--bg-elevated))",
         elevated: "var(--bg-elevated)",
         hover: "var(--bg-hover)",
         active: "var(--bg-active)",
@@ -33,6 +33,21 @@ const config: Config = {
           text: "var(--accent-text)",
         },
         
+        status: {
+          success: {
+            bg: "var(--status-success-bg)",
+            text: "var(--status-success-text)",
+          },
+          warning: {
+            bg: "var(--status-warning-bg)",
+            text: "var(--status-warning-text)",
+          },
+          danger: {
+            bg: "var(--status-danger-bg)",
+            text: "var(--status-danger-text)",
+          },
+        },
+
         domain: {
           frontend: {
             bg: "var(--domain-frontend-bg)",
@@ -46,6 +61,14 @@ const config: Config = {
             bg: "var(--domain-database-bg)",
             border: "var(--domain-database-border)",
           },
+          shared: {
+            bg: "var(--domain-shared-bg)",
+            border: "var(--domain-shared-border)",
+          },
+          config: {
+            bg: "var(--domain-config-bg)",
+            border: "var(--domain-config-border)",
+          },
           external: {
             bg: "var(--domain-external-bg)",
             border: "var(--domain-external-border)",
@@ -54,37 +77,49 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
-          "Inter",
+          '"Segoe UI Variable"',
+          '"SF Pro"',
           "-apple-system",
           "BlinkMacSystemFont",
+          "system-ui",
           '"Segoe UI"',
-          "Roboto",
           "sans-serif",
         ],
         mono: [
-          '"JetBrains Mono"',
-          '"Fira Code"',
+          '"SF Mono"',
+          '"Cascadia Code"',
+          "Consolas",
           "Menlo",
           "Monaco",
-          "Consolas",
           "monospace",
         ],
       },
       fontSize: {
-        micro: ["10px", { lineHeight: "14px" }],
+        micro: ["11px", { lineHeight: "16px" }],
         caption: ["11px", { lineHeight: "16px" }],
         meta: ["12px", { lineHeight: "16px" }],
         body: ["13px", { lineHeight: "18px" }],
-        "body-md": ["14px", { lineHeight: "20px" }],
+        "body-md": ["13px", { lineHeight: "18px" }],
         subheading: ["15px", { lineHeight: "22px" }],
-        heading: ["18px", { lineHeight: "24px" }],
-        title: ["22px", { lineHeight: "28px" }],
+        heading: ["20px", { lineHeight: "26px" }],
+        title: ["20px", { lineHeight: "26px" }],
+        display: ["28px", { lineHeight: "34px" }],
       },
       borderRadius: {
         none: "0px",
-        sm: "2px",
-        md: "4px",
-        lg: "6px",
+        sm: "6px",
+        md: "10px",
+        lg: "14px",
+      },
+      boxShadow: {
+        menu: "var(--shadow-menu)",
+        modal: "var(--shadow-modal)",
+      },
+      transitionDuration: {
+        DEFAULT: "150ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0, 0, 0.2, 1)",
       },
     },
   },
@@ -92,4 +127,3 @@ const config: Config = {
 };
 
 export default config;
-

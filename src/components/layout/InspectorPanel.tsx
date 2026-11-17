@@ -26,6 +26,7 @@ export interface InspectorPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   width: number;
+  onResize?: (width: number) => void;
   selectedFile: FileRecord | null;
   selectedSymbol?: SymbolRecord | null;
   selectedDiagramElement?: SelectedDiagramElement | null;
@@ -41,6 +42,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   isOpen,
   onToggle,
   width,
+  onResize,
   selectedFile,
   selectedSymbol,
   selectedDiagramElement,
@@ -50,6 +52,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   initialSymbolDetail,
   initialClassDetail,
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
   const [activeSymbolId, setActiveSymbolId] = useState<number | null>(
     selectedSymbol?.id ?? null
@@ -141,9 +144,32 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     }
   };
 
+  // Panel resizing logic
+  useEffect(() => {
+    if (!isDragging || !onResize) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth >= 260 && newWidth <= 600) {
+        onResize(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, onResize]);
+
   if (!isOpen) {
     return (
-      <div className="w-8 bg-surface border-l border-border-default flex flex-col items-center py-2 flex-shrink-0">
+      <div className="w-8 bg-surface border-l border-border-default flex flex-col items-center py-2 flex-shrink-0 transition-all duration-150 ease-out">
         <button
           onClick={onToggle}
           title="Open Inspector Panel"
@@ -152,7 +178,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
         </button>
-        <span className="[writing-mode:vertical-lr] rotate-180 mt-4 text-micro font-mono text-text-muted uppercase tracking-wider select-none">
+        <span className="[writing-mode:vertical-lr] rotate-180 mt-4 text-micro font-sans font-medium text-text-muted select-none">
           Inspector
         </span>
       </div>
@@ -189,9 +215,24 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   return (
     <aside
       style={{ width }}
-      className="bg-surface border-l border-border-default flex flex-col select-none flex-shrink-0 h-full overflow-hidden"
+      className="relative bg-surface border-l border-border-default flex flex-col select-none flex-shrink-0 h-full overflow-hidden transition-[width] duration-150 ease-out"
       data-testid="inspector-panel"
     >
+      {/* 1px Hairline + 6px invisible grab handle on left edge */}
+      {onResize && (
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          aria-hidden="true"
+          className={`absolute top-0 bottom-0 -left-1 w-2.5 z-30 cursor-col-resize hover:bg-accent/30 transition-colors ${
+            isDragging ? "bg-accent/40" : ""
+          }`}
+          title="Drag to resize Inspector panel"
+        />
+      )}
+
       {/* Header */}
       <div className="h-8 border-b border-border-default px-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -206,7 +247,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <span>Back ({history.length})</span>
             </button>
           )}
-          <span className="text-caption font-semibold text-text-primary uppercase tracking-wider font-mono">
+          <span className="text-caption font-semibold text-text-primary font-sans">
             {selectedDiagramElement
               ? selectedDiagramElement.type === "node"
                 ? "Diagram Node"
@@ -277,7 +318,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     <span className="font-mono font-semibold text-text-primary text-body truncate">
                       {activeSymbolRecord.name}
                     </span>
-                    <Badge variant="neutral" size="sm" className="uppercase font-mono">
+                    <Badge variant="neutral" size="sm">
                       {activeSymbolRecord.kind}
                     </Badge>
                   </div>
@@ -319,7 +360,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 1: SIGNATURE */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-signature">
-              <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+              <div className="text-caption font-medium text-text-secondary">
                 Signature
               </div>
               {activeSymbolRecord.signature ? (
@@ -333,13 +374,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 2: RELATIONSHIPS (CALLERS & CALLEES) */}
             <div className="flex flex-col gap-3" data-testid="inspector-section-relationships">
-              <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono border-b border-border-subtle pb-1">
+              <div className="text-caption font-medium text-text-secondary border-b border-border-subtle pb-1">
                 Relationships
               </div>
 
               {/* Callers */}
               <div className="flex flex-col gap-1.5" data-testid="inspector-callers-group">
-                <div className="text-micro font-mono text-text-muted uppercase">
+                <div className="text-micro font-medium text-text-muted">
                   Incoming Calls (Callers)
                 </div>
                 {incomingCalls.length === 0 ? (
@@ -387,7 +428,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
               {/* Callees */}
               <div className="flex flex-col gap-1.5" data-testid="inspector-callees-group">
-                <div className="text-micro font-mono text-text-muted uppercase">
+                <div className="text-micro font-medium text-text-muted">
                   Outgoing Calls (Callees)
                 </div>
                 {outgoingCalls.length === 0 ? (
@@ -438,7 +479,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 3: METRICS */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-metrics">
-              <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+              <div className="text-caption font-medium text-text-secondary">
                 Metrics
               </div>
               {symbolDetail?.function_metrics ? (
@@ -447,7 +488,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     className="bg-canvas p-2 rounded border border-border-subtle flex flex-col cursor-help"
                     title="McCabe Cyclomatic Complexity: CC = 1 + ∑ branches + ∑ loops (from DECISIONS.md)"
                   >
-                    <span className="text-text-muted text-micro uppercase">Complexity</span>
+                    <span className="text-text-muted text-micro font-medium">Complexity</span>
                     <span className="text-text-primary font-medium text-body">
                       {symbolDetail.function_metrics.cyclomatic_complexity}
                     </span>
@@ -457,7 +498,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     className="bg-canvas p-2 rounded border border-border-subtle flex flex-col cursor-help"
                     title="Branch points: if/elif, conditionals/ternaries, switch cases, and boolean operators (&&, ||, ??, and, or)"
                   >
-                    <span className="text-text-muted text-micro uppercase">Branches</span>
+                    <span className="text-text-muted text-micro font-medium">Branches</span>
                     <span className="text-text-primary font-medium text-body">
                       {symbolDetail.function_metrics.branch_count}
                     </span>
@@ -467,7 +508,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     className="bg-canvas p-2 rounded border border-border-subtle flex flex-col cursor-help"
                     title="Loop points: for, for-in, for-of, while, do-while"
                   >
-                    <span className="text-text-muted text-micro uppercase">Loops</span>
+                    <span className="text-text-muted text-micro font-medium">Loops</span>
                     <span className="text-text-primary font-medium text-body">
                       {symbolDetail.function_metrics.loop_count}
                     </span>
@@ -477,7 +518,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     className="bg-canvas p-2 rounded border border-border-subtle flex flex-col cursor-help"
                     title="Explicit exception handling constructs: try/catch (TS/JS) or try/except (Python)"
                   >
-                    <span className="text-text-muted text-micro uppercase">Error Handling</span>
+                    <span className="text-text-muted text-micro font-medium">Error Handling</span>
                     <span className="text-text-primary font-medium text-body truncate">
                       {symbolDetail.function_metrics.has_error_handling
                         ? "Present"
@@ -492,7 +533,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 4: SIDE EFFECTS */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-side-effects">
-              <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+              <div className="text-caption font-medium text-text-secondary">
                 Side Effects
               </div>
               {sideEffectsList.length > 0 ? (
@@ -503,7 +544,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                       className="p-1.5 bg-canvas rounded border border-border-subtle flex items-center justify-between text-micro font-mono"
                     >
                       <div className="flex items-center gap-1.5 truncate">
-                        <span className="px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 font-semibold uppercase text-[9px]">
+                        <span className="px-1.5 py-0.5 rounded-sm bg-status-warning-bg/40 text-status-warning-text font-medium text-[10px]">
                           {marker.category}
                         </span>
                         <span className="text-text-primary truncate" title={marker.pattern}>
@@ -524,7 +565,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 5: EVIDENCE */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-evidence">
-              <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+              <div className="text-caption font-medium text-text-secondary">
                 Evidence
               </div>
               <div className="flex flex-col gap-1.5 text-micro font-mono bg-canvas p-2 rounded border border-border-subtle">
@@ -547,14 +588,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                 {symbolDetail?.snippet ? (
                   <div className="mt-1 flex flex-col gap-1">
-                    <span className="text-text-muted text-[10px] uppercase">Snippet:</span>
+                    <span className="text-text-muted text-[11px] font-medium">Snippet:</span>
                     <pre className="p-2 bg-surface rounded border border-border-subtle font-mono text-micro overflow-x-auto text-text-muted max-h-36 select-text whitespace-pre-wrap">
                       <code>{symbolDetail.snippet}</code>
                     </pre>
                   </div>
                 ) : (
                   <div className="mt-1">
-                    <span className="text-text-muted text-[10px] uppercase block">Snippet:</span>
+                    <span className="text-text-muted text-[11px] font-medium block">Snippet:</span>
                     <span className="text-text-muted text-caption italic">None detected</span>
                   </div>
                 )}
@@ -566,12 +607,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <div className="flex flex-col gap-4 pt-2 border-t border-border-subtle" data-testid="inspector-section-classes">
                 {/* Inheritance */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+                  <div className="text-caption font-medium text-text-secondary">
                     Inheritance & Bases
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {/* Superclass / Base Classes */}
-                    <div className="text-micro font-mono text-text-muted">Base Classes:</div>
+                    <div className="text-micro font-medium text-text-muted">Base Classes:</div>
                     {classDetail?.base_classes && classDetail.base_classes.length > 0 ? (
                       <div className="flex items-center gap-1 flex-wrap">
                         {classDetail.base_classes.map((bc, i) => (
@@ -585,7 +626,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     )}
 
                     {/* Interfaces */}
-                    <div className="text-micro font-mono text-text-muted mt-1">Interfaces:</div>
+                    <div className="text-micro font-medium text-text-muted mt-1">Interfaces:</div>
                     {classDetail?.interfaces && classDetail.interfaces.length > 0 ? (
                       <div className="flex items-center gap-1 flex-wrap">
                         {classDetail.interfaces.map((iface, i) => (
@@ -599,7 +640,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     )}
 
                     {/* Instantiation Sites */}
-                    <div className="text-micro font-mono text-text-muted mt-1">Instantiation Sites:</div>
+                    <div className="text-micro font-medium text-text-muted mt-1">Instantiation Sites:</div>
                     {classDetail?.instantiations && classDetail.instantiations.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {classDetail.instantiations.map((inst) => (
@@ -642,13 +683,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                 {/* Class Members */}
                 <div className="flex flex-col gap-2">
-                  <div className="text-micro font-semibold text-text-secondary uppercase tracking-wider font-mono">
+                  <div className="text-caption font-medium text-text-secondary">
                     Class Members
                   </div>
 
                   {/* Constructors */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-micro font-mono text-text-muted">Constructors:</span>
+                    <span className="text-micro font-medium text-text-muted">Constructors:</span>
                     {classDetail?.constructors && classDetail.constructors.length > 0 ? (
                       classDetail.constructors.map((ctor, i) => (
                         <div key={i} className="p-1.5 bg-canvas rounded border border-border-subtle font-mono text-micro text-text-primary">
@@ -663,7 +704,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                   {/* Methods */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-micro font-mono text-text-muted">Methods:</span>
+                    <span className="text-micro font-medium text-text-muted">Methods:</span>
                     {classDetail?.methods && classDetail.methods.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {classDetail.methods.map((method, i) => (
@@ -676,7 +717,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 </span>
                               )}
                               {method.is_static && (
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/25">
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-accent-subtle text-accent border border-accent/25">
                                   static
                                 </span>
                               )}
@@ -691,7 +732,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                   {/* Properties */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-micro font-mono text-text-muted">Properties:</span>
+                    <span className="text-micro font-medium text-text-muted">Properties:</span>
                     {classDetail?.properties && classDetail.properties.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {classDetail.properties.map((prop, i) => (
@@ -737,25 +778,25 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-caption font-mono">
               <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro uppercase">Lines</span>
+                <span className="text-text-muted text-micro font-medium font-sans">Lines</span>
                 <span className="text-text-primary font-medium text-body">
                   {selectedFile.line_count.toLocaleString()}
                 </span>
               </div>
               <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro uppercase">Size</span>
+                <span className="text-text-muted text-micro font-medium font-sans">Size</span>
                 <span className="text-text-primary font-medium text-body">
                   {formatBytes(selectedFile.size_bytes)}
                 </span>
               </div>
               <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro uppercase">Extension</span>
+                <span className="text-text-muted text-micro font-medium font-sans">Extension</span>
                 <span className="text-text-primary font-medium text-body">
                   {selectedFile.extension ? `.${selectedFile.extension}` : "none"}
                 </span>
               </div>
               <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro uppercase">Status</span>
+                <span className="text-text-muted text-micro font-medium font-sans">Status</span>
                 <Badge
                   variant={
                     selectedFile.status === "parsed"
@@ -773,17 +814,17 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {selectedFile.status === "error" && selectedFile.error_message && (
               <div className="flex flex-col gap-1">
-                <span className="text-status-error text-micro uppercase font-mono font-medium">
+                <span className="text-status-danger-text text-micro font-medium font-sans">
                   Error Details
                 </span>
-                <div className="p-2 bg-status-error/10 border border-status-error/20 rounded font-mono text-micro text-status-error break-all select-text">
+                <div className="p-2 bg-status-danger-bg/20 border border-status-danger-border rounded font-mono text-micro text-status-danger-text break-all select-text">
                   {selectedFile.error_message}
                 </div>
               </div>
             )}
 
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-text-muted text-micro uppercase font-mono">
+              <div className="flex items-center gap-1.5 text-text-muted text-micro font-medium font-sans">
                 <Hash className="w-3 h-3" />
                 <span>Content Hash (BLAKE3)</span>
               </div>
@@ -898,7 +939,7 @@ const DiagramNodeInspector: React.FC<{
           <span className="font-semibold text-text-primary text-sm truncate" title={node.label}>
             {node.label}
           </span>
-          <Badge variant="neutral" size="sm" className="uppercase text-[10px]">
+          <Badge variant="neutral" size="sm" className="text-[10px]">
             {node.kind}
           </Badge>
         </div>
@@ -914,7 +955,7 @@ const DiagramNodeInspector: React.FC<{
 
       {node.source_ref && (
         <div className="flex flex-col gap-1 p-2 bg-canvas rounded border border-border-subtle text-[11px]">
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+          <span className="text-[10px] text-text-muted font-medium">
             Source Reference
           </span>
           <div className="flex items-center justify-between text-text-secondary">
@@ -937,7 +978,7 @@ const DiagramNodeInspector: React.FC<{
 
       {node.metrics && (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+          <span className="text-[10px] text-text-muted font-medium">
             Metrics
           </span>
           <div className="grid grid-cols-2 gap-1.5 text-[11px]">
@@ -971,7 +1012,7 @@ const DiagramNodeInspector: React.FC<{
 
       {connectedEdges && connectedEdges.length > 0 && (
         <div className="flex flex-col gap-1 pt-2 border-t border-border-subtle">
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+          <span className="text-[10px] text-text-muted font-medium">
             Connected Links ({connectedEdges.length})
           </span>
           <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -1020,7 +1061,7 @@ const DiagramEdgeInspector: React.FC<{
     <div className="flex flex-col gap-3 font-mono" data-testid="diagram-edge-inspector">
       <div className="flex flex-col gap-1 pb-3 border-b border-border-subtle">
         <div className="flex items-center justify-between gap-1">
-          <span className="font-semibold text-text-primary text-sm uppercase">
+          <span className="font-semibold text-text-primary text-sm">
             {edge.relationship}
           </span>
           <Badge variant={edge.confidence === "confirmed" ? "confirmed" : edge.confidence === "static" ? "static" : edge.confidence === "inferred" ? "inferred" : "unknown"} size="sm">
@@ -1036,7 +1077,7 @@ const DiagramEdgeInspector: React.FC<{
 
       {/* Endpoints */}
       <div className="flex flex-col gap-1.5 p-2 bg-canvas rounded border border-border-subtle text-[11px]">
-        <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+        <span className="text-[10px] text-text-muted font-medium">
           Endpoints
         </span>
         <div className="text-text-secondary truncate">
@@ -1056,7 +1097,7 @@ const DiagramEdgeInspector: React.FC<{
       {/* Provenance Evidence */}
       <div className="flex flex-col gap-2 p-2 bg-subtle rounded border border-border-subtle text-[11px]">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+          <span className="text-[10px] text-text-muted font-medium">
             Provenance Evidence
           </span>
           <span className="text-[9px] text-text-muted">ID #{edge.evidence_id}</span>

@@ -135,7 +135,7 @@ export const DiagramLegend: React.FC<DiagramLegendProps> = ({
               <div className="flex items-center justify-between">
                 <span className="flex items-center space-x-1.5">
                   <span>inferred</span>
-                  <span className="px-1 py-0.2 bg-subtle border border-dashed rounded text-[9px] uppercase font-mono text-text-muted">
+                  <span className="px-1 py-0.2 bg-subtle border border-dashed rounded-sm text-[9px] font-sans font-medium text-text-muted">
                     inferred
                   </span>
                 </span>
@@ -144,7 +144,7 @@ export const DiagramLegend: React.FC<DiagramLegendProps> = ({
               <div className="flex items-center justify-between">
                 <span className="flex items-center space-x-1.5">
                   <span>unknown</span>
-                  <span className="px-1 py-0.2 bg-subtle border border-dotted rounded text-[9px] uppercase font-mono text-text-faint">
+                  <span className="px-1 py-0.2 bg-subtle border border-dotted rounded-sm text-[9px] font-sans font-medium text-text-faint">
                     unknown
                   </span>
                 </span>

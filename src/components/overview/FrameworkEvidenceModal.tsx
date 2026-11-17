@@ -66,7 +66,7 @@ export const FrameworkEvidenceModal: React.FC<FrameworkEvidenceModalProps> = ({
                 {framework.version}
               </span>
             )}
-            <span className="flex items-center text-micro font-mono px-1.5 py-0.5 bg-bg-subtle text-text-secondary border border-border-subtle rounded-sm uppercase tracking-wider">
+            <span className="flex items-center text-micro font-sans font-medium px-1.5 py-0.5 bg-subtle text-text-secondary border border-border-subtle rounded-sm">
               {getConfidenceIcon(framework.confidence)}
               {framework.confidence}
             </span>

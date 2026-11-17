@@ -5,6 +5,7 @@ import { DependenciesView } from "@/components/dependencies/DependenciesView";
 import { CodeIntelligenceView } from "@/components/intelligence/CodeIntelligenceView";
 import { OverviewView } from "@/components/overview/OverviewView";
 import { CommandPalette } from "@/components/palette/CommandPalette";
+import { WelcomeView } from "@/components/welcome/WelcomeView";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
 import type { SelectedDiagramElement } from "@/types/diagram";
@@ -179,6 +180,7 @@ export const App: React.FC = () => {
         theme={ui.theme}
         inspectorOpen={ui.inspectorOpen}
         inspectorWidth={ui.inspectorWidth}
+        onResizeInspector={ui.setInspectorWidth}
         onSelectView={ui.setActiveView}
         onOpenFolder={project.openFolder}
         onReopenProject={project.reopenProject}
@@ -193,7 +195,15 @@ export const App: React.FC = () => {
           ui.setActiveView("explorer");
         }}
       >
-        {renderActiveView()}
+        {!project.currentProject ? (
+          <WelcomeView
+            onOpenFolder={project.openFolder}
+            onReopenProject={project.reopenProject}
+            recentProjects={project.recentProjects}
+          />
+        ) : (
+          renderActiveView()
+        )}
       </AppShell>
 
       <CommandPalette

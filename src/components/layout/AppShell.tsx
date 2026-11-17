@@ -3,10 +3,11 @@ import { TopBar } from "./TopBar";
 import { NavRail } from "./NavRail";
 import { InspectorPanel } from "./InspectorPanel";
 import { StatusBar } from "./StatusBar";
+import { PipelineProgress } from "@/components/pipeline/PipelineProgress";
 import type { FileRecord, Project, ScanProgressPayload, SymbolRecord, ViewType } from "@/types/ipc";
 import type { SelectedDiagramElement } from "@/types/diagram";
 
-interface AppShellProps {
+export interface AppShellProps {
   currentProject: Project | null;
   recentProjects: Project[];
   files: FileRecord[];
@@ -20,6 +21,7 @@ interface AppShellProps {
   theme: "dark" | "light";
   inspectorOpen: boolean;
   inspectorWidth: number;
+  onResizeInspector?: (width: number) => void;
   onSelectView: (view: ViewType) => void;
   onOpenFolder: () => void;
   onReopenProject: (path: string) => void;
@@ -47,6 +49,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   theme,
   inspectorOpen,
   inspectorWidth,
+  onResizeInspector,
   onSelectView,
   onOpenFolder,
   onReopenProject,
@@ -75,10 +78,25 @@ export const AppShell: React.FC<AppShellProps> = ({
         onOpenCommandPalette={onOpenCommandPalette}
       />
 
+      {isScanning && (
+        <PipelineProgress
+          stage={
+            scanProgress?.stage === "parsing"
+              ? "parse"
+              : scanProgress?.stage === "analyzing"
+              ? "analyze"
+              : "scan"
+          }
+          filesProcessed={scanProgress?.files_scanned || 0}
+          currentFile={scanProgress?.current_file}
+          onCancel={onCancelScan}
+        />
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         <NavRail activeView={activeView} onSelectView={onSelectView} />
 
-        <main className="flex-1 flex overflow-hidden bg-canvas">
+        <main className="flex-1 min-w-0 flex overflow-hidden bg-canvas">
           {children}
         </main>
 
@@ -86,6 +104,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           isOpen={inspectorOpen}
           onToggle={onToggleInspector}
           width={inspectorWidth}
+          onResize={onResizeInspector}
           selectedFile={selectedFile}
           selectedSymbol={selectedSymbol}
           selectedDiagramElement={selectedDiagramElement}

@@ -300,7 +300,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-body font-semibold text-text-primary">{fw.name}</span>
                     <span
-                      className="px-1.5 py-0.5 rounded-sm text-micro font-mono uppercase tracking-wider border border-border-subtle bg-bg-subtle text-text-secondary"
+                      className="px-1.5 py-0.5 rounded-sm text-micro font-sans font-medium border border-border-subtle bg-subtle text-text-secondary"
                     >
                       {fw.confidence}
                     </span>
@@ -455,7 +455,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-micro font-mono text-text-muted">Cohesion: {m.cohesion_score}</span>
-                    <span className="px-1.5 py-0.5 rounded-sm text-micro font-mono uppercase tracking-wider border border-border-default bg-surface text-text-secondary">
+                    <span className="px-1.5 py-0.5 rounded-sm text-micro font-sans font-medium border border-border-default bg-surface text-text-secondary">
                       {m.layer}
                     </span>
                   </div>
@@ -486,7 +486,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="bg-surface border border-border-default rounded-sm overflow-hidden">
           <table className="w-full text-left border-collapse" data-testid="entry-points-table">
             <thead>
-              <tr className="border-b border-border-default bg-bg-canvas text-micro font-mono uppercase tracking-wider text-text-muted">
+              <tr className="border-b border-border-default bg-canvas text-caption font-sans font-medium text-text-muted">
                 <th className="py-2 px-3">Name</th>
                 <th className="py-2 px-3">Type</th>
                 <th className="py-2 px-3">File Location</th>

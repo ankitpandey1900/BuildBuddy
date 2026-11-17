@@ -14,8 +14,10 @@ import {
   ShieldAlert,
   FileBarChart,
   BookOpen,
+  FileCode,
 } from "lucide-react";
 import type { FileRecord, ViewType } from "@/types/ipc";
+import { Kbd } from "@/components/ui/Kbd";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -55,8 +57,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         e.preventDefault();
         if (isOpen) {
           onClose();
-        } else {
-          // Open handled externally
         }
       }
       if (e.key === "Escape" && isOpen) {
@@ -75,12 +75,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     { id: "explorer", label: "Go to Repository Explorer", icon: <FolderTree className="w-4 h-4" /> },
     { id: "architecture", label: "Go to Architecture Diagrams", icon: <GitGraph className="w-4 h-4" /> },
     { id: "dependencies", label: "Go to Dependencies", icon: <Boxes className="w-4 h-4" /> },
+    { id: "intelligence", label: "Go to Code Intelligence", icon: <Code2 className="w-4 h-4" /> },
     { id: "apis", label: "Go to API Inventory", icon: <Network className="w-4 h-4" /> },
     { id: "database", label: "Go to Database Schema", icon: <Database className="w-4 h-4" /> },
-    { id: "intelligence", label: "Go to Code Intelligence", icon: <Code2 className="w-4 h-4" /> },
-    { id: "security", label: "Go to Security & Risk", icon: <ShieldAlert className="w-4 h-4" /> },
-    { id: "reports", label: "Go to Engineering Reports", icon: <FileBarChart className="w-4 h-4" /> },
     { id: "documentation", label: "Go to Documentation", icon: <BookOpen className="w-4 h-4" /> },
+    { id: "security", label: "Go to Security & Health", icon: <ShieldAlert className="w-4 h-4" /> },
+    { id: "reports", label: "Go to Engineering Reports", icon: <FileBarChart className="w-4 h-4" /> },
   ];
 
   const filteredNav = navigationCommands.filter((c) =>
@@ -93,16 +93,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-24 select-none"
+      className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-start justify-center pt-20 px-4 select-none animate-in fade-in duration-150"
       onClick={onClose}
       data-testid="command-palette-backdrop"
     >
       <div
-        className="w-[540px] bg-surface border border-border-default shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[460px]"
+        className="w-full max-w-[560px] bg-surface border border-border-default shadow-modal rounded-lg overflow-hidden flex flex-col max-h-[480px] font-sans animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Input */}
-        <div className="h-11 border-b border-border-default px-3 flex items-center gap-2">
+        {/* Search Input Bar */}
+        <div className="h-11 border-b border-border-default px-3.5 flex items-center gap-2.5 bg-elevated/40">
           <Search className="w-4 h-4 text-text-muted flex-shrink-0" />
           <input
             ref={inputRef}
@@ -110,17 +110,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             placeholder="Type a command or search files..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-text-primary placeholder:text-text-muted text-body outline-none"
+            className="w-full bg-transparent text-text-primary placeholder:text-text-muted text-body outline-none font-sans"
           />
-          <kbd className="text-micro font-mono bg-subtle px-1.5 py-0.5 rounded border border-border-subtle text-text-muted">
-            ESC
-          </kbd>
+          <Kbd>Esc</Kbd>
         </div>
 
-        {/* Command List */}
-        <div className="flex-1 overflow-y-auto p-1.5 text-meta">
+        {/* Command & File Groups */}
+        <div className="flex-1 overflow-y-auto p-2 text-body">
           {/* Quick Actions */}
-          <div className="px-2 py-1 text-micro font-mono text-text-muted uppercase tracking-wider">
+          <div className="px-2 py-1 text-caption text-text-muted font-medium">
             Actions
           </div>
           <button
@@ -128,17 +126,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               onClose();
               onOpenFolder();
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-left"
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
           >
-            <FolderOpen className="w-4 h-4 text-accent" />
-            <span>Open Project Folder...</span>
+            <div className="flex items-center gap-2.5">
+              <FolderOpen className="w-4 h-4 text-accent" />
+              <span>Open Project Folder...</span>
+            </div>
+            <Kbd>Ctrl+O</Kbd>
           </button>
           <button
             onClick={() => {
               onClose();
               onTriggerScan();
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-left"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
           >
             <RefreshCw className="w-4 h-4 text-text-muted" />
             <span>Re-scan Repository</span>
@@ -148,17 +149,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               onClose();
               onToggleTheme();
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-left"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
           >
             <Sun className="w-4 h-4 text-text-muted" />
-            <span>Toggle Dark/Light Theme</span>
+            <span>Toggle Dark / Light Theme</span>
           </button>
 
           {/* Navigation */}
           {filteredNav.length > 0 && (
             <>
-              <div className="px-2 py-1 mt-2 text-micro font-mono text-text-muted uppercase tracking-wider">
-                Navigation
+              <div className="px-2 py-1 mt-2 text-caption text-text-muted font-medium border-t border-border-subtle pt-2">
+                Views & Navigation
               </div>
               {filteredNav.map((cmd) => (
                 <button
@@ -167,7 +168,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     onClose();
                     onSelectView(cmd.id);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-left"
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
                 >
                   <span className="text-text-muted">{cmd.icon}</span>
                   <span>{cmd.label}</span>
@@ -176,30 +177,47 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             </>
           )}
 
-          {/* Files */}
+          {/* File Results */}
           {filteredFiles.length > 0 && (
             <>
-              <div className="px-2 py-1 mt-2 text-micro font-mono text-text-muted uppercase tracking-wider">
-                Files
+              <div className="px-2 py-1 mt-2 text-caption text-text-muted font-medium border-t border-border-subtle pt-2">
+                Matching Files
               </div>
-              {filteredFiles.map((f) => (
+              {filteredFiles.map((file) => (
                 <button
-                  key={f.id}
+                  key={file.id}
                   onClick={() => {
                     onClose();
-                    onSelectView("explorer");
-                    onSelectFile(f);
+                    onSelectFile(file);
                   }}
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-left group"
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
                 >
-                  <span className="truncate">{f.relative_path}</span>
-                  <span className="text-micro font-mono text-text-muted">
-                    {f.line_count > 0 ? `${f.line_count}L` : ""}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileCode className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate font-mono text-caption text-text-secondary">
+                      {file.relative_path}
+                    </span>
+                  </div>
+                  <span className="text-caption text-text-muted ml-2 flex-shrink-0 font-sans">
+                    {file.line_count} lines
                   </span>
                 </button>
               ))}
             </>
           )}
+        </div>
+
+        {/* Footer hints */}
+        <div className="h-8 border-t border-border-subtle px-3 flex items-center justify-between text-caption text-text-muted bg-elevated/20">
+          <div className="flex items-center gap-2">
+            <span>Navigate</span>
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Select</span>
+            <Kbd>↵</Kbd>
+          </div>
         </div>
       </div>
     </div>

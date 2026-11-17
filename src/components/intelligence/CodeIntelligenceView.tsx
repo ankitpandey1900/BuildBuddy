@@ -203,7 +203,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       columnHelper.accessor("kind", {
         header: "Kind",
         cell: (info) => (
-          <Badge variant="neutral" size="sm" className="font-mono text-micro uppercase">
+          <Badge variant="neutral" size="sm">
             {info.getValue()}
           </Badge>
         ),
@@ -437,7 +437,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         <div className="flex items-center gap-3 flex-wrap text-xs">
           {/* Language Filter */}
           <div className="flex items-center gap-1">
-            <span className="text-micro text-text-muted font-mono uppercase">Lang:</span>
+            <span className="text-caption text-text-muted font-sans font-medium">Lang:</span>
             <select
               value={languageFilter}
               onChange={(e) => setLanguageFilter(e.target.value)}
@@ -452,7 +452,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
 
           {/* Kind Filter */}
           <div className="flex items-center gap-1">
-            <span className="text-micro text-text-muted font-mono uppercase">Kind:</span>
+            <span className="text-caption text-text-muted font-sans font-medium">Kind:</span>
             <select
               value={kindFilter}
               onChange={(e) => setKindFilter(e.target.value)}
@@ -471,7 +471,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
 
           {/* Path Prefix */}
           <div className="flex items-center gap-1">
-            <span className="text-micro text-text-muted font-mono uppercase">Path:</span>
+            <span className="text-caption text-text-muted font-sans font-medium">Path:</span>
             <input
               type="text"
               placeholder="e.g. src/"
@@ -484,7 +484,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
 
           {/* Min Complexity */}
           <div className="flex items-center gap-1">
-            <span className="text-micro text-text-muted font-mono uppercase">Min CC:</span>
+            <span className="text-caption text-text-muted font-sans font-medium">Min CC:</span>
             <select
               value={minComplexity}
               onChange={(e) =>
@@ -581,7 +581,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
             data-testid="symbols-table-container"
           >
             <table className="w-full text-left border-collapse table-fixed">
-              <thead className="bg-surface sticky top-0 z-10 text-text-secondary text-[11px] uppercase tracking-wider font-mono border-b border-border-default select-none shadow-sm">
+              <thead className="bg-surface sticky top-0 z-10 text-text-secondary text-caption font-sans font-medium border-b border-border-default select-none shadow-sm">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {

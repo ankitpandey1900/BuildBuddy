@@ -203,7 +203,7 @@ export const DiagramNodeComponent: React.FC<NodeProps> = ({ data, selected }) =>
         <span className="truncate" title={secondary}>
           {secondary}
         </span>
-        <span className="text-[10px] uppercase font-mono tracking-wider text-text-faint ml-1">
+        <span className="text-[11px] font-sans font-medium text-text-faint ml-1">
           {layer}
         </span>
       </div>

@@ -3,75 +3,116 @@
 @tailwind utilities;
 
 :root {
-  /* Dark Theme Default */
-  --bg-canvas: #0D1117;
-  --bg-surface: #161B22;
-  --bg-subtle: #21262D;
-  --bg-elevated: #30363D;
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(255, 255, 255, 0.10);
+  /* Dark Theme Default - 3 Layered Slate Surfaces */
+  --bg-canvas: #12151A;
+  --bg-surface: #181C23;
+  --bg-elevated: #222731;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.09);
 
-  --text-primary: #F0F6FC;
-  --text-secondary: #C9D1D9;
-  --text-muted: #8B949E;
-  --text-faint: #484F58;
+  --text-primary: #F0F3F6;
+  --text-secondary: #BAC2CC;
+  --text-muted: #7D8794;
+  --text-faint: #4C5562;
 
-  --border-subtle: #21262D;
-  --border-default: #30363D;
-  --border-strong: #6E7681;
-  --border-focus: #58A6FF;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-focus: #3B82F6;
 
-  --accent-default: #388BFD;
-  --accent-hover: #58A6FF;
-  --accent-subtle: rgba(56, 139, 253, 0.15);
-  --accent-text: #79C0FF;
+  --accent-default: #3B82F6;
+  --accent-hover: #60A5FA;
+  --accent-subtle: rgba(59, 130, 246, 0.14);
+  --accent-text: #60A5FA;
 
-  /* Domain Tokens */
-  --domain-frontend-bg: #1C2433;
-  --domain-frontend-border: #58A6FF;
-  --domain-backend-bg: #1A2824;
-  --domain-backend-border: #3FB950;
-  --domain-database-bg: #2B2319;
-  --domain-database-border: #D29922;
-  --domain-external-bg: #271F30;
-  --domain-external-border: #BC8CFF;
+  /* Semantic status colors */
+  --status-success-bg: rgba(34, 197, 94, 0.14);
+  --status-success-text: #4ADE80;
+  --status-warning-bg: rgba(234, 179, 8, 0.14);
+  --status-warning-text: #FACC15;
+  --status-danger-bg: rgba(239, 68, 68, 0.14);
+  --status-danger-text: #F87171;
+
+  /* Domain / Architecture Layer Tokens */
+  --domain-frontend-bg: rgba(59, 130, 246, 0.12);
+  --domain-frontend-border: #60A5FA;
+  --domain-backend-bg: rgba(16, 185, 129, 0.12);
+  --domain-backend-border: #34D399;
+  --domain-database-bg: rgba(245, 158, 11, 0.12);
+  --domain-database-border: #FBBF24;
+  --domain-shared-bg: rgba(139, 92, 246, 0.12);
+  --domain-shared-border: #A78BFA;
+  --domain-config-bg: rgba(100, 116, 139, 0.12);
+  --domain-config-border: #94A3B8;
+  --domain-external-bg: rgba(236, 72, 153, 0.12);
+  --domain-external-border: #F472B6;
+
+  /* Elevation Shadows */
+  --shadow-menu: 0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 4px 12px -2px rgba(0, 0, 0, 0.25);
 }
 
 [data-theme='light'] {
-  --bg-canvas: #F6F8FA;
+  --bg-canvas: #F6F7F9;
   --bg-surface: #FFFFFF;
-  --bg-subtle: #F0F2F5;
-  --bg-elevated: #E1E4E8;
+  --bg-elevated: #F0F2F5;
   --bg-hover: rgba(0, 0, 0, 0.04);
-  --bg-active: rgba(0, 0, 0, 0.08);
+  --bg-active: rgba(0, 0, 0, 0.07);
 
-  --text-primary: #1F2328;
-  --text-secondary: #424A53;
-  --text-muted: #656D76;
-  --text-faint: #8C959F;
+  --text-primary: #191C21;
+  --text-secondary: #4B535E;
+  --text-muted: #6E7783;
+  --text-faint: #9AA2AD;
 
-  --border-subtle: #E1E4E8;
-  --border-default: #D0D7DE;
-  --border-strong: #8C959F;
-  --border-focus: #0969DA;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --border-focus: #2563EB;
 
-  --accent-default: #0969DA;
-  --accent-hover: #1A7F37;
-  --accent-subtle: rgba(9, 105, 218, 0.10);
-  --accent-text: #0969DA;
+  --accent-default: #2563EB;
+  --accent-hover: #1D4ED8;
+  --accent-subtle: rgba(37, 99, 235, 0.10);
+  --accent-text: #2563EB;
 
-  /* Domain Tokens */
-  --domain-frontend-bg: #EEF4FF;
-  --domain-frontend-border: #0969DA;
-  --domain-backend-bg: #EBF8EE;
-  --domain-backend-border: #1A7F37;
-  --domain-database-bg: #FFF8E6;
-  --domain-database-border: #9A6700;
-  --domain-external-bg: #F5EEFF;
-  --domain-external-border: #8250DF;
+  /* Semantic status colors */
+  --status-success-bg: rgba(22, 163, 74, 0.10);
+  --status-success-text: #16A34A;
+  --status-warning-bg: rgba(202, 138, 4, 0.10);
+  --status-warning-text: #CA8A04;
+  --status-danger-bg: rgba(220, 38, 38, 0.10);
+  --status-danger-text: #DC2626;
+
+  /* Domain / Architecture Layer Tokens */
+  --domain-frontend-bg: rgba(37, 99, 235, 0.08);
+  --domain-frontend-border: #2563EB;
+  --domain-backend-bg: rgba(5, 150, 105, 0.08);
+  --domain-backend-border: #059669;
+  --domain-database-bg: rgba(217, 119, 6, 0.08);
+  --domain-database-border: #D97706;
+  --domain-shared-bg: rgba(124, 58, 237, 0.08);
+  --domain-shared-border: #7C3AED;
+  --domain-config-bg: rgba(71, 85, 105, 0.08);
+  --domain-config-border: #475569;
+  --domain-external-bg: rgba(219, 39, 119, 0.08);
+  --domain-external-border: #DB2777;
+
+  /* Elevation Shadows */
+  --shadow-menu: 0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 16px 40px -8px rgba(0, 0, 0, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
 }
 
-/* Custom Scrollbar */
+/* System Typography and Selection */
+body {
+  font-family: "Segoe UI Variable", "SF Pro", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-primary);
+  background-color: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Minimal Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -90,7 +131,7 @@
   background: var(--border-strong);
 }
 
-/* Accessible Focus Ring: 1px neutral border default, 2px ring on :focus-visible only */
+/* Accessible Focus Ring: 2px solid on :focus-visible only */
 .focus-ring {
   outline: none;
 }
@@ -99,3 +140,23 @@
   outline-offset: 1px;
 }
 
+/* Universal Focus-Visible Reset (removes thick blue outline from mouse clicks) */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

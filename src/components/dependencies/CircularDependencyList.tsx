@@ -32,7 +32,7 @@ export const CircularDependencyList: React.FC<CircularDependencyListProps> = ({
             key={idx}
             className="p-3 bg-surface border border-border-default rounded-md text-xs flex flex-col gap-2"
           >
-            <div className="text-text-secondary font-mono text-micro uppercase tracking-wider flex items-center justify-between">
+            <div className="text-text-secondary font-sans text-caption font-medium flex items-center justify-between">
               <span>Cycle #{idx + 1} ({cycle.cycle_files.length} files)</span>
             </div>
 

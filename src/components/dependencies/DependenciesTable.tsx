@@ -260,7 +260,7 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
       {/* Table Content */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-canvas/50 sticky top-0 z-10 text-text-secondary text-micro uppercase tracking-wider font-mono border-b border-border-default select-none">
+          <thead className="bg-canvas/80 sticky top-0 z-10 text-text-secondary text-caption font-sans font-medium border-b border-border-default select-none">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {

@@ -215,7 +215,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           {confidence === "inferred" && (
             <span
               data-testid="edge-inferred-badge"
-              className="px-1 py-0.2 text-[9px] font-mono uppercase tracking-wider rounded bg-subtle border border-dashed border-border-strong text-text-muted"
+              className="px-1 py-0.2 text-[9px] font-sans font-medium rounded-sm bg-subtle border border-dashed border-border-strong text-text-muted"
               title="Confidence: Inferred (never merged with confirmed)"
             >
               inferred
@@ -225,7 +225,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           {confidence === "unknown" && (
             <span
               data-testid="edge-unknown-badge"
-              className="px-1 py-0.2 text-[9px] font-mono uppercase tracking-wider rounded bg-subtle border border-dotted border-border-strong text-text-faint"
+              className="px-1 py-0.2 text-[9px] font-sans font-medium rounded-sm bg-subtle border border-dotted border-border-strong text-text-faint"
               title="Confidence: Unknown"
             >
               unknown

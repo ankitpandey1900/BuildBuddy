@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   LayoutDashboard,
   FolderTree,
@@ -10,12 +10,17 @@ import {
   ShieldAlert,
   FileBarChart,
   BookOpen,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import type { ViewType } from "@/types/ipc";
+import { Tooltip } from "@/components/ui/Tooltip";
 
-interface NavRailProps {
+export interface NavRailProps {
   activeView: ViewType;
   onSelectView: (view: ViewType) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface NavItem {
@@ -24,50 +29,133 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-export const NavRail: React.FC<NavRailProps> = ({ activeView, onSelectView }) => {
-  const items: NavItem[] = [
-    { id: "overview", label: "Overview", icon: <LayoutDashboard className="w-4 h-4" /> },
-    { id: "explorer", label: "Explorer", icon: <FolderTree className="w-4 h-4" /> },
-    { id: "architecture", label: "Architecture", icon: <GitGraph className="w-4 h-4" /> },
-    { id: "dependencies", label: "Dependencies", icon: <Boxes className="w-4 h-4" /> },
-    { id: "apis", label: "APIs", icon: <Network className="w-4 h-4" /> },
-    { id: "database", label: "Database", icon: <Database className="w-4 h-4" /> },
-    { id: "intelligence", label: "Code Intel", icon: <Code2 className="w-4 h-4" /> },
-    { id: "security", label: "Security", icon: <ShieldAlert className="w-4 h-4" /> },
-    { id: "reports", label: "Reports", icon: <FileBarChart className="w-4 h-4" /> },
-    { id: "documentation", label: "Documentation", icon: <BookOpen className="w-4 h-4" /> },
-  ];
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: "Explore",
+    items: [
+      { id: "overview", label: "Overview", icon: <LayoutDashboard className="w-4 h-4" /> },
+      { id: "explorer", label: "Explorer", icon: <FolderTree className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: "Analyze",
+    items: [
+      { id: "architecture", label: "Architecture", icon: <GitGraph className="w-4 h-4" /> },
+      { id: "dependencies", label: "Dependencies", icon: <Boxes className="w-4 h-4" /> },
+      { id: "intelligence", label: "Code Intel", icon: <Code2 className="w-4 h-4" /> },
+      { id: "apis", label: "APIs", icon: <Network className="w-4 h-4" /> },
+      { id: "database", label: "Database", icon: <Database className="w-4 h-4" /> },
+    ],
+  },
+  {
+    title: "Document",
+    items: [
+      { id: "documentation", label: "Documentation", icon: <BookOpen className="w-4 h-4" /> },
+      { id: "security", label: "Security", icon: <ShieldAlert className="w-4 h-4" /> },
+      { id: "reports", label: "Reports", icon: <FileBarChart className="w-4 h-4" /> },
+    ],
+  },
+];
+
+export const NavRail: React.FC<NavRailProps> = ({
+  activeView,
+  onSelectView,
+  isCollapsed: controlledCollapsed,
+  onToggleCollapse: controlledToggle,
+}) => {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+  const toggleCollapse = controlledToggle || (() => setInternalCollapsed((prev) => !prev));
 
   return (
-    <aside className="w-12 bg-surface border-r border-border-default flex flex-col items-center py-2 select-none flex-shrink-0 z-30">
-      <nav className="flex flex-col gap-1 w-full px-1.5" aria-label="Main Navigation">
-        {items.map((item) => {
-          const isActive = activeView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectView(item.id)}
-              title={item.label}
-              aria-label={item.label}
-              className={`w-9 h-9 mx-auto rounded-md flex items-center justify-center transition-colors focus-ring relative group ${
-                isActive
-                  ? "bg-accent/15 text-accent border border-accent/30"
-                  : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
-              }`}
-            >
-              {item.icon}
-              {/* Tooltip on hover */}
-              <span
-                role="tooltip"
-                className="absolute left-11 ml-1 px-2 py-0.5 bg-elevated border border-border-default text-text-primary text-micro font-sans rounded shadow-md whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50"
-              >
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
+    <aside
+      aria-label="Main Navigation Sidebar"
+      data-testid="app-sidebar"
+      className={`bg-surface border-r border-border-default flex flex-col justify-between py-2 select-none flex-shrink-0 z-30 transition-all duration-150 ease-out ${
+        isCollapsed ? "w-12" : "w-52"
+      }`}
+    >
+      {/* Groups & Navigation Items */}
+      <nav className="flex flex-col gap-4 px-1.5 w-full overflow-y-auto">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title} className="flex flex-col gap-0.5">
+            {/* Group Title (hidden when collapsed) */}
+            {!isCollapsed && (
+              <div className="px-2.5 py-1 text-[11px] font-sans font-medium text-text-muted select-none">
+                {group.title}
+              </div>
+            )}
+
+            {/* Group Items */}
+            {group.items.map((item) => {
+              const isActive = activeView === item.id;
+
+              const buttonElement = (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectView(item.id)}
+                  title={isCollapsed ? item.label : undefined}
+                  aria-label={item.label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`w-full flex items-center rounded-sm transition-colors duration-150 ease-out focus-ring cursor-pointer ${
+                    isCollapsed
+                      ? "h-8 justify-center px-0"
+                      : "h-7.5 px-2.5 gap-2.5 text-left"
+                  } ${
+                    isActive
+                      ? "bg-accent-subtle text-accent font-medium shadow-none"
+                      : "text-text-secondary hover:text-text-primary hover:bg-hover font-normal"
+                  }`}
+                >
+                  <span className="flex-shrink-0 flex items-center justify-center">
+                    {item.icon}
+                  </span>
+                  {!isCollapsed && (
+                    <span className="truncate text-body leading-none">{item.label}</span>
+                  )}
+                </button>
+              );
+
+              if (isCollapsed) {
+                return (
+                  <Tooltip key={item.id} content={item.label} side="right">
+                    {buttonElement}
+                  </Tooltip>
+                );
+              }
+
+              return buttonElement;
+            })}
+          </div>
+        ))}
       </nav>
+
+      {/* Collapse / Expand Toggle Button at Bottom */}
+      <div className="pt-2 border-t border-border-subtle px-1.5 flex items-center">
+        <button
+          type="button"
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={`w-full h-7 flex items-center rounded-sm hover:bg-hover text-text-muted hover:text-text-primary transition-colors duration-150 focus-ring cursor-pointer ${
+            isCollapsed ? "justify-center" : "px-2.5 gap-2"
+          }`}
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <PanelLeft className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <>
+              <PanelLeftClose className="w-4 h-4 flex-shrink-0" />
+              <span className="text-caption truncate">Collapse</span>
+            </>
+          )}
+        </button>
+      </div>
     </aside>
   );
 };
-

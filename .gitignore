@@ -32,6 +32,7 @@ target/
 # Testing & Playwright
 test-results/
 playwright-report/
+docs/screenshots/
 
 # OS
 .DS_Store
