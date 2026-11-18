@@ -66,9 +66,9 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
       <div
         onMouseDown={handleMouseDown}
         aria-hidden="true"
-        className={`absolute top-0 bottom-0 z-30 cursor-col-resize ${
-          side === "right" ? "-left-1 w-2.5" : "-right-1 w-2.5"
-        } hover:bg-accent/30 transition-colors ${isDragging ? "bg-accent/40" : ""}`}
+        className={`absolute top-0 bottom-0 z-30 cursor-col-resize w-1.5 ${
+          side === "right" ? "-left-[3px]" : "-right-[3px]"
+        } ${isDragging ? "bg-accent/30" : "bg-transparent"}`}
         title="Drag to resize panel"
       />
       {children}

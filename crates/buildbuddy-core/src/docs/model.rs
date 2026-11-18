@@ -2,25 +2,46 @@ use serde::{Deserialize, Serialize};
 
 use crate::docs::lint::{check_banned_phrases, BannedPhraseViolation};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
     ProjectOverview,
+    HighLevelDesign,
+    LowLevelDesign,
+    ApiDocumentation,
+    DatabaseDocumentation,
     DependencyInventory,
+    ArchitectureDecisionRecords,
+    SecurityReport,
+    TechnicalDebtReport,
 }
 
 impl DocumentType {
     pub fn as_str(&self) -> &'static str {
         match self {
             DocumentType::ProjectOverview => "project_overview",
+            DocumentType::HighLevelDesign => "hld",
+            DocumentType::LowLevelDesign => "lld",
+            DocumentType::ApiDocumentation => "api_documentation",
+            DocumentType::DatabaseDocumentation => "database_documentation",
             DocumentType::DependencyInventory => "dependency_inventory",
+            DocumentType::ArchitectureDecisionRecords => "adrs",
+            DocumentType::SecurityReport => "security_report",
+            DocumentType::TechnicalDebtReport => "tech_debt_report",
         }
     }
 
     pub fn default_title(&self) -> &'static str {
         match self {
             DocumentType::ProjectOverview => "Project Overview",
+            DocumentType::HighLevelDesign => "High-Level Design (HLD)",
+            DocumentType::LowLevelDesign => "Low-Level Design (LLD)",
+            DocumentType::ApiDocumentation => "API Documentation",
+            DocumentType::DatabaseDocumentation => "Database Documentation",
             DocumentType::DependencyInventory => "Dependency Inventory",
+            DocumentType::ArchitectureDecisionRecords => "Architecture Decision Records (ADRs)",
+            DocumentType::SecurityReport => "Security Audit Report",
+            DocumentType::TechnicalDebtReport => "Technical Debt Report",
         }
     }
 }
@@ -31,7 +52,14 @@ impl std::str::FromStr for DocumentType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "project_overview" => Ok(DocumentType::ProjectOverview),
+            "hld" => Ok(DocumentType::HighLevelDesign),
+            "lld" => Ok(DocumentType::LowLevelDesign),
+            "api_documentation" => Ok(DocumentType::ApiDocumentation),
+            "database_documentation" => Ok(DocumentType::DatabaseDocumentation),
             "dependency_inventory" => Ok(DocumentType::DependencyInventory),
+            "adrs" => Ok(DocumentType::ArchitectureDecisionRecords),
+            "security_report" => Ok(DocumentType::SecurityReport),
+            "tech_debt_report" => Ok(DocumentType::TechnicalDebtReport),
             other => Err(format!("Unknown document type: {}", other)),
         }
     }
@@ -314,14 +342,54 @@ pub fn split_into_sentences(text: &str) -> Vec<String> {
 }
 
 /// If a sentence contains a detected secret, drops the entire sentence from the text.
+/// Preserves markdown formatting, line breaks, code fences, tables, and paragraphs.
 pub fn drop_secret_sentences(text: &str) -> String {
-    let sentences = split_into_sentences(text);
-    let clean_sentences: Vec<String> = sentences
-        .into_iter()
-        .filter(|s| !sentence_contains_secret(s))
-        .collect();
+    let mut in_code_block = false;
+    let mut result_lines = Vec::new();
 
-    clean_sentences.join(" ")
+    for line in text.lines() {
+        let trimmed_line = line.trim();
+        if trimmed_line.starts_with("```") {
+            in_code_block = !in_code_block;
+            result_lines.push(line.to_string());
+            continue;
+        }
+
+        if in_code_block {
+            if !sentence_contains_secret(line) {
+                result_lines.push(line.to_string());
+            }
+            continue;
+        }
+
+        if trimmed_line.starts_with('#')
+            || trimmed_line.starts_with('|')
+            || trimmed_line.starts_with('-')
+            || trimmed_line.starts_with('*')
+        {
+            if !sentence_contains_secret(line) {
+                result_lines.push(line.to_string());
+            }
+            continue;
+        }
+
+        if trimmed_line.is_empty() {
+            result_lines.push(String::new());
+            continue;
+        }
+
+        let sentences = split_into_sentences(line);
+        let clean: Vec<String> = sentences
+            .into_iter()
+            .filter(|s| !sentence_contains_secret(s))
+            .collect();
+
+        if !clean.is_empty() {
+            result_lines.push(clean.join(" "));
+        }
+    }
+
+    result_lines.join("\n")
 }
 
 #[cfg(test)]
@@ -377,5 +445,23 @@ mod tests {
         assert!(!cleaned.contains("sk_live_"));
         assert!(!cleaned.contains("Secret key is"));
         assert_eq!(cleaned, "BuildBuddy parses code offline. Generates markdown reports.");
+    }
+
+    #[test]
+    fn test_document_type_roundtrip() {
+        let types = [
+            DocumentType::ProjectOverview,
+            DocumentType::HighLevelDesign,
+            DocumentType::LowLevelDesign,
+            DocumentType::ApiDocumentation,
+            DocumentType::DatabaseDocumentation,
+            DocumentType::DependencyInventory,
+            DocumentType::ArchitectureDecisionRecords,
+        ];
+        for t in types {
+            let s = t.as_str();
+            assert_eq!(s.parse::<DocumentType>(), Ok(t));
+            assert!(!t.default_title().is_empty());
+        }
     }
 }

@@ -9,7 +9,11 @@ import { WelcomeView } from "@/components/welcome/WelcomeView";
 import { useProjectState } from "@/stores/projectStore";
 import { useUIState } from "@/stores/uiStore";
 import type { SelectedDiagramElement } from "@/types/diagram";
-import { Network, Database, ShieldAlert, FileBarChart, BookOpen } from "lucide-react";
+import { ApiView } from "@/components/api/ApiView";
+import { DatabaseView } from "@/components/database/DatabaseView";
+import { FindingsView } from "@/components/findings/FindingsView";
+import { DocumentationView } from "@/components/docs/DocumentationView";
+import { ReportsView } from "@/components/reports/ReportsView";
 
 // Lazy-load Architecture screen with dynamic import() to keep main bundle lean
 const ArchitectureView = React.lazy(() =>
@@ -64,6 +68,7 @@ export const App: React.FC = () => {
               ui.setActiveView("explorer");
             }}
             onOpenFolder={project.openFolder}
+            onReanalyze={project.triggerScan}
           />
         );
       case "architecture":
@@ -76,12 +81,14 @@ export const App: React.FC = () => {
             }
           >
             <ArchitectureView
+              defaultDiagramType="system_flow"
               projectId={project.currentProject?.id}
               projectRootPath={project.currentProject?.root_path}
               theme={ui.theme}
               onSelectDiagramElement={handleSelectDiagramElement}
               onRunPipeline={project.triggerScan}
               onTriggerScan={project.triggerScan}
+              lastAnalysisRunId={project.scanSummary?.analysis_run_id}
               onNavigateToSource={(filePath, line) => {
                 project.openFileAtLine(filePath, line);
                 ui.setActiveView("explorer");
@@ -104,21 +111,17 @@ export const App: React.FC = () => {
         );
       case "apis":
         return (
-          <PlaceholderView
-            title="API Endpoints"
-            icon={<Network className="w-8 h-8 text-accent" />}
-            description="HTTP routes, parameter schemas, controller mappings, and middleware analysis."
-            badge="Phase 3"
+          <ApiView
+            projectId={project.currentProject?.id}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
           />
         );
       case "database":
         return (
-          <PlaceholderView
-            title="Database & Models"
-            icon={<Database className="w-8 h-8 text-accent" />}
-            description="Entity-relationship models, schema declarations, and query mapping."
-            badge="Phase 3"
-          />
+          <DatabaseView projectId={project.currentProject?.id} onNavigateToFileLine={(filePath,line)=>{project.openFileAtLine(filePath,line);ui.setActiveView("explorer");}} />
         );
       case "intelligence":
         return (
@@ -134,29 +137,29 @@ export const App: React.FC = () => {
         );
       case "security":
         return (
-          <PlaceholderView
-            title="Security & Health"
-            icon={<ShieldAlert className="w-8 h-8 text-accent" />}
-            description="Rule-based static findings: dead code, hardcoded secrets, and unsafe patterns."
-            badge="Phase 3"
-          />
+          <FindingsView projectId={project.currentProject?.id} onNavigateToFileLine={(filePath, line) => { project.openFileAtLine(filePath, line); ui.setActiveView("explorer"); }} />
         );
       case "reports":
         return (
-          <PlaceholderView
-            title="Engineering Reports"
-            icon={<FileBarChart className="w-8 h-8 text-accent" />}
-            description="Structured codebase health audits and technical debt metrics."
-            badge="Phase 5"
+          <ReportsView
+            projectId={project.currentProject?.id}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
+            onNavigateToDocs={(_docType) => {
+              ui.setActiveView("documentation");
+            }}
           />
         );
       case "documentation":
         return (
-          <PlaceholderView
-            title="Documentation Engine"
-            icon={<BookOpen className="w-8 h-8 text-accent" />}
-            description="Deterministic HLD, LLD, and ADR workspace with markdown export."
-            badge="Phase 5 / Task 8-9"
+          <DocumentationView
+            projectId={project.currentProject?.id}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
           />
         );
       default:
@@ -184,6 +187,7 @@ export const App: React.FC = () => {
         onSelectView={ui.setActiveView}
         onOpenFolder={project.openFolder}
         onReopenProject={project.reopenProject}
+        onRemoveProject={project.removeRecentProject}
         onTriggerScan={project.triggerScan}
         onCancelScan={project.abortScan}
         onToggleTheme={ui.toggleTheme}
@@ -199,6 +203,7 @@ export const App: React.FC = () => {
           <WelcomeView
             onOpenFolder={project.openFolder}
             onReopenProject={project.reopenProject}
+            onRemoveProject={project.removeRecentProject}
             recentProjects={project.recentProjects}
           />
         ) : (
@@ -218,33 +223,6 @@ export const App: React.FC = () => {
         onSelectFile={project.selectFile}
       />
     </>
-  );
-};
-
-interface PlaceholderViewProps {
-  title: string;
-  icon: React.ReactNode;
-  description: string;
-  badge: string;
-}
-
-const PlaceholderView: React.FC<PlaceholderViewProps> = ({
-  title,
-  icon,
-  description,
-  badge,
-}) => {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-text-muted select-none">
-      <div className="p-3 bg-surface border border-border-default rounded-lg mb-3">
-        {icon}
-      </div>
-      <h2 className="text-heading font-semibold text-text-primary mb-1">{title}</h2>
-      <p className="text-body text-text-secondary max-w-md mb-3">{description}</p>
-      <span className="text-micro font-mono bg-subtle text-accent-text border border-border-default px-2 py-0.5 rounded">
-        Planned for {badge}
-      </span>
-    </div>
   );
 };
 

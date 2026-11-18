@@ -45,6 +45,7 @@ const config: Config = {
           danger: {
             bg: "var(--status-danger-bg)",
             text: "var(--status-danger-text)",
+            border: "var(--status-danger-border)",
           },
         },
 

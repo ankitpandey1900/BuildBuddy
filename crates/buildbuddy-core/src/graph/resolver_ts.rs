@@ -12,7 +12,8 @@ pub struct TsConfigOptions {
 
 impl TsConfigOptions {
     pub fn parse(content: &str) -> Self {
-        let Ok(parsed): Result<Value, _> = serde_json::from_str(content) else {
+        let stripped = strip_json_comments(content);
+        let Ok(parsed): Result<Value, _> = serde_json::from_str(&stripped) else {
             return Self::default();
         };
 
@@ -127,6 +128,22 @@ impl TsResolver {
             }
         }
 
+        // Standard Next.js / Vite alias fallback: @/* or ~/*
+        if import_spec.starts_with("@/") || import_spec.starts_with("~/") {
+            let suffix = &import_spec[2..];
+            let candidates = [
+                format!("src/{}", suffix),
+                suffix.to_string(),
+            ];
+            for cand in &candidates {
+                let candidate_path = PathBuf::from(cand);
+                let normalized = normalize_path(&candidate_path);
+                if let Some((file_id, file_path)) = self.probe_file_or_index(&normalized) {
+                    return (ResolutionStatus::Internal, Some(file_id), Some(file_path));
+                }
+            }
+        }
+
         // Not a relative path and didn't match project aliases -> External package
         (ResolutionStatus::External, None, None)
     }
@@ -189,6 +206,58 @@ fn match_path_alias<'a>(pattern: &'a str, spec: &'a str) -> Option<String> {
         return Some(String::new());
     }
     None
+}
+
+fn strip_json_comments(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    let mut in_string = false;
+    let mut escape = false;
+
+    while let Some(c) = chars.next() {
+        if escape {
+            out.push(c);
+            escape = false;
+            continue;
+        }
+        if c == '\\' && in_string {
+            out.push(c);
+            escape = true;
+            continue;
+        }
+        if c == '"' {
+            in_string = !in_string;
+            out.push(c);
+            continue;
+        }
+        if !in_string {
+            if c == '/' {
+                if let Some(&'/') = chars.peek() {
+                    chars.next();
+                    for next_c in chars.by_ref() {
+                        if next_c == '\n' {
+                            out.push('\n');
+                            break;
+                        }
+                    }
+                    continue;
+                } else if let Some(&'*') = chars.peek() {
+                    chars.next();
+                    while let Some(next_c) = chars.next() {
+                        if next_c == '*' {
+                            if let Some(&'/') = chars.peek() {
+                                chars.next();
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+        out.push(c);
+    }
+    out
 }
 
 fn normalize_path(path: &Path) -> String {
@@ -271,6 +340,36 @@ mod tests {
         assert_eq!(status, ResolutionStatus::Internal);
         assert_eq!(id, Some(10));
         assert_eq!(path.as_deref(), Some("src/components/button.tsx"));
+    }
+
+    #[test]
+    fn test_ts_nextjs_at_alias_fallback_and_comments() {
+        let mut known = HashMap::new();
+        known.insert("src/components/button.tsx".to_string(), 10);
+        known.insert("src/lib/utils.ts".to_string(), 11);
+
+        // JSON with comments
+        let tsconfig_str = r#"{
+            // Next.js compiler options
+            "compilerOptions": {
+                /* baseUrl config */
+                "baseUrl": "."
+            }
+        }"#;
+        let tsconfig = TsConfigOptions::parse(tsconfig_str);
+        let resolver = TsResolver::new(known, Some(tsconfig));
+
+        // @/components/button resolves automatically via fallback
+        let (status, id, path) = resolver.resolve("src/app/page.tsx", "@/components/button");
+        assert_eq!(status, ResolutionStatus::Internal);
+        assert_eq!(id, Some(10));
+        assert_eq!(path.as_deref(), Some("src/components/button.tsx"));
+
+        // ~/lib/utils resolves automatically via fallback
+        let (status2, id2, path2) = resolver.resolve("src/app/page.tsx", "~/lib/utils");
+        assert_eq!(status2, ResolutionStatus::Internal);
+        assert_eq!(id2, Some(11));
+        assert_eq!(path2.as_deref(), Some("src/lib/utils.ts"));
     }
 }
 

@@ -702,31 +702,28 @@ Recommended tools:
 
 Do not use Mermaid as the only renderer for all diagrams. Complex dependency graphs and large architectures need a more capable interactive layout system.
 
-## 7.5 Diagram visual standards
+## 7.5 Visual standards (application + diagrams)
 
-Use a restrained engineering visual language.
+BuildBuddy uses a calm native workbench language (macOS / Windows 11 system apps, Linear restraint). Full token tables live in `docs/DESIGN_TOKENS.md`.
 
-- Neutral backgrounds.
-- Thin borders.
-- Consistent component shapes.
-- Restrained status colors.
-- No glow effects.
-- No decorative gradients.
-- No unnecessary shadows.
-- Strong contrast.
-- Readable text at normal zoom.
+Application UI:
+- System UI font stack (`Segoe UI Variable`, `SF Pro`, `-apple-system`, `system-ui`). Monospace only for code, paths, hashes, and line numbers.
+- Type scale: 11 / 12 / 13 (body) / 15 / 20 / 28. Weights 400 / 500 / 600.
+- 4px spacing grid. Radii 6 / 10 / 14. 1px low-contrast hairline separators.
+- Neutral light and dark palettes (dark is layered charcoal, never pure black). One accent color. Semantic success / warning / danger used sparingly.
+- Architecture layers (frontend, backend, data, shared, config, external) use muted desaturated tints defined once in tokens.
+- Focus: 2px accent ring on `:focus-visible` only. Hover uses `--bg-hover`; pressed uses `--bg-active`.
+- Motion: 150ms ease-out; disabled under `prefers-reduced-motion`.
+- Soft elevation on floating layers only (menus, popovers, command palette, inspector overlays). Base views stay flat.
 
-Color must communicate meaning, not decoration.
+Banned: gradients, glows, sparkles, AI badges, decorative motion, uppercase monospace chrome labels, thick persistent focus outlines.
 
-Example:
-- Frontend: neutral blue-grey.
-- Backend: neutral green-grey.
-- Database: neutral amber.
-- External services: neutral purple-grey.
-- Warnings: muted red.
-- Selected node: brand accent.
-
-The palette must be accessible and consistent in both themes.
+Diagram canvas (in addition to the above):
+- Neutral backgrounds, thin borders, consistent node shapes.
+- Color communicates meaning, not decoration.
+- Frontend: muted blue-grey. Backend: muted green-grey. Data: muted amber. Shared: muted violet. Config: muted slate. External: muted rose.
+- Selected node: brand accent. Inferred edges remain labelled inferred.
+- Accessible and consistent in both themes.
 
 ## 7.6 Diagram accuracy
 

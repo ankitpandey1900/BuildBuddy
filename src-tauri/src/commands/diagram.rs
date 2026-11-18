@@ -1,6 +1,6 @@
 use buildbuddy_core::diagram::builders::{
-    build_architecture_overview_diagram, build_class_diagram, build_file_dependency_diagram,
-    build_module_dependency_diagram,
+    build_architecture_overview_diagram, build_call_graph, build_class_diagram,
+    build_er_diagram, build_file_dependency_diagram, build_module_dependency_diagram,
 };
 use buildbuddy_core::diagram::export::save_export_file;
 use buildbuddy_core::diagram::model::{
@@ -49,6 +49,12 @@ pub fn get_diagram_impl(
         DiagramType::ClassDiagram => {
             build_class_diagram(conn, project_id).map_err(|e| e.to_string())?
         }
+        DiagramType::CallGraph => {
+            build_call_graph(conn, project_id).map_err(|e| e.to_string())?
+        }
+        DiagramType::ErDiagram => {
+            build_er_diagram(conn, project_id).map_err(|e| e.to_string())?
+        }
     };
 
     let check_progressive = options
@@ -93,6 +99,12 @@ pub fn drill_down_impl(
         }
         DiagramType::ClassDiagram => {
             build_class_diagram(conn, project_id).map_err(|e| e.to_string())?
+        }
+        DiagramType::CallGraph => {
+            build_call_graph(conn, project_id).map_err(|e| e.to_string())?
+        }
+        DiagramType::ErDiagram => {
+            build_er_diagram(conn, project_id).map_err(|e| e.to_string())?
         }
     };
 

@@ -34,13 +34,15 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const variantClasses = {
-    confirmed: "bg-status-success-bg text-status-success-text border-status-success-text/30",
+    confirmed:
+      "bg-elevated text-text-primary border-border-strong border-solid",
     success: "bg-status-success-bg text-status-success-text border-status-success-text/30",
-    static: "bg-accent-subtle text-accent-text border-accent-text/30",
-    inferred: "bg-status-warning-bg text-status-warning-text border-status-warning-text/30",
+    static: "bg-elevated text-text-primary border-border-default border-solid font-medium",
+    inferred:
+      "bg-transparent text-text-secondary border-border-strong border-dashed",
     warning: "bg-status-warning-bg text-status-warning-text border-status-warning-text/30",
     danger: "bg-status-danger-bg text-status-danger-text border-status-danger-text/30",
-    unknown: "bg-elevated text-text-muted border-border-default",
+    unknown: "bg-transparent text-text-muted border-border-default border-dotted",
     neutral: "bg-elevated text-text-secondary border-border-subtle",
     accent: "bg-accent-subtle text-accent-text border-accent/30",
   };

@@ -192,13 +192,15 @@ pub struct DroppedEdge {
 }
 
 /// The type of diagram.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagramType {
     FileDependency,
     ModuleDependency,
     ArchitectureOverview,
     ClassDiagram,
+    CallGraph,
+    ErDiagram,
 }
 
 impl DiagramType {
@@ -208,6 +210,8 @@ impl DiagramType {
             DiagramType::ModuleDependency => "module_dependency",
             DiagramType::ArchitectureOverview => "architecture_overview",
             DiagramType::ClassDiagram => "class_diagram",
+            DiagramType::CallGraph => "call_graph",
+            DiagramType::ErDiagram => "er_diagram",
         }
     }
 
@@ -217,6 +221,8 @@ impl DiagramType {
             "module_dependency" => Some(DiagramType::ModuleDependency),
             "architecture_overview" => Some(DiagramType::ArchitectureOverview),
             "class_diagram" => Some(DiagramType::ClassDiagram),
+            "call_graph" => Some(DiagramType::CallGraph),
+            "er_diagram" => Some(DiagramType::ErDiagram),
             _ => None,
         }
     }
@@ -358,6 +364,8 @@ mod tests {
             DiagramType::ModuleDependency,
             DiagramType::ArchitectureOverview,
             DiagramType::ClassDiagram,
+            DiagramType::CallGraph,
+            DiagramType::ErDiagram,
         ];
         for t in types {
             let s = t.as_str();

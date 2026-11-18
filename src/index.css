@@ -4,15 +4,16 @@
 
 :root {
   /* Dark Theme Default - 3 Layered Slate Surfaces */
-  --bg-canvas: #12151A;
-  --bg-surface: #181C23;
-  --bg-elevated: #222731;
+  --bg-canvas: #11151B;
+  --bg-surface: #191E26;
+  --bg-elevated: #252C36;
+  --bg-subtle: #222832;
   --bg-hover: rgba(255, 255, 255, 0.05);
   --bg-active: rgba(255, 255, 255, 0.09);
 
   --text-primary: #F0F3F6;
-  --text-secondary: #BAC2CC;
-  --text-muted: #7D8794;
+  --text-secondary: #C2CAD5;
+  --text-muted: #8994A3;
   --text-faint: #4C5562;
 
   --border-subtle: rgba(255, 255, 255, 0.07);
@@ -20,18 +21,21 @@
   --border-strong: rgba(255, 255, 255, 0.22);
   --border-focus: #3B82F6;
 
-  --accent-default: #3B82F6;
-  --accent-hover: #60A5FA;
-  --accent-subtle: rgba(59, 130, 246, 0.14);
-  --accent-text: #60A5FA;
+  --accent-default: #4B8DF8;
+  --accent-hover: #6CA5FC;
+  --accent-subtle: rgba(75, 141, 248, 0.16);
+  --accent-text: #76ADFF;
 
   /* Semantic status colors */
   --status-success-bg: rgba(34, 197, 94, 0.14);
   --status-success-text: #4ADE80;
+  --status-success-border: rgba(74, 222, 128, 0.35);
   --status-warning-bg: rgba(234, 179, 8, 0.14);
   --status-warning-text: #FACC15;
+  --status-warning-border: rgba(250, 204, 21, 0.35);
   --status-danger-bg: rgba(239, 68, 68, 0.14);
   --status-danger-text: #F87171;
+  --status-danger-border: rgba(248, 113, 113, 0.4);
 
   /* Domain / Architecture Layer Tokens */
   --domain-frontend-bg: rgba(59, 130, 246, 0.12);
@@ -56,6 +60,7 @@
   --bg-canvas: #F6F7F9;
   --bg-surface: #FFFFFF;
   --bg-elevated: #F0F2F5;
+  --bg-subtle: #F0F2F5;
   --bg-hover: rgba(0, 0, 0, 0.04);
   --bg-active: rgba(0, 0, 0, 0.07);
 
@@ -77,10 +82,13 @@
   /* Semantic status colors */
   --status-success-bg: rgba(22, 163, 74, 0.10);
   --status-success-text: #16A34A;
+  --status-success-border: rgba(22, 163, 74, 0.28);
   --status-warning-bg: rgba(202, 138, 4, 0.10);
   --status-warning-text: #CA8A04;
+  --status-warning-border: rgba(202, 138, 4, 0.28);
   --status-danger-bg: rgba(220, 38, 38, 0.10);
   --status-danger-text: #DC2626;
+  --status-danger-border: rgba(220, 38, 38, 0.28);
 
   /* Domain / Architecture Layer Tokens */
   --domain-frontend-bg: rgba(37, 99, 235, 0.08);
@@ -132,21 +140,19 @@ body {
 }
 
 /* Accessible Focus Ring: 2px solid on :focus-visible only */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
 .focus-ring {
   outline: none;
 }
 .focus-ring:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 1px;
-}
-
-/* Universal Focus-Visible Reset (removes thick blue outline from mouse clicks) */
-button:focus:not(:focus-visible),
-input:focus:not(:focus-visible),
-select:focus:not(:focus-visible),
-textarea:focus:not(:focus-visible),
-[tabindex]:focus:not(:focus-visible) {
-  outline: none;
 }
 
 /* Respect Prefers Reduced Motion */

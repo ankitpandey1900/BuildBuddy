@@ -9,19 +9,16 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  Search,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Code2,
-  AlertCircle,
-  Loader2,
-  FileCode,
-} from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, FileCode, Filter } from "lucide-react";
 import { listSymbols } from "@/lib/tauri";
 import type { ListSymbolsFilter, SymbolRecord } from "@/types/ipc";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { SearchInput } from "@/components/ui/Input";
+import { Toolbar, ToolbarGroup } from "@/components/ui/Toolbar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Kbd } from "@/components/ui/Kbd";
+import { Popover } from "@/components/ui/Popover";
 
 export interface CodeIntelligenceViewProps {
   projectId?: number | null;
@@ -190,7 +187,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           const row = info.row.original;
           return (
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-mono font-medium text-text-primary text-xs truncate" title={row.name}>
+              <span className="font-mono font-medium text-text-primary text-caption truncate" title={row.name}>
                 {row.parent_name ? (
                   <span className="text-text-muted font-normal">{row.parent_name}.</span>
                 ) : null}
@@ -203,9 +200,14 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       columnHelper.accessor("kind", {
         header: "Kind",
         cell: (info) => (
-          <Badge variant="neutral" size="sm">
-            {info.getValue()}
-          </Badge>
+          <span className="inline-flex items-center gap-1">
+            <Badge variant="neutral" size="sm">
+              {info.getValue()}
+            </Badge>
+            <Badge variant={info.row.original.confidence} size="sm">
+              {info.row.original.confidence}
+            </Badge>
+          </span>
         ),
       }),
       columnHelper.accessor("file_path", {
@@ -222,8 +224,8 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         id: "line",
         header: "Line",
         cell: (info) => (
-          <span className="font-mono text-micro text-text-muted">
-            L{info.getValue()}
+          <span className="font-mono text-caption text-text-muted tabular-nums">
+            {info.getValue()}
           </span>
         ),
       }),
@@ -232,17 +234,17 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         cell: (info) => {
           const val = info.getValue();
           if (val === null || val === undefined) {
-            return <span className="font-mono text-micro text-text-muted text-center block">—</span>;
+            return <span className="text-caption text-text-muted text-center block">—</span>;
           }
           const isHigh = val >= 10;
           const isMedium = val >= 5;
           return (
             <span
-              className={`font-mono text-micro text-center block font-medium ${
+              className={`tabular-nums text-caption text-center block ${
                 isHigh
-                  ? "text-rose-400"
+                  ? "text-status-danger-text"
                   : isMedium
-                  ? "text-amber-400"
+                  ? "text-status-warning-text"
                   : "text-text-secondary"
               }`}
             >
@@ -255,7 +257,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         id: "callers",
         header: "Callers",
         cell: (info) => (
-          <span className="font-mono text-micro text-center block text-text-muted">
+          <span className="tabular-nums text-caption text-center block text-text-muted">
             {info.getValue()}
           </span>
         ),
@@ -264,7 +266,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         id: "callees",
         header: "Callees",
         cell: (info) => (
-          <span className="font-mono text-micro text-center block text-text-muted">
+          <span className="tabular-nums text-caption text-center block text-text-muted">
             {info.getValue()}
           </span>
         ),
@@ -278,24 +280,24 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           return (
             <div className="flex items-center gap-1 flex-wrap">
               {row.is_exported && (
-                <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-accent/15 text-accent-text border border-accent/25" title="Exported">
+                <Badge variant="neutral" size="sm">
                   export
-                </span>
+                </Badge>
               )}
               {row.is_async && (
-                <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-blue-500/10 text-blue-400 border border-blue-500/25" title="Async">
+                <Badge variant="neutral" size="sm">
                   async
-                </span>
+                </Badge>
               )}
               {row.has_error_handling && (
-                <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-purple-500/10 text-purple-400 border border-purple-500/25" title="Error Handling (try/catch)">
+                <Badge variant="neutral" size="sm">
                   errors
-                </span>
+                </Badge>
               )}
               {row.has_side_effects && (
-                <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-amber-500/10 text-amber-400 border border-amber-500/25" title="Side Effects (fs/network/db)">
+                <Badge variant="neutral" size="sm">
                   effects
-                </span>
+                </Badge>
               )}
             </div>
           );
@@ -395,6 +397,98 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
     return () => window.removeEventListener("keydown", onGlobalKey);
   }, []);
 
+  const fieldClass =
+    "bg-elevated border border-border-default rounded-sm px-2 py-1 text-caption text-text-primary focus-ring w-full";
+
+  const renderSymbolFilters = () => (
+    <div className="flex flex-col gap-2 text-caption font-sans">
+      <label className="flex flex-col gap-1 text-text-muted">
+        Language
+        <select
+          value={languageFilter}
+          onChange={(e) => setLanguageFilter(e.target.value)}
+          className={fieldClass}
+          data-testid="filter-language"
+        >
+          <option value="all">All Languages</option>
+          <option value="typescript">TypeScript / JS</option>
+          <option value="python">Python</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-text-muted">
+        Kind
+        <select
+          value={kindFilter}
+          onChange={(e) => setKindFilter(e.target.value)}
+          className={fieldClass}
+          data-testid="filter-kind"
+        >
+          <option value="all">All Kinds</option>
+          <option value="function">Function</option>
+          <option value="class">Class</option>
+          <option value="method">Method</option>
+          <option value="interface">Interface</option>
+          <option value="variable">Variable</option>
+          <option value="constant">Constant</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-text-muted">
+        Path prefix
+        <input
+          type="text"
+          placeholder="e.g. src/"
+          value={pathPrefix}
+          onChange={(e) => setPathPrefix(e.target.value)}
+          className={fieldClass}
+          data-testid="filter-path-prefix"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-text-muted">
+        Minimum complexity
+        <select
+          value={minComplexity}
+          onChange={(e) =>
+            setMinComplexity(e.target.value === "all" ? "all" : Number(e.target.value))
+          }
+          className={fieldClass}
+          data-testid="filter-min-complexity"
+        >
+          <option value="all">All</option>
+          <option value="2">≥ 2</option>
+          <option value="5">≥ 5</option>
+          <option value="10">≥ 10</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-text-secondary">
+        <input
+          type="checkbox"
+          checked={isExportedOnly}
+          onChange={(e) => setIsExportedOnly(e.target.checked)}
+          data-testid="filter-exported"
+        />
+        Exported
+      </label>
+      <label className="flex items-center gap-2 text-text-secondary">
+        <input
+          type="checkbox"
+          checked={hasErrorHandlingOnly}
+          onChange={(e) => setHasErrorHandlingOnly(e.target.checked)}
+          data-testid="filter-error-handling"
+        />
+        Error handling
+      </label>
+      <label className="flex items-center gap-2 text-text-secondary">
+        <input
+          type="checkbox"
+          checked={hasSideEffectsOnly}
+          onChange={(e) => setHasSideEffectsOnly(e.target.checked)}
+          data-testid="filter-side-effects"
+        />
+        Side effects
+      </label>
+    </div>
+  );
+
   return (
     <div
       className="flex-1 flex flex-col h-full bg-canvas text-text-primary overflow-hidden font-sans select-none"
@@ -402,174 +496,81 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       tabIndex={0}
       data-testid="code-intelligence-view"
     >
-      {/* Top Filter and Search Bar */}
-      <div className="p-3 border-b border-border-default bg-surface/50 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-3">
-          {/* FTS Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
+      <Toolbar>
+        <ToolbarGroup className="flex-1 min-w-0 gap-2">
+          <div className="w-full max-w-md">
+            <SearchInput
               ref={searchInputRef}
-              type="text"
               placeholder='Search symbols with FTS (Press "/" to focus)...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 bg-canvas border border-border-default rounded text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              size="sm"
               data-testid="symbol-search-input"
+              suffix={<Kbd>/</Kbd>}
             />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono text-text-muted bg-surface px-1 rounded border border-border-subtle">
-              /
-            </span>
           </div>
-
-          {/* Result Count */}
-          <div className="text-micro font-mono text-text-muted flex items-center gap-1.5" data-testid="result-count">
-            <Code2 className="w-3.5 h-3.5 text-accent" />
-            <span>
-              {isLoading
-                ? "Loading..."
-                : `${rows.length.toLocaleString()} symbol${rows.length === 1 ? "" : "s"}`}
-            </span>
-          </div>
+          <Popover
+            align="left"
+            className="w-72 p-2"
+            trigger={
+              <Button variant="secondary" size="sm" icon={<Filter className="w-3.5 h-3.5" />}>
+                Filter
+              </Button>
+            }
+          >
+            {renderSymbolFilters()}
+          </Popover>
+        </ToolbarGroup>
+        <div className="text-caption text-text-muted tabular-nums" data-testid="result-count">
+          {isLoading
+            ? "Loading..."
+            : `${rows.length.toLocaleString()} symbol${rows.length === 1 ? "" : "s"}`}
         </div>
-
-        {/* Filter Controls Bar */}
-        <div className="flex items-center gap-3 flex-wrap text-xs">
-          {/* Language Filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-caption text-text-muted font-sans font-medium">Lang:</span>
-            <select
-              value={languageFilter}
-              onChange={(e) => setLanguageFilter(e.target.value)}
-              className="bg-canvas border border-border-default rounded px-2 py-1 text-micro text-text-primary focus:outline-none focus:border-accent"
-              data-testid="filter-language"
-            >
-              <option value="all">All Languages</option>
-              <option value="typescript">TypeScript / JS</option>
-              <option value="python">Python</option>
-            </select>
-          </div>
-
-          {/* Kind Filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-caption text-text-muted font-sans font-medium">Kind:</span>
-            <select
-              value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value)}
-              className="bg-canvas border border-border-default rounded px-2 py-1 text-micro text-text-primary focus:outline-none focus:border-accent"
-              data-testid="filter-kind"
-            >
-              <option value="all">All Kinds</option>
-              <option value="function">Function</option>
-              <option value="class">Class</option>
-              <option value="method">Method</option>
-              <option value="interface">Interface</option>
-              <option value="variable">Variable</option>
-              <option value="constant">Constant</option>
-            </select>
-          </div>
-
-          {/* Path Prefix */}
-          <div className="flex items-center gap-1">
-            <span className="text-caption text-text-muted font-sans font-medium">Path:</span>
-            <input
-              type="text"
-              placeholder="e.g. src/"
-              value={pathPrefix}
-              onChange={(e) => setPathPrefix(e.target.value)}
-              className="w-24 bg-canvas border border-border-default rounded px-1.5 py-1 text-micro text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-              data-testid="filter-path-prefix"
-            />
-          </div>
-
-          {/* Min Complexity */}
-          <div className="flex items-center gap-1">
-            <span className="text-caption text-text-muted font-sans font-medium">Min CC:</span>
-            <select
-              value={minComplexity}
-              onChange={(e) =>
-                setMinComplexity(e.target.value === "all" ? "all" : Number(e.target.value))
-              }
-              className="bg-canvas border border-border-default rounded px-2 py-1 text-micro text-text-primary focus:outline-none focus:border-accent"
-              data-testid="filter-min-complexity"
-            >
-              <option value="all">All</option>
-              <option value="2">≥ 2</option>
-              <option value="5">≥ 5</option>
-              <option value="10">≥ 10</option>
-            </select>
-          </div>
-
-          <div className="h-4 w-[1px] bg-border-default" />
-
-          {/* Toggles */}
-          <label className="flex items-center gap-1.5 cursor-pointer text-micro text-text-secondary hover:text-text-primary">
-            <input
-              type="checkbox"
-              checked={isExportedOnly}
-              onChange={(e) => setIsExportedOnly(e.target.checked)}
-              className="rounded bg-canvas border-border-default text-accent focus:ring-0"
-              data-testid="filter-exported"
-            />
-            <span>Exported</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-micro text-text-secondary hover:text-text-primary">
-            <input
-              type="checkbox"
-              checked={hasErrorHandlingOnly}
-              onChange={(e) => setHasErrorHandlingOnly(e.target.checked)}
-              className="rounded bg-canvas border-border-default text-accent focus:ring-0"
-              data-testid="filter-error-handling"
-            />
-            <span>Error Handling</span>
-          </label>
-
-          <label className="flex items-center gap-1.5 cursor-pointer text-micro text-text-secondary hover:text-text-primary">
-            <input
-              type="checkbox"
-              checked={hasSideEffectsOnly}
-              onChange={(e) => setHasSideEffectsOnly(e.target.checked)}
-              className="rounded bg-canvas border-border-default text-accent focus:ring-0"
-              data-testid="filter-side-effects"
-            />
-            <span>Side Effects</span>
-          </label>
-        </div>
-      </div>
-
+      </Toolbar>
       {/* Main Table / View Area */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         {isLoading && (
-          <div
-            className="absolute inset-0 bg-canvas/70 backdrop-blur-[1px] flex items-center justify-center z-20 text-text-muted gap-2 text-xs font-mono"
-            data-testid="loading-state"
-          >
-            <Loader2 className="w-4 h-4 animate-spin text-accent" />
-            <span>Loading code intelligence symbols...</span>
+          <div className="absolute inset-0 bg-canvas flex items-center justify-center z-20" data-testid="loading-state">
+            <EmptyState
+              title="Loading symbols"
+              description="Reading the local symbol index. Run analysis if this project has not been scanned."
+            />
           </div>
         )}
 
         {error && (
-          <div
-            className="p-4 bg-rose-500/10 border-b border-rose-500/25 text-rose-400 flex items-center gap-2 text-xs"
-            data-testid="error-state"
-          >
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>Failed to load symbols: {error}</span>
+          <div className="flex-1 flex items-center justify-center" data-testid="error-state">
+            <EmptyState
+              title="Symbols failed to load"
+              description={error}
+            />
           </div>
         )}
 
         {!isLoading && !error && rows.length === 0 && (
-          <div
-            className="flex-1 flex flex-col items-center justify-center p-8 text-center text-text-muted gap-2"
-            data-testid="empty-state"
-          >
-            <Code2 className="w-8 h-8 text-text-faint" />
-            <p className="text-body font-medium text-text-primary">No symbols match the current filters</p>
-            <p className="text-caption text-text-muted max-w-sm">
-              Adjust search keywords, language filters, or metric flags to see extracted symbols.
-            </p>
+          <div className="flex-1 flex items-center justify-center" data-testid="empty-state">
+            <EmptyState
+              title="No symbols match the current filters"
+              description="No symbols are in the current result. Clear filters, or run analysis if this project has not been scanned."
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setLanguageFilter("all");
+                    setKindFilter("all");
+                    setPathPrefix("");
+                    setMinComplexity("all");
+                    setIsExportedOnly(false);
+                    setHasErrorHandlingOnly(false);
+                    setHasSideEffectsOnly(false);
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
           </div>
         )}
 
@@ -673,9 +674,9 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
                         height: `${virtualRow.size}px`,
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
-                      className={`border-b border-border-subtle cursor-pointer transition-colors ${
+                      className={`h-9 border-b border-border-subtle cursor-pointer transition-colors ${
                         isSelected
-                          ? "bg-accent/10 border-accent/30 text-text-primary"
+                          ? "bg-accent-subtle text-text-primary"
                           : "hover:bg-hover text-text-secondary"
                       }`}
                       data-testid={`symbol-row-${virtualRow.index}`}
@@ -719,20 +720,23 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       </div>
 
       {/* Keyboard Shortcuts Hint Bar */}
-      <div className="h-6 border-t border-border-default bg-surface px-3 flex items-center justify-between text-micro text-text-muted font-mono">
+      <div className="h-7 border-t border-border-default bg-surface px-3 flex items-center justify-between text-caption text-text-muted font-sans">
         <div className="flex items-center gap-3">
-          <span>
-            <kbd className="bg-canvas border border-border-subtle px-1 rounded text-text-secondary">↑</kbd>
-            <kbd className="bg-canvas border border-border-subtle px-1 rounded text-text-secondary ml-0.5">↓</kbd> Select
+          <span className="inline-flex items-center gap-1">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+            Select
           </span>
-          <span>
-            <kbd className="bg-canvas border border-border-subtle px-1 rounded text-text-secondary">Enter</kbd> Open in Explorer
+          <span className="inline-flex items-center gap-1">
+            <Kbd>Enter</Kbd>
+            Open in Explorer
           </span>
-          <span>
-            <kbd className="bg-canvas border border-border-subtle px-1 rounded text-text-secondary">/</kbd> Search
+          <span className="inline-flex items-center gap-1">
+            <Kbd>/</Kbd>
+            Search
           </span>
         </div>
-        <div>Double-click row to open at source line</div>
+        <div>Double-click a row to open that line</div>
       </div>
     </div>
   );

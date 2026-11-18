@@ -226,8 +226,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             setIsDragging(true);
           }}
           aria-hidden="true"
-          className={`absolute top-0 bottom-0 -left-1 w-2.5 z-30 cursor-col-resize hover:bg-accent/30 transition-colors ${
-            isDragging ? "bg-accent/40" : ""
+          className={`absolute top-0 bottom-0 -left-[3px] w-1.5 z-30 cursor-col-resize ${
+            isDragging ? "bg-accent/30" : "bg-transparent"
           }`}
           title="Drag to resize Inspector panel"
         />
@@ -240,7 +240,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             <button
               onClick={handleBack}
               title="Go back to previous symbol"
-              className="p-0.5 rounded hover:bg-hover text-text-muted hover:text-text-primary flex items-center gap-0.5 text-micro font-mono"
+              className="p-0.5 rounded hover:bg-hover text-text-muted hover:text-text-primary flex items-center gap-0.5 text-caption font-sans"
               data-testid="inspector-back-btn"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -360,7 +360,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 1: SIGNATURE */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-signature">
-              <div className="text-caption font-medium text-text-secondary">
+              <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                 Signature
               </div>
               {activeSymbolRecord.signature ? (
@@ -368,13 +368,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   <code>{activeSymbolRecord.signature}</code>
                 </pre>
               ) : (
-                <span className="text-text-muted text-caption italic">None detected</span>
+                <span className="text-text-secondary text-body">None detected</span>
               )}
             </div>
 
             {/* SECTION 2: RELATIONSHIPS (CALLERS & CALLEES) */}
             <div className="flex flex-col gap-3" data-testid="inspector-section-relationships">
-              <div className="text-caption font-medium text-text-secondary border-b border-border-subtle pb-1">
+              <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                 Relationships
               </div>
 
@@ -384,13 +384,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   Incoming Calls (Callers)
                 </div>
                 {incomingCalls.length === 0 ? (
-                  <span className="text-text-muted text-caption italic">None detected</span>
+                  <span className="text-text-secondary text-body">None detected</span>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {/* Confirmed / Static Callers */}
                     {confirmedIncoming.length > 0 && (
                       <div className="flex flex-col gap-1">
-                        <div className="text-[10px] font-mono text-emerald-400 font-medium">
+                        <div className="text-caption font-medium text-text-muted">
                           Resolved Callers (Confirmed / Static)
                         </div>
                         {confirmedIncoming.map((call) => (
@@ -408,7 +408,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     {/* Inferred / Unknown Callers */}
                     {inferredIncoming.length > 0 && (
                       <div className="flex flex-col gap-1">
-                        <div className="text-[10px] font-mono text-amber-400 font-medium">
+                        <div className="text-caption font-medium text-text-muted">
                           Unresolved / Dynamic Callers (Inferred / Unknown)
                         </div>
                         {inferredIncoming.map((call) => (
@@ -432,13 +432,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   Outgoing Calls (Callees)
                 </div>
                 {outgoingCalls.length === 0 ? (
-                  <span className="text-text-muted text-caption italic">None detected</span>
+                  <span className="text-text-secondary text-body">None detected</span>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {/* Confirmed / Static Callees */}
                     {confirmedOutgoing.length > 0 && (
                       <div className="flex flex-col gap-1">
-                        <div className="text-[10px] font-mono text-emerald-400 font-medium">
+                        <div className="text-caption font-medium text-text-muted">
                           Resolved Callees (Confirmed / Static)
                         </div>
                         {confirmedOutgoing.map((call) => (
@@ -457,7 +457,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     {/* Inferred / Unknown Callees */}
                     {inferredOutgoing.length > 0 && (
                       <div className="flex flex-col gap-1">
-                        <div className="text-[10px] font-mono text-amber-400 font-medium">
+                        <div className="text-caption font-medium text-text-muted">
                           Unresolved / Dynamic Callees (Inferred / Unknown)
                         </div>
                         {inferredOutgoing.map((call) => (
@@ -479,7 +479,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             {/* SECTION 3: METRICS */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-metrics">
-              <div className="text-caption font-medium text-text-secondary">
+              <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                 Metrics
               </div>
               {symbolDetail?.function_metrics ? (
@@ -527,13 +527,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   </div>
                 </div>
               ) : (
-                <span className="text-text-muted text-caption italic">None detected</span>
+                <span className="text-text-secondary text-body">None detected</span>
               )}
             </div>
 
             {/* SECTION 4: SIDE EFFECTS */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-side-effects">
-              <div className="text-caption font-medium text-text-secondary">
+              <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                 Side Effects
               </div>
               {sideEffectsList.length > 0 ? (
@@ -559,13 +559,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   ))}
                 </div>
               ) : (
-                <span className="text-text-muted text-caption italic">None detected</span>
+                <span className="text-text-secondary text-body">None detected</span>
               )}
             </div>
 
             {/* SECTION 5: EVIDENCE */}
             <div className="flex flex-col gap-1.5" data-testid="inspector-section-evidence">
-              <div className="text-caption font-medium text-text-secondary">
+              <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                 Evidence
               </div>
               <div className="flex flex-col gap-1.5 text-micro font-mono bg-canvas p-2 rounded border border-border-subtle">
@@ -596,7 +596,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 ) : (
                   <div className="mt-1">
                     <span className="text-text-muted text-[11px] font-medium block">Snippet:</span>
-                    <span className="text-text-muted text-caption italic">None detected</span>
+                    <span className="text-text-secondary text-body">None detected</span>
                   </div>
                 )}
               </div>
@@ -607,7 +607,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               <div className="flex flex-col gap-4 pt-2 border-t border-border-subtle" data-testid="inspector-section-classes">
                 {/* Inheritance */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-caption font-medium text-text-secondary">
+                  <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                     Inheritance & Bases
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -622,7 +622,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
 
                     {/* Interfaces */}
@@ -636,7 +636,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
 
                     {/* Instantiation Sites */}
@@ -676,14 +676,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
                   </div>
                 </div>
 
                 {/* Class Members */}
                 <div className="flex flex-col gap-2">
-                  <div className="text-caption font-medium text-text-secondary">
+                  <div className="text-body font-semibold text-text-primary border-b border-border-subtle pb-1.5">
                     Class Members
                   </div>
 
@@ -698,7 +698,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         </div>
                       ))
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
                   </div>
 
@@ -726,7 +726,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
                   </div>
 
@@ -754,7 +754,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-text-muted text-caption italic">None detected</span>
+                      <span className="text-text-secondary text-body">None detected</span>
                     )}
                   </div>
                 </div>
@@ -876,7 +876,7 @@ const RelationshipRow: React.FC<RelationshipRowProps> = ({
 
   return (
     <div
-      className="p-1.5 bg-canvas rounded border border-border-subtle flex items-center justify-between text-micro font-mono gap-1"
+      className="py-1.5 flex items-center justify-between gap-2 border-b border-border-subtle last:border-0 text-caption"
       data-testid="relationship-row"
     >
       <div className="flex items-center gap-1.5 min-w-0">

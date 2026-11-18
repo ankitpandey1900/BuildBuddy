@@ -338,6 +338,40 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_modules_project ON modules(project_id);
 
+        CREATE TABLE IF NOT EXISTS api_endpoints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            framework TEXT NOT NULL,
+            method TEXT NOT NULL,
+            route TEXT NOT NULL,
+            controller_name TEXT,
+            file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+            source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE,
+            UNIQUE(project_id, framework, method, route, file_path, start_line)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_api_endpoints_project ON api_endpoints(project_id, file_path, start_line);
+
+        CREATE TABLE IF NOT EXISTS database_engines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL, file_path TEXT NOT NULL, line_number INTEGER NOT NULL, confidence TEXT NOT NULL,
+            source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS database_tables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL, file_path TEXT NOT NULL, start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, confidence TEXT NOT NULL,
+            source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE,
+            UNIQUE(project_id, name, file_path, start_line)
+        );
+        CREATE TABLE IF NOT EXISTS database_fields (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER NOT NULL REFERENCES database_tables(id) ON DELETE CASCADE,
+            name TEXT NOT NULL, declared_type TEXT NOT NULL, is_primary_key INTEGER NOT NULL, is_foreign_key INTEGER NOT NULL,
+            line_number INTEGER NOT NULL, source_evidence_id INTEGER NOT NULL REFERENCES source_evidence(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS diagrams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -394,6 +428,33 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
     // Backward-compatibility: add error_message column to files if upgrading existing DB
     conn.execute("ALTER TABLE files ADD COLUMN error_message TEXT", []).ok();
+
+    // Backward-compatibility / auto-heal: backfill missing source_evidence_id in import_edges
+    // to preserve all real relationships with complete provenance
+    let _ = conn.execute(
+        "INSERT INTO source_evidence (
+            project_id, file_path, start_line, end_line, start_column, end_column, snippet, confidence, evidence_type
+         )
+         SELECT ie.project_id, sf.relative_path, ie.line_number, ie.line_number, 0, 0,
+                'import ' || ie.imported_name || ' from ''' || ie.target_module || '''',
+                'static', 'import_stmt'
+         FROM import_edges ie
+         JOIN files sf ON ie.source_file_id = sf.id
+         WHERE ie.source_evidence_id IS NULL",
+        [],
+    );
+
+    let _ = conn.execute(
+        "UPDATE import_edges
+         SET source_evidence_id = (
+             SELECT se.id FROM source_evidence se
+             JOIN files sf ON se.file_path = sf.relative_path AND se.project_id = import_edges.project_id
+             WHERE sf.id = import_edges.source_file_id AND se.start_line = import_edges.line_number
+             ORDER BY se.id DESC LIMIT 1
+         )
+         WHERE source_evidence_id IS NULL",
+        [],
+    );
 
     Ok(())
 }

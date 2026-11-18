@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use buildbuddy_core::arch::ArchitectureAnalyzer;
 use buildbuddy_core::diagram::builders::{
-    build_architecture_overview_diagram, build_class_diagram, build_file_dependency_diagram,
-    build_module_dependency_diagram,
+    build_architecture_overview_diagram, build_call_graph, build_class_diagram,
+    build_er_diagram, build_file_dependency_diagram, build_module_dependency_diagram,
 };
 use buildbuddy_core::diagram::model::*;
 use buildbuddy_core::diagram::progressive::{apply_progressive_disclosure, drill_down};
@@ -375,6 +375,8 @@ fn test_all_models_have_real_evidence_ids() {
     let mod_dep = build_module_dependency_diagram(&conn, 1).unwrap();
     let arch_ov = build_architecture_overview_diagram(&conn, 1).unwrap();
     let class_diag = build_class_diagram(&conn, 1).unwrap();
+    let call_graph = build_call_graph(&conn, 1).unwrap();
+    let er_diag = build_er_diagram(&conn, 1).unwrap();
 
     let all_edges: Vec<&DiagramEdge> = file_dep
         .model
@@ -383,6 +385,8 @@ fn test_all_models_have_real_evidence_ids() {
         .chain(mod_dep.model.edges.iter())
         .chain(arch_ov.model.edges.iter())
         .chain(class_diag.model.edges.iter())
+        .chain(call_graph.model.edges.iter())
+        .chain(er_diag.model.edges.iter())
         .collect();
 
     assert!(!all_edges.is_empty(), "Should have multiple edges to verify");

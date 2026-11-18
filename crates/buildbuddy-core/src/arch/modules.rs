@@ -108,16 +108,20 @@ impl ModuleGrouper {
             return ".".to_string();
         }
 
-        // If path starts with "src/" and has a subfolder (e.g. "src/client/App.tsx")
-        if parts[0] == "src" && parts.len() > 2 {
-            format!("src/{}", parts[1])
-        } else if parts.len() > 2 {
-            // e.g. "pkg/subpkg/main.py" -> "pkg"
-            parts[0].to_string()
-        } else {
-            // e.g. "api/routes.py" -> "api" or "src/index.ts" -> "src"
-            parts[0].to_string()
+        let container_roots = ["src", "app", "packages", "crates", "apps", "modules", "pkg"];
+
+        // Handle nested Next.js inside src (e.g. "src/app/api/auth/route.ts" -> "src/app/api")
+        if parts.len() > 3 && parts[0] == "src" && (parts[1] == "app" || parts[1] == "pages") {
+            return format!("{}/{}/{}", parts[0], parts[1], parts[2]);
         }
+
+        // Handle standard container directories (e.g. "src/components", "app/api", "packages/core")
+        if parts.len() > 2 && container_roots.contains(&parts[0]) {
+            return format!("{}/{}", parts[0], parts[1]);
+        }
+
+        // Standard top-level module (e.g. "components/Button.tsx" -> "components")
+        parts[0].to_string()
     }
 
     fn classify_layer(mod_dir: &str, files: &[String]) -> LayerLabel {

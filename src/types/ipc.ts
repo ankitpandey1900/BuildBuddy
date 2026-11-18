@@ -272,6 +272,63 @@ export interface DependencyOverview {
   unused_dependencies_count: number;
 }
 
+export interface ApiEndpoint {
+  id: number;
+  framework: string;
+  method: string;
+  route: string;
+  controller_name: string | null;
+  file_path: string;
+  start_line: number;
+  end_line: number;
+  snippet: string;
+  confidence: "confirmed" | "static" | "inferred" | "unknown";
+  source_evidence_id: number;
+}
+export interface DatabaseField { name: string; declared_type: string; is_primary_key: boolean; is_foreign_key: boolean; line: number; source_evidence_id: number; }
+export interface DatabaseTable { name: string; file_path: string; start_line: number; end_line: number; confidence: "confirmed" | "static" | "inferred" | "unknown"; source_evidence_id: number; fields: DatabaseField[]; }
+export interface Finding { id: number; category: string; title: string; description: string; severity: "info" | "low" | "medium" | "high" | "critical"; confidence: "confirmed" | "static" | "inferred" | "unknown"; file_path: string | null; start_line: number | null; end_line: number | null; source_evidence_id: number | null; metadata_json: string; }
+
+export type DocumentType =
+  | "project_overview"
+  | "hld"
+  | "lld"
+  | "api_documentation"
+  | "database_documentation"
+  | "dependency_inventory"
+  | "adrs"
+  | "security_report"
+  | "tech_debt_report";
+
+export type DocumentSectionState = "generated" | "user_edited" | "stale";
+
+export interface DocumentSection {
+  section_key: string;
+  title: string;
+  sort_order: number;
+  content: string;
+  content_hash: string;
+  state: DocumentSectionState;
+  evidence_keys: string[];
+}
+
+export interface GeneratedDocument {
+  doc_type: DocumentType;
+  title: string;
+  sections: DocumentSection[];
+}
+
+export interface DocumentRevision {
+  revision_number: number;
+  created_at: string;
+  content_markdown: string;
+}
+
+export interface DocumentExportResult {
+  success: boolean;
+  path: string;
+}
+
 export interface CircularDependencyCycle {
   cycle_files: string[];
 }

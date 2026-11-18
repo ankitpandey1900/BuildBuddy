@@ -13,6 +13,15 @@ use crate::core::vcs::{detect_git_status, GitRepoStatus};
 use crate::AppState;
 
 #[tauri::command]
+pub async fn get_findings(
+    state: State<'_, AppState>,
+    project_id: i64,
+) -> Result<Vec<crate::core::store::graph::StoredFinding>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    GraphStore::get_findings(&conn, project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_dependencies_overview(
     state: State<'_, AppState>,
     project_id: i64,

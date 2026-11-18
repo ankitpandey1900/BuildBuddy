@@ -2,6 +2,9 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen, UnlistenFn } from "@tauri-apps/api/event";
 import type {
   ArchitectureModel,
+  ApiEndpoint,
+  DatabaseTable,
+  Finding,
   ClassDetailResponse,
   FileContentDto,
   FileRecord,
@@ -16,6 +19,10 @@ import type {
   SymbolDetail,
   SymbolDto,
   SymbolRecord,
+  DocumentType,
+  GeneratedDocument,
+  DocumentRevision,
+  DocumentExportResult,
 } from "@/types/ipc";
 import type {
   DiagramOptions,
@@ -61,6 +68,11 @@ export async function openProjectByPath(path: string): Promise<Project> {
 export async function getRecentProjects(): Promise<Project[]> {
   if (!isTauri()) return [];
   return await tauriInvoke<Project[]>("get_recent_projects");
+}
+
+export async function removeProject(projectId: number): Promise<void> {
+  if (!isTauri()) return;
+  return await tauriInvoke<void>("remove_project", { projectId });
 }
 
 export async function getProject(projectId: number): Promise<Project> {
@@ -238,6 +250,16 @@ export async function getOverviewData(projectId: number): Promise<OverviewDataDt
   return await tauriInvoke<OverviewDataDto>("get_overview_data", { projectId });
 }
 
+export async function getApiEndpoints(projectId: number): Promise<ApiEndpoint[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<ApiEndpoint[]>("get_api_endpoints", { projectId });
+}
+export async function getDatabaseTables(projectId: number): Promise<DatabaseTable[]> { if (!isTauri()) return []; return tauriInvoke<DatabaseTable[]>("get_database_tables", { projectId }); }
+export async function getFindings(projectId: number): Promise<Finding[]> {
+  if (!isTauri()) return [];
+  return tauriInvoke<Finding[]>("get_findings", { projectId });
+}
+
 export async function getArchitectureModel(projectId: number): Promise<ArchitectureModel | null> {
   if (!isTauri()) return null;
   return await tauriInvoke<ArchitectureModel | null>("get_architecture_model", { projectId });
@@ -288,6 +310,67 @@ export async function drillDown(
     groupId,
     projectId,
     diagramType,
+  });
+}
+
+export async function getDocument(projectId: number, docType: DocumentType): Promise<GeneratedDocument> {
+  if (!isTauri()) {
+    return {
+      doc_type: docType,
+      title: `${docType} Document`,
+      sections: [
+        {
+          section_key: "overview",
+          title: "Overview",
+          sort_order: 10,
+          content: "Mock document content for offline preview.",
+          content_hash: "mock",
+          state: "generated",
+          evidence_keys: [],
+        },
+      ],
+    };
+  }
+  return await tauriInvoke<GeneratedDocument>("get_document", { projectId, docType });
+}
+
+export async function generateDocument(projectId: number, docType: DocumentType): Promise<GeneratedDocument> {
+  if (!isTauri()) {
+    return await getDocument(projectId, docType);
+  }
+  return await tauriInvoke<GeneratedDocument>("generate_document", { projectId, docType });
+}
+
+export async function saveDocumentSection(
+  projectId: number,
+  docType: DocumentType,
+  sectionKey: string,
+  content: string
+): Promise<void> {
+  if (!isTauri()) return;
+  await tauriInvoke("save_document_section", { projectId, docType, sectionKey, content });
+}
+
+export async function listDocumentRevisions(
+  projectId: number,
+  docType: DocumentType
+): Promise<DocumentRevision[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<DocumentRevision[]>("list_document_revisions", { projectId, docType });
+}
+
+export async function exportDocument(
+  projectId: number,
+  docType: DocumentType,
+  format: "markdown" | "html",
+  targetPath: string
+): Promise<DocumentExportResult> {
+  if (!isTauri()) return { success: true, path: targetPath };
+  return await tauriInvoke<DocumentExportResult>("export_document", {
+    projectId,
+    docType,
+    format,
+    targetPath,
   });
 }
 

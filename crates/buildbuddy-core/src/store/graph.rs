@@ -1,9 +1,26 @@
 use rusqlite::{params, Connection, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::graph::model::{DependencyOverview, ImportEdge, ResolutionStatus};
 use crate::manifest::ManifestDependency;
+use crate::health::HealthFinding;
 
 pub struct GraphStore;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoredFinding {
+    pub id: i64,
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub severity: String,
+    pub confidence: String,
+    pub file_path: Option<String>,
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
+    pub source_evidence_id: Option<i64>,
+    pub metadata_json: String,
+}
 
 impl GraphStore {
     pub fn insert_import_edges(
@@ -222,6 +239,107 @@ impl GraphStore {
             circular_cycles_count,
             unused_dependencies_count,
         })
+    }
+
+    /// Rebuild findings that are derived directly from persisted function metrics.
+    /// A complexity score is an objective static metric, while the threshold is a
+    /// review prompt rather than a claim that the function is defective.
+    pub fn refresh_complexity_findings(conn: &Connection, project_id: i64) -> Result<()> {
+        conn.execute(
+            "DELETE FROM findings WHERE project_id = ?1 AND category = 'complexity'",
+            params![project_id],
+        )?;
+
+        let mut statement = conn.prepare(
+            "SELECT func.name, func.cyclomatic_complexity, f.relative_path,
+                    evidence.start_line, evidence.end_line, func.source_evidence_id
+             FROM functions func
+             JOIN files f ON f.id = func.file_id
+             LEFT JOIN source_evidence evidence ON evidence.id = func.source_evidence_id
+             WHERE func.project_id = ?1 AND func.cyclomatic_complexity >= 10
+             ORDER BY func.cyclomatic_complexity DESC, f.relative_path ASC, func.name ASC",
+        )?;
+        let rows = statement.query_map(params![project_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+            ))
+        })?;
+
+        for row in rows {
+            let (name, complexity, file_path, start_line, end_line, evidence_id) = row?;
+            let severity = if complexity >= 15 { "high" } else { "medium" };
+            let title = format!("High complexity: {}", name);
+            let description = format!(
+                "{} has cyclomatic complexity {}. Review its branching and loop paths before changing it.",
+                name, complexity
+            );
+            let metadata = format!(
+                r#"{{"function_name":{},"cyclomatic_complexity":{},"file_path":{},"start_line":{},"end_line":{}}}"#,
+                serde_json::to_string(&name).unwrap_or_default(),
+                complexity,
+                serde_json::to_string(&file_path).unwrap_or_default(),
+                start_line.map_or("null".to_string(), |line| line.to_string()),
+                end_line.map_or("null".to_string(), |line| line.to_string()),
+            );
+            Self::insert_finding(
+                conn,
+                project_id,
+                "complexity",
+                &title,
+                &description,
+                severity,
+                "static",
+                evidence_id,
+                &metadata,
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn refresh_health_findings(conn: &Connection, project_id: i64, candidates: &[HealthFinding]) -> Result<()> {
+        conn.execute("DELETE FROM findings WHERE project_id = ?1 AND category IN ('security', 'dead_code')", params![project_id])?;
+        for candidate in candidates {
+            let evidence_type = if candidate.confidence == "inferred" { "heuristic" } else { "source_pattern" };
+            let evidence_id = conn.query_row(
+                "INSERT INTO source_evidence (project_id, file_path, start_line, end_line, start_column, end_column, snippet, confidence, evidence_type)
+                 VALUES (?1, ?2, ?3, ?3, 0, 0, ?4, ?5, ?6) RETURNING id",
+                params![project_id, candidate.file_path, candidate.line_number as i64, candidate.evidence_snippet, candidate.confidence, evidence_type], |row| row.get(0),
+            )?;
+            let metadata = format!(r#"{{"rule":{},"file_path":{},"line":{}}}"#, serde_json::to_string(candidate.rule).unwrap_or_default(), serde_json::to_string(&candidate.file_path).unwrap_or_default(), candidate.line_number);
+            Self::insert_finding(conn, project_id, candidate.category, candidate.title, candidate.description, candidate.severity, candidate.confidence, Some(evidence_id), &metadata)?;
+        }
+        Ok(())
+    }
+
+    pub fn get_findings(conn: &Connection, project_id: i64) -> Result<Vec<StoredFinding>> {
+        let mut statement = conn.prepare(
+            "SELECT finding.id, finding.category, finding.title, finding.description,
+                    finding.severity, finding.confidence, evidence.file_path,
+                    evidence.start_line, evidence.end_line, finding.source_evidence_id,
+                    finding.metadata_json
+             FROM findings finding
+             LEFT JOIN source_evidence evidence ON evidence.id = finding.source_evidence_id
+             WHERE finding.project_id = ?1
+             ORDER BY CASE finding.severity
+                WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2
+                WHEN 'low' THEN 3 ELSE 4 END, finding.id ASC",
+        )?;
+        let findings = statement
+            .query_map(params![project_id], |row| {
+                Ok(StoredFinding {
+                    id: row.get(0)?, category: row.get(1)?, title: row.get(2)?,
+                    description: row.get(3)?, severity: row.get(4)?, confidence: row.get(5)?,
+                    file_path: row.get(6)?, start_line: row.get(7)?, end_line: row.get(8)?,
+                    source_evidence_id: row.get(9)?, metadata_json: row.get(10)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(findings)
     }
 }
 

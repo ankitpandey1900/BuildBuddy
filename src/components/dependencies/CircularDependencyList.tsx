@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, ArrowRight, CornerDownRight } from "lucide-react";
+import { ArrowRight, CornerDownRight } from "lucide-react";
 import type { CircularDependencyCycle } from "@/types/ipc";
 
 interface CircularDependencyListProps {
@@ -13,24 +13,23 @@ export const CircularDependencyList: React.FC<CircularDependencyListProps> = ({
 }) => {
   if (cycles.length === 0) {
     return (
-      <div className="p-4 text-center text-text-muted text-xs border border-border-default rounded-md bg-surface/50">
-        No circular dependency cycles detected. Clean directed acyclic graph.
+      <div className="p-4 text-caption text-text-secondary">
+        No circular dependency cycles detected.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-xs font-semibold text-amber-500">
-        <AlertTriangle className="w-4 h-4" />
-        <span>{cycles.length} Circular Import Cycle{cycles.length > 1 ? "s" : ""}</span>
+    <div className="flex flex-col">
+      <div className="px-3 py-2 text-body font-semibold text-text-primary border-b border-border-subtle">
+        {cycles.length} Circular Import Cycle{cycles.length > 1 ? "s" : ""}
       </div>
 
       <div className="flex flex-col gap-2">
         {cycles.map((cycle, idx) => (
           <div
             key={idx}
-            className="p-3 bg-surface border border-border-default rounded-md text-xs flex flex-col gap-2"
+            className="px-3 py-2 border-b border-border-subtle text-caption flex flex-col gap-1.5"
           >
             <div className="text-text-secondary font-sans text-caption font-medium flex items-center justify-between">
               <span>Cycle #{idx + 1} ({cycle.cycle_files.length} files)</span>
@@ -55,7 +54,7 @@ export const CircularDependencyList: React.FC<CircularDependencyListProps> = ({
                       {file}
                     </button>
                     {isLast && (
-                      <div className="flex items-center gap-1 text-amber-500/80 text-micro ml-1">
+                      <div className="flex items-center gap-1 text-text-muted text-caption ml-1">
                         <ArrowRight className="w-2.5 h-2.5" />
                         <span>loops back to {cycle.cycle_files[0]}</span>
                       </div>

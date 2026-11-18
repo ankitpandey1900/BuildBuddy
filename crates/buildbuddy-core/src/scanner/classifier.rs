@@ -24,9 +24,9 @@ pub fn classify_file(path: &Path) -> Option<LanguageInfo> {
     let ext = path.extension()?.to_str()?.to_lowercase();
     match ext.as_str() {
         "ts" | "mts" | "cts" => Some(LanguageInfo { name: "TypeScript", category: "programming" }),
-        "tsx" => Some(LanguageInfo { name: "TypeScript (TSX)", category: "programming" }),
+        "tsx" => Some(LanguageInfo { name: "React (TSX)", category: "programming" }),
         "js" | "mjs" | "cjs" => Some(LanguageInfo { name: "JavaScript", category: "programming" }),
-        "jsx" => Some(LanguageInfo { name: "JavaScript (JSX)", category: "programming" }),
+        "jsx" => Some(LanguageInfo { name: "React (JSX)", category: "programming" }),
         "py" | "pyw" | "pyi" => Some(LanguageInfo { name: "Python", category: "programming" }),
         "rs" => Some(LanguageInfo { name: "Rust", category: "programming" }),
         "go" => Some(LanguageInfo { name: "Go", category: "programming" }),
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_classify_file() {
         assert_eq!(classify_file(&PathBuf::from("src/main.ts")).unwrap().name, "TypeScript");
-        assert_eq!(classify_file(&PathBuf::from("src/App.tsx")).unwrap().name, "TypeScript (TSX)");
+        assert_eq!(classify_file(&PathBuf::from("src/App.tsx")).unwrap().name, "React (TSX)");
         assert_eq!(classify_file(&PathBuf::from("api/server.py")).unwrap().name, "Python");
         assert_eq!(classify_file(&PathBuf::from("backend/main.rs")).unwrap().name, "Rust");
         assert_eq!(classify_file(&PathBuf::from("package.json")).unwrap().name, "JSON");

@@ -37,6 +37,9 @@ export async function layout(
     groupPadding = 40;
   }
 
+  // Top padding must clear the group header bar (~42px) with comfortable breathing room
+  const groupPaddingTop = Math.max(groupPadding + 28, 58);
+
   // 1. Validate endpoints and detect dense graph for adaptive layout optimizations
   const validNodeIds = new Set<string>();
   for (const node of model.nodes) {
@@ -111,7 +114,7 @@ export async function layout(
       labels: [{ text: group.label }],
       children,
       layoutOptions: {
-        "elk.padding": `[top=${groupPadding},left=${groupPadding},bottom=${groupPadding},right=${groupPadding}]`,
+        "elk.padding": `[top=${groupPaddingTop},left=${groupPadding},bottom=${groupPadding},right=${groupPadding}]`,
         "elk.algorithm": "layered",
         "elk.direction": direction,
         "elk.spacing.nodeNode": String(nodeSpacing),
@@ -141,14 +144,18 @@ export async function layout(
       "elk.algorithm": "layered",
       "elk.direction": direction,
       "elk.edgeRouting": "ORTHOGONAL",
+      "elk.layered.mergeEdges": "true",
+      "elk.aspectRatio": "1.6",
       "elk.spacing.nodeNode": String(nodeSpacing),
-      "elk.spacing.edgeNode": "24",
-      "elk.spacing.edgeEdge": "16",
+      "elk.spacing.edgeNode": "20",
+      "elk.spacing.edgeEdge": "12",
       "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
       "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-      "elk.layered.thoroughness": "1",
+      "elk.layered.thoroughness": "2",
       "elk.layered.cycleBreaking.strategy": "GREEDY",
       "elk.layered.crossingMinimization.strategy": crossingStrategy,
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+      "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
       "org.eclipse.elk.randomSeed": "1",
     },
     children: rootChildren,

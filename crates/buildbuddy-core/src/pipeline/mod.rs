@@ -7,6 +7,9 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 use crate::arch::ArchitectureAnalyzer;
+use crate::api::ApiExtractor;
+use crate::database::DatabaseExtractor;
+use crate::health::SecretDetector;
 use crate::arch::model::ProjectArchReport;
 use crate::graph::call_resolver::CallResolver;
 use crate::graph::FileImportItem;
@@ -19,6 +22,8 @@ use crate::parser::{FileToParse, ParserManager, ParserWorkerPool, WorkerPoolConf
 use crate::scanner::incremental::IncrementalEngine;
 use crate::scanner::walker::scan_directory;
 use crate::store::arch::ArchStore;
+use crate::store::api::ApiStore;
+use crate::store::database::DatabaseStore;
 use crate::store::files::batch_insert_or_update_files;
 use crate::store::graph::GraphStore;
 use crate::store::symbols::persist_file_parse_result;
@@ -266,6 +271,10 @@ impl PipelineRunner {
             list
         };
 
+        // Clean previous dependencies so fresh analysis is consistent
+        conn.execute("DELETE FROM import_edges WHERE project_id = ?1", params![project_id]).ok();
+        conn.execute("DELETE FROM manifest_dependencies WHERE project_id = ?1", params![project_id]).ok();
+
         let parser = ParserManager::new();
         let mut all_files = Vec::new();
         let mut parsed_results = Vec::new();
@@ -331,6 +340,14 @@ impl PipelineRunner {
             .collect();
 
         let report = ArchitectureAnalyzer::analyze(&all_files_refs, &parsed_refs, &manifest_deps, &edges);
+
+        let endpoints = ApiExtractor::extract(&all_files_refs);
+        ApiStore::replace_endpoints(conn, project_id, &endpoints).map_err(|e| e.to_string())?;
+        let (engines, schemas) = DatabaseExtractor::extract(&all_files_refs);
+        DatabaseStore::replace(conn, project_id, &engines, &schemas).map_err(|e| e.to_string())?;
+        GraphStore::refresh_complexity_findings(conn, project_id).map_err(|e| e.to_string())?;
+        let secret_candidates = SecretDetector::scan(&all_files_refs);
+        GraphStore::refresh_health_findings(conn, project_id, &secret_candidates).map_err(|e| e.to_string())?;
 
         ArchStore::persist_architecture(
             conn,

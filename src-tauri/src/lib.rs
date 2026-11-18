@@ -49,6 +49,7 @@ pub fn run() {
             commands::project::get_recent_projects,
             commands::project::get_project,
             commands::project::set_project_settings,
+            commands::project::remove_project,
             commands::scanner::start_scan,
             commands::scanner::cancel_scan,
             commands::parser::start_parse,
@@ -63,6 +64,7 @@ pub fn run() {
             commands::explorer::get_symbol_detail,
             commands::explorer::get_class_detail,
             commands::graph::get_dependencies_overview,
+            commands::graph::get_findings,
             commands::graph::get_circular_dependencies,
             commands::graph::get_import_edges,
             commands::graph::get_git_status,
@@ -70,9 +72,16 @@ pub fn run() {
             commands::arch::get_overview_data,
             commands::arch::get_architecture_model,
             commands::arch::analyze_architecture,
+            commands::api::get_api_endpoints,
+            commands::database::get_database_tables,
             commands::diagram::get_diagram,
             commands::diagram::drill_down,
             commands::diagram::export_diagram_file,
+            commands::docs::get_document,
+            commands::docs::generate_document,
+            commands::docs::save_document_section,
+            commands::docs::list_document_revisions,
+            commands::docs::export_document,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BuildBuddy application");

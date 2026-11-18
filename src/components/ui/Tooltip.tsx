@@ -7,6 +7,8 @@ export interface TooltipProps {
   children: React.ReactElement;
   side?: "top" | "bottom" | "left" | "right";
   className?: string;
+  /** Classes for the positioning wrapper, so the child can stretch in a flex row. */
+  wrapperClassName?: string;
   delayMs?: number;
 }
 
@@ -15,6 +17,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   children,
   side = "top",
   className,
+  wrapperClassName,
   delayMs = 250,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -38,7 +41,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
   };
 
   return (
-    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+    <div
+      className={twMerge(clsx("relative inline-flex", wrapperClassName))}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
       {children}
       {isVisible && content && (
         <div

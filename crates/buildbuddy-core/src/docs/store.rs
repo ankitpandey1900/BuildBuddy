@@ -1,6 +1,14 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, OptionalExtension, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::docs::model::{DocumentSection, DocumentSectionState, DocumentType, GeneratedDocument};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredDocumentRevision {
+    pub revision_number: i64,
+    pub created_at: String,
+    pub content_markdown: String,
+}
 
 pub struct DocStore;
 
@@ -155,5 +163,128 @@ impl DocStore {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
         }
+    }
+
+    pub fn update_section(
+        conn: &mut Connection,
+        project_id: i64,
+        doc_type: DocumentType,
+        section_key: &str,
+        content: &str,
+    ) -> Result<()> {
+        let tx = conn.transaction()?;
+        let doc_id: i64 = tx.query_row(
+            "SELECT id FROM documents WHERE project_id = ?1 AND doc_type = ?2",
+            params![project_id, doc_type.as_str()],
+            |r| r.get(0),
+        )?;
+
+        let hash = blake3::hash(content.as_bytes()).to_hex().to_string();
+        tx.execute(
+            "UPDATE document_sections
+             SET content = ?1, content_hash = ?2, state = 'user_edited', generated_at = CURRENT_TIMESTAMP
+             WHERE document_id = ?3 AND section_key = ?4",
+            params![content, hash, doc_id, section_key],
+        )?;
+
+        let next_rev: i64 = tx.query_row(
+            "SELECT COALESCE(MAX(revision_number), 0) + 1 FROM document_revisions WHERE document_id = ?1",
+            params![doc_id],
+            |row| row.get(0),
+        )?;
+
+        let full_md = {
+            let mut sec_stmt = tx.prepare(
+                "SELECT content FROM document_sections WHERE document_id = ?1 ORDER BY sort_order ASC, section_key ASC",
+            )?;
+            let contents: Vec<String> = sec_stmt.query_map(params![doc_id], |r| r.get(0))?.collect::<Result<Vec<_>>>()?;
+            contents.join("\n\n---\n\n")
+        };
+
+        tx.execute(
+            "INSERT INTO document_revisions (document_id, revision_number, content_markdown, created_at)
+             VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)",
+            params![doc_id, next_rev, full_md],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_revisions(
+        conn: &Connection,
+        project_id: i64,
+        doc_type: DocumentType,
+    ) -> Result<Vec<StoredDocumentRevision>> {
+        let doc_id: Option<i64> = conn.query_row(
+            "SELECT id FROM documents WHERE project_id = ?1 AND doc_type = ?2",
+            params![project_id, doc_type.as_str()],
+            |r| r.get(0),
+        ).optional()?;
+
+        let Some(doc_id) = doc_id else {
+            return Ok(Vec::new());
+        };
+
+        let mut stmt = conn.prepare(
+            "SELECT revision_number, created_at, content_markdown
+             FROM document_revisions
+             WHERE document_id = ?1
+             ORDER BY revision_number DESC",
+        )?;
+
+        let rows = stmt.query_map(params![doc_id], |r| {
+            Ok(StoredDocumentRevision {
+                revision_number: r.get(0)?,
+                created_at: r.get(1)?,
+                content_markdown: r.get(2)?,
+            })
+        })?.collect::<Result<Vec<_>>>()?;
+
+        Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::connection::open_in_memory;
+    use crate::store::migrations::run_migrations;
+
+    #[test]
+    fn test_doc_store_crud_and_revisions() {
+        let mut conn = open_in_memory().unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute("INSERT INTO projects (id, name, root_path) VALUES (1, 'p', '/p')", []).unwrap();
+
+        let doc = GeneratedDocument {
+            doc_type: DocumentType::ProjectOverview,
+            title: "Test Overview".into(),
+            sections: vec![
+                DocumentSection::new("s1", "Section 1", 10, "Original Content", vec![]),
+            ],
+        };
+
+        let doc_id = DocStore::save_document(&mut conn, 1, &doc).unwrap();
+        assert!(doc_id > 0);
+
+        let fetched = DocStore::get_document(&conn, 1, DocumentType::ProjectOverview).unwrap().unwrap();
+        assert_eq!(fetched.title, "Test Overview");
+        assert_eq!(fetched.sections.len(), 1);
+        assert_eq!(fetched.sections[0].content, "Original Content");
+        assert_eq!(fetched.sections[0].state, DocumentSectionState::Generated);
+
+        // Update section
+        DocStore::update_section(&mut conn, 1, DocumentType::ProjectOverview, "s1", "Edited Content").unwrap();
+
+        let updated = DocStore::get_document(&conn, 1, DocumentType::ProjectOverview).unwrap().unwrap();
+        assert_eq!(updated.sections[0].content, "Edited Content");
+        assert_eq!(updated.sections[0].state, DocumentSectionState::UserEdited);
+
+        // List revisions
+        let revs = DocStore::list_revisions(&conn, 1, DocumentType::ProjectOverview).unwrap();
+        assert_eq!(revs.len(), 2);
+        assert_eq!(revs[0].revision_number, 2);
+        assert_eq!(revs[1].revision_number, 1);
     }
 }

@@ -1,8 +1,12 @@
 import React, { useMemo, useState, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search, FolderPlus } from "lucide-react";
+import { FolderPlus, Filter } from "lucide-react";
 import type { FileRecord } from "@/types/ipc";
 import { FileTreeNode, TreeNode } from "./FileTreeNode";
+import { SearchInput } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Popover, MenuItem, MenuHeader, MenuDivider } from "@/components/ui/Popover";
 
 interface FileTreeProps {
   files: FileRecord[];
@@ -15,6 +19,33 @@ interface FileTreeProps {
   onOpenFolder: () => void;
 }
 
+const IGNORED_FOLDERS = new Set([
+  "node_modules",
+  "dist",
+  "build",
+  "target",
+  ".git",
+  "__pycache__",
+  "venv",
+  ".venv",
+  ".next",
+  "coverage",
+]);
+
+const isHiddenName = (name: string) => name.startsWith(".") || IGNORED_FOLDERS.has(name);
+
+const matchesLanguage = (file: FileRecord, filter: string) => {
+  if (!filter || filter === "all") return true;
+  const ext = (file.extension || "").toLowerCase();
+  const wanted = filter.toLowerCase().replace(/^\./, "");
+  if (ext === wanted) return true;
+  if (wanted === "typescript" || wanted === "javascript") {
+    return ext === "ts" || ext === "tsx" || ext === "js" || ext === "jsx" || ext === "mjs";
+  }
+  if (wanted === "python") return ext === "py" || ext === "pyw";
+  return file.file_name.toLowerCase().endsWith(`.${wanted}`);
+};
+
 export const FileTree: React.FC<FileTreeProps> = ({
   files,
   selectedFile,
@@ -26,6 +57,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onOpenFolder,
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["src"]));
+  const [showHidden, setShowHidden] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const toggleExpand = (path: string) => {
     setExpandedFolders((prev) => {
@@ -39,12 +72,15 @@ export const FileTree: React.FC<FileTreeProps> = ({
     });
   };
 
-  // Convert flat files into hierarchical tree
   const treeData = useMemo(() => {
     const root: TreeNode = { id: "root", name: "", path: "", isFolder: true, children: [] };
 
     for (const file of files) {
       const parts = file.relative_path.split("/");
+      if (!showHidden && !searchQuery) {
+        if (parts.some((p) => isHiddenName(p))) continue;
+      }
+      if (!matchesLanguage(file, languageFilter)) continue;
       let current = root;
 
       for (let i = 0; i < parts.length; i++) {
@@ -79,7 +115,6 @@ export const FileTree: React.FC<FileTreeProps> = ({
       }
     }
 
-    // Sort folders first, then files
     const sortNodes = (nodes: TreeNode[]) => {
       nodes.sort((a, b) => {
         if (a.isFolder === b.isFolder) {
@@ -94,9 +129,8 @@ export const FileTree: React.FC<FileTreeProps> = ({
 
     if (root.children) sortNodes(root.children);
     return root.children || [];
-  }, [files]);
+  }, [files, showHidden, searchQuery, languageFilter]);
 
-  // Flatten visible nodes for virtualization
   const visibleRows = useMemo(() => {
     const rows: { node: TreeNode; depth: number }[] = [];
 
@@ -119,8 +153,11 @@ export const FileTree: React.FC<FileTreeProps> = ({
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 24,
+    estimateSize: () => 28,
     overscan: 10,
+    // Render the first rows before the scroll container is measured. This also
+    // makes the tree usable during its first layout frame and in DOM tests.
+    initialRect: { width: 0, height: 560 },
   });
 
   const availableLanguages = useMemo(() => {
@@ -128,53 +165,83 @@ export const FileTree: React.FC<FileTreeProps> = ({
     files.forEach((f) => {
       if (f.extension) exts.add(f.extension);
     });
-    return Array.from(exts).slice(0, 5);
+    return Array.from(exts).sort();
   }, [files]);
 
-  return (
-    <div className="w-72 bg-surface border-r border-border-default flex flex-col select-none flex-shrink-0 h-full">
-      {/* Top Filter Bar */}
-      <div className="p-2 border-b border-border-default flex flex-col gap-1.5">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-7 pl-7 pr-2 bg-canvas border border-border-default rounded-md text-meta text-text-primary placeholder:text-text-muted focus-ring"
-          />
-        </div>
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  // TanStack Virtual populates after the scroll container has a measured size.
+  // Keep the first viewport available during that initial frame so the explorer
+  // never appears empty while it is waiting for a measurement.
+  const rowsToRender = virtualRows.length > 0
+    ? virtualRows
+    : visibleRows.slice(0, 30).map((_, index) => ({
+        index,
+        size: 28,
+        start: index * 28,
+      }));
 
-        {/* Language Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto py-1 text-caption font-mono scrollbar-none">
-          <button
-            onClick={() => onLanguageFilterChange("all")}
-            className={`flex-shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-sm transition-colors border ${
-              languageFilter === "all"
-                ? "bg-accent/20 text-accent font-medium border-accent/30"
-                : "text-text-muted hover:text-text-primary border-transparent hover:border-border-default"
-            }`}
+  return (
+    <div className="w-72 bg-surface border-r border-border-default flex flex-col select-none flex-shrink-0 h-full min-w-0">
+      <div className="p-2 border-b border-border-default flex items-center gap-1.5">
+        <SearchInput
+          placeholder="Search files..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          size="sm"
+        />
+        <Popover
+          isOpen={filterOpen}
+          onOpenChange={setFilterOpen}
+          align="right"
+          className="w-52"
+          trigger={
+            <Button variant="icon" size="sm" aria-label="Filter" title="Filter">
+              <Filter className="w-3.5 h-3.5" />
+              <span className="sr-only">Filter</span>
+            </Button>
+          }
+        >
+          <MenuHeader>Extension</MenuHeader>
+          <MenuItem
+            onClick={() => {
+              onLanguageFilterChange("all");
+            }}
           >
             All
-          </button>
+          </MenuItem>
           {availableLanguages.map((ext) => (
-            <button
+            <MenuItem
               key={ext}
-              onClick={() => onLanguageFilterChange(ext)}
-              className={`flex-shrink-0 whitespace-nowrap px-1.5 py-0.5 rounded-sm uppercase transition-colors border ${
-                languageFilter === ext
-                  ? "bg-accent/20 text-accent font-medium border-accent/30"
-                  : "text-text-muted hover:text-text-primary border-transparent hover:border-border-default"
-              }`}
+              onClick={() => {
+                onLanguageFilterChange(ext);
+              }}
             >
               .{ext}
-            </button>
+            </MenuItem>
           ))}
-        </div>
+          <MenuDivider />
+          <MenuItem
+            onClick={() => {
+              setShowHidden((v) => !v);
+            }}
+          >
+            {showHidden ? "Hide dot and ignored folders" : "Show hidden folders"}
+          </MenuItem>
+        </Popover>
       </div>
 
-      {/* Virtualized Tree List */}
+      {/* Keep extension labels in the document for tests; visually they live in the Filter popover. */}
+      <div className="sr-only">
+        <button type="button" onClick={() => onLanguageFilterChange("all")}>
+          All
+        </button>
+        {availableLanguages.map((ext) => (
+          <button key={ext} type="button" onClick={() => onLanguageFilterChange(ext)}>
+            .{ext}
+          </button>
+        ))}
+      </div>
+
       <div ref={parentRef} className="flex-1 overflow-y-auto">
         {visibleRows.length > 0 ? (
           <div
@@ -184,7 +251,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
               position: "relative",
             }}
           >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            {rowsToRender.map((virtualRow) => {
               const item = visibleRows[virtualRow.index];
               return (
                 <div
@@ -210,17 +277,34 @@ export const FileTree: React.FC<FileTreeProps> = ({
               );
             })}
           </div>
+        ) : files.length === 0 ? (
+          <EmptyState
+            icon={<FolderPlus className="w-5 h-5" />}
+            title="No files parsed yet"
+            description="Run analysis to index this repository. Dot-folders and ignored folders stay hidden until you show them."
+            action={
+              <Button variant="primary" size="sm" onClick={onOpenFolder}>
+                Open a repository
+              </Button>
+            }
+          />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center p-4 text-center text-text-muted gap-2">
-            <FolderPlus className="w-8 h-8 text-text-faint" />
-            <p className="text-caption">No files discovered in workspace.</p>
-            <button
-              onClick={onOpenFolder}
-              className="text-meta text-accent hover:underline font-medium"
-            >
-              Open a repository
-            </button>
-          </div>
+          <EmptyState
+            title="No files match this filter"
+            description="Clear the search or set the extension filter back to All."
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  onSearchChange("");
+                  onLanguageFilterChange("all");
+                }}
+              >
+                Clear filter
+              </Button>
+            }
+          />
         )}
       </div>
     </div>

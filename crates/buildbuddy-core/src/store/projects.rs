@@ -101,6 +101,11 @@ pub fn update_project_settings(conn: &Connection, id: i64, settings_json: &str) 
     Ok(())
 }
 
+pub fn delete_project(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,6 +131,10 @@ mod tests {
         update_project_settings(&conn, proj.id, "{\"theme\":\"light\"}").unwrap();
         let updated = get_project_by_id(&conn, proj.id).unwrap();
         assert_eq!(updated.settings_json, "{\"theme\":\"light\"}");
+
+        delete_project(&conn, proj.id).unwrap();
+        let empty_list = list_projects(&conn).unwrap();
+        assert_eq!(empty_list.len(), 0);
     }
 }
 

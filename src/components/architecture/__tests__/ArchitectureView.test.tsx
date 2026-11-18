@@ -431,7 +431,7 @@ describe("ArchitectureView React Flow Integration", () => {
     expect(screen.getByRole("menuitem", { name: /mermaid/i })).not.toBeDisabled();
   });
 
-  it("empty state: renders 'No dependencies detected' with reason and pipeline button when diagram has no edges", () => {
+  it("empty state: renders isolated nodes on canvas with info banner and pipeline button when diagram has no edges", () => {
     const handleRunPipeline = vi.fn();
     const emptyEdgesModel: PositionedModel = {
       diagram_type: "module_dependency",
@@ -459,15 +459,47 @@ describe("ArchitectureView React Flow Integration", () => {
       />
     );
 
-    // Verify empty state is rendered, NOT a bare node row
+    // Canvas should be rendered (not hidden behind empty state)
+    expect(screen.getByTestId("react-flow-wrapper")).toBeInTheDocument();
+
+    // Informational banner should be visible on canvas
+    expect(screen.getByTestId("isolated-nodes-banner")).toBeInTheDocument();
+    expect(screen.getByText(/0 dependencies detected/)).toBeInTheDocument();
+
+    // The full "no-dependencies-state" card should NOT be shown
+    expect(screen.queryByTestId("no-dependencies-state")).not.toBeInTheDocument();
+
+    // Pipeline button on the banner
+    const pipelineBtn = screen.getByRole("button", { name: /run pipeline/i });
+    expect(pipelineBtn).toBeInTheDocument();
+    fireEvent.click(pipelineBtn);
+    expect(handleRunPipeline).toHaveBeenCalledTimes(1);
+  });
+
+  it("empty state: renders 'No dependencies detected' card when diagram has 0 nodes and 0 edges", () => {
+    const handleRunPipeline = vi.fn();
+    const fullyEmptyModel: PositionedModel = {
+      diagram_type: "module_dependency",
+      width: 800,
+      height: 600,
+      groups: [],
+      nodes: [],
+      edges: [],
+    };
+
+    render(
+      <ArchitectureView
+        initialPositionedModel={fullyEmptyModel}
+        onRunPipeline={handleRunPipeline}
+      />
+    );
+
     expect(screen.getByTestId("no-dependencies-state")).toBeInTheDocument();
     expect(screen.getByText("No dependencies detected")).toBeInTheDocument();
-    expect(screen.getByText(/0 dependencies detected. Run analysis pipeline/)).toBeInTheDocument();
+    expect(screen.getByText(/0 files parsed/)).toBeInTheDocument();
+    expect(screen.queryByTestId("react-flow-wrapper")).not.toBeInTheDocument();
 
     const pipelineBtn = screen.getByTestId("run-pipeline-btn");
-    expect(pipelineBtn).toBeInTheDocument();
-    expect(pipelineBtn).toHaveTextContent("Run Analysis Pipeline");
-
     fireEvent.click(pipelineBtn);
     expect(handleRunPipeline).toHaveBeenCalledTimes(1);
   });
@@ -592,5 +624,38 @@ describe("ArchitectureView React Flow Integration", () => {
     fireEvent.click(zoomOutBtns[0]);
     fireEvent.click(fitBtns[0]);
     fireEvent.click(resetZoomBtns[0]);
+  });
+
+  it("diagram types: renders segmented controls for Calls and ER and calls getDiagram", async () => {
+    const mockGetDiagram = vi.spyOn(tauriLib, "getDiagram").mockResolvedValue({
+      model: {
+        diagram_type: "call_graph",
+        nodes: [],
+        edges: [],
+        groups: [],
+      },
+      dropped_edges: [],
+      collapsed_overview: null,
+    });
+
+    render(<ArchitectureView projectId={1} />);
+
+    // Calls segment button
+    const callsBtn = screen.getByRole("radio", { name: "Calls" });
+    expect(callsBtn).toBeInTheDocument();
+    fireEvent.click(callsBtn);
+
+    await waitFor(() => {
+      expect(mockGetDiagram).toHaveBeenCalledWith("call_graph", 1, expect.anything());
+    });
+
+    // ER segment button
+    const erBtn = screen.getByRole("radio", { name: "ER" });
+    expect(erBtn).toBeInTheDocument();
+    fireEvent.click(erBtn);
+
+    await waitFor(() => {
+      expect(mockGetDiagram).toHaveBeenCalledWith("er_diagram", 1, expect.anything());
+    });
   });
 });

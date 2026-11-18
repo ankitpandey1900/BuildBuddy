@@ -135,14 +135,14 @@ describe("DependenciesTable Component (TanStack Table)", () => {
     render(<DependenciesTable edges={mockEdges} />);
 
     // Click external tab
-    const externalTab = screen.getByRole("button", { name: "external" });
+    const externalTab = screen.getByRole("radio", { name: "external" });
     fireEvent.click(externalTab);
 
     expect(screen.getByText("react")).toBeInTheDocument();
     expect(screen.queryByText("src/utils.ts")).not.toBeInTheDocument();
 
     // Click internal tab
-    const internalTab = screen.getByRole("button", { name: "internal" });
+    const internalTab = screen.getByRole("radio", { name: "internal" });
     fireEvent.click(internalTab);
 
     expect(screen.getByText("src/utils.ts")).toBeInTheDocument();

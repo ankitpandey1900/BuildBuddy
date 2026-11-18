@@ -8,6 +8,7 @@ import {
   onScanProgress,
   openProjectByPath,
   readFileContent,
+  removeProject,
   selectAndOpenProject,
   startScan,
 } from "@/lib/tauri";
@@ -74,6 +75,16 @@ export function useProjectState() {
       console.error("Failed to reopen project", e);
     }
   }, [refreshRecent, refreshFiles]);
+
+  const removeRecentProject = useCallback(async (projectId: number) => {
+    try {
+      await removeProject(projectId);
+      setRecentProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setCurrentProject((curr) => (curr?.id === projectId ? null : curr));
+    } catch (e) {
+      console.error("Failed to remove recent project", e);
+    }
+  }, []);
 
   const triggerScan = useCallback(async () => {
     if (!currentProject) return;
@@ -186,6 +197,7 @@ export function useProjectState() {
     setLanguageFilter,
     openFolder,
     reopenProject,
+    removeRecentProject,
     triggerScan,
     abortScan,
     selectFile,

@@ -19,7 +19,6 @@ import {
   RefreshCw,
   FolderOpen,
   Play,
-  Maximize2,
 } from "lucide-react";
 
 import type {
@@ -48,6 +47,7 @@ import { DiagramToolbar } from "./controls/DiagramToolbar";
 import { DiagramFilterPanel, type DiagramFilterState } from "./controls/DiagramFilterPanel";
 import { DiagramLegend, SvgMarkerDefs } from "./controls/DiagramLegend";
 import { DiagramControls } from "./controls/DiagramControls";
+import { SystemFlowView } from "./SystemFlowView";
 import {
   classifyNodeLayer,
   classifyGroupLayer,
@@ -60,10 +60,13 @@ import {
 export interface ArchitectureViewProps {
   projectId?: number;
   projectRootPath?: string | null;
+  defaultDiagramType?: DiagramType;
   onNavigateToSource?: (filePath: string, line: number) => void;
   onSelectDiagramElement?: (element: SelectedDiagramElement | null) => void;
   onRunPipeline?: () => void;
   onTriggerScan?: () => void;
+  /** When set, the diagram re-fetches whenever this value changes (e.g. after pipeline completes). */
+  lastAnalysisRunId?: number;
   // Optional pre-positioned model for tests
   initialPositionedModel?: PositionedModel | null;
   theme?: "dark" | "light";
@@ -84,7 +87,6 @@ const DEFAULT_FILTERS: DiagramFilterState = {
     "call",
     "inheritance",
     "instantiation",
-    "declared_dependency",
     "entry",
   ]),
   confidences: new Set<DiagramConfidence>([
@@ -108,10 +110,12 @@ const DEFAULT_FILTERS: DiagramFilterState = {
 const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   projectId,
   projectRootPath,
+  defaultDiagramType,
   onNavigateToSource,
   onSelectDiagramElement,
   onRunPipeline,
   onTriggerScan,
+  lastAnalysisRunId,
   initialPositionedModel,
   theme = "dark",
 }) => {
@@ -119,8 +123,10 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   const workerClientRef = useRef<LayoutWorkerClient | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  // View state
-  const [diagramType, setDiagramType] = useState<DiagramType>("module_dependency");
+  // View state: default to defaultDiagramType prop or fallback to architecture_overview
+  const [diagramType, setDiagramType] = useState<DiagramType>(
+    () => initialPositionedModel?.diagram_type || defaultDiagramType || "architecture_overview"
+  );
   const [direction, setDirection] = useState<LayoutDirection>("DOWN");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeDrillGroupId, setActiveDrillGroupId] = useState<string | null>(null);
@@ -224,28 +230,155 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
       return true;
     });
 
-    const validNodeIds = new Set(validNodes.map((n) => n.id));
+    let validNodeIds = new Set(validNodes.map((n) => n.id));
+
+    // Normalize module:root <-> module:. aliases between edges and nodes
+    let hasDotModule = validNodeIds.has("module:.");
+    let hasRootModule = validNodeIds.has("module:root");
+
+    // If edges originate from root/dot module but the node was omitted from modules table, synthesize it
+    const hasRootEdge = model.edges.some((e) => e.from === "module:root" || e.from === "module:.");
+    if (hasRootEdge && !hasDotModule && !hasRootModule) {
+      validNodes.push({
+        id: "module:root",
+        kind: "module",
+        label: "Project Root",
+        width: 200,
+        height: 50,
+      });
+      validNodeIds.add("module:root");
+      hasRootModule = true;
+    }
+
+    const normalizedEdges = model.edges.map((e) => {
+      let from = e.from;
+      let to = e.to;
+      if (from === "module:root" && hasDotModule && !hasRootModule) from = "module:.";
+      if (from === "module:." && hasRootModule && !hasDotModule) from = "module:root";
+      if (to === "module:root" && hasDotModule && !hasRootModule) to = "module:.";
+      if (to === "module:." && hasRootModule && !hasDotModule) to = "module:root";
+      return { ...e, from, to };
+    });
+
+    const validEdges = normalizedEdges.filter((edge) => {
+      return validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
+    });
 
     const validGroups = model.groups.filter((group) => {
       return !isIgnoredModuleOrDirectory(group.id) && !isIgnoredModuleOrDirectory(group.label);
     });
 
-    const validEdges = model.edges.filter((edge) => {
-      return validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
+    // In architecture overview, limit external packages so 45 npm packages don't stretch into a 12,000px horizontal strip.
+    // Keep external packages that have direct calls/imports or top frameworks; hide dev/type packages when there are many.
+    const isDevOrTypePkg = (pkgId: string) => {
+      const lower = pkgId.toLowerCase();
+      return (
+        lower.includes("@types/") ||
+        lower.includes("eslint") ||
+        lower.includes("prettier") ||
+        lower.includes("toploader") ||
+        lower.includes("bundle-analyzer") ||
+        lower.includes("postcss") ||
+        lower.includes("autoprefixer")
+      );
+    };
+
+    const connectedNodeIds = new Set<string>();
+    validEdges.forEach((e) => {
+      connectedNodeIds.add(e.from);
+      connectedNodeIds.add(e.to);
     });
+
+    const isBinaryOrAsset = (filePath: string) => {
+      const lower = filePath.toLowerCase();
+      return (
+        lower.endsWith(".webp") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".gif") ||
+        lower.endsWith(".ico") ||
+        lower.endsWith(".svg") ||
+        lower.endsWith(".woff") ||
+        lower.endsWith(".woff2") ||
+        lower.endsWith(".ttf") ||
+        lower.endsWith(".eot")
+      );
+    };
+
+    const cleanNodes = validNodes.filter((node) => {
+      if (node.kind === "file") {
+        const path = node.source_ref?.file_path || node.id.replace(/^file:/, "");
+        if (isBinaryOrAsset(path)) return false;
+      }
+      if (node.kind === "external") {
+        if (!connectedNodeIds.has(node.id)) return false;
+        if (validNodes.length > 15 && isDevOrTypePkg(node.id)) return false;
+      }
+      return true;
+    });
+
+    // Ensure unparented root files are placed inside a Project Root group container
+    const hasUngroupedFiles = cleanNodes.some((n) => n.kind === "file" && !n.group_id);
+    const updatedGroups = [...validGroups];
+    if (hasUngroupedFiles && !updatedGroups.some((g) => g.id === "group:dir:root")) {
+      updatedGroups.push({
+        id: "group:dir:root",
+        label: "Project Root",
+        collapsed: false,
+      });
+    }
+
+    const assignedNodes = cleanNodes.map((n) => {
+      if (n.kind === "file" && !n.group_id) {
+        return { ...n, group_id: "group:dir:root" };
+      }
+      return n;
+    });
+
+    // Disambiguate duplicate file names (e.g. migration.sql, route.ts) by prefixing parent directory
+    const nameCounts = new Map<string, number>();
+    assignedNodes.forEach((n) => {
+      if (n.kind === "file") {
+        nameCounts.set(n.label, (nameCounts.get(n.label) || 0) + 1);
+      }
+    });
+
+    const finalNodes = assignedNodes.map((n) => {
+      if (n.kind === "file" && (nameCounts.get(n.label) || 0) > 1) {
+        const path = (n.source_ref?.file_path || n.id.replace(/^file:/, "")).replace(/\\/g, "/");
+        const parts = path.split("/");
+        if (parts.length > 1) {
+          const parentFolder = parts[parts.length - 2];
+          return {
+            ...n,
+            label: `${parentFolder}/${n.label}`,
+          };
+        }
+      }
+      return n;
+    });
+
+    const cleanNodeIds = new Set(finalNodes.map((n) => n.id));
+    const finalEdges = validEdges.filter(
+      (edge) => cleanNodeIds.has(edge.from) && cleanNodeIds.has(edge.to)
+    );
 
     return {
       ...model,
-      nodes: validNodes,
-      groups: validGroups,
-      edges: validEdges,
+      nodes: finalNodes,
+      groups: updatedGroups,
+      edges: finalEdges,
     };
   }, []);
 
   // Fetch diagram model from DB
   const fetchDiagram = useCallback(
     async (dtype: DiagramType, pId?: number) => {
-      if (!pId) return;
+      if (!pId || dtype === "system_flow") {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setError(null);
       setActiveDrillGroupId(null);
@@ -278,7 +411,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     [sanitizeModel]
   );
 
-  // Trigger fetch when projectId or diagramType changes, or sync initialPositionedModel
+  // Trigger fetch when projectId, diagramType, or lastAnalysisRunId changes
   useEffect(() => {
     if (initialPositionedModel) {
       setPositionedModel(initialPositionedModel);
@@ -293,7 +426,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     if (projectId) {
       fetchDiagram(diagramType, projectId);
     }
-  }, [projectId, diagramType, fetchDiagram, initialPositionedModel]);
+  }, [projectId, diagramType, lastAnalysisRunId, fetchDiagram, initialPositionedModel]);
 
   // Execute Layout in Web Worker whenever activeModel or direction changes
   useEffect(() => {
@@ -797,9 +930,10 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   }, [filters]);
 
   // Check empty or no-dependencies low-data state:
-  // If diagram has no edges, do not render a bare node row. Show clear state:
-  // "No dependencies detected" with the reason (e.g. "0 files parsed. Run analysis") and button.
-  const hasNoEdges = positionedModel && positionedModel.edges.length === 0;
+  // If diagram has no nodes at all, show the empty state banner.
+  // If nodes exist but no edges, still render the canvas with isolated nodes in a grid.
+  const hasNoData = positionedModel && positionedModel.nodes.length === 0 && positionedModel.edges.length === 0;
+  const hasNoEdges = positionedModel && positionedModel.edges.length === 0 && positionedModel.nodes.length > 0;
 
   return (
     <div
@@ -946,8 +1080,13 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         </div>
       )}
 
+      {/* System Flow Diagram (Mermaid interactive workflow engine) */}
+      {diagramType === "system_flow" && (
+        <SystemFlowView projectId={projectId} theme={theme} />
+      )}
+
       {/* Empty State when no project is loaded */}
-      {!projectId && !initialPositionedModel && (
+      {diagramType !== "system_flow" && !projectId && !initialPositionedModel && (
         <div className="flex-1 flex flex-col items-center justify-center font-mono text-xs text-text-muted space-y-2 p-4">
           <FolderOpen className="w-8 h-8 text-text-faint" />
           <span>No project opened. Select or open a repository to explore its architecture.</span>
@@ -955,9 +1094,8 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
       )}
 
       {/* Section 1: Empty and low-data states */}
-      {/* If a diagram has no edges, do not render a bare node row. Show clear state: */}
-      {/* "No dependencies detected" with the reason (for example "0 files parsed. Run analysis") and button */}
-      {(projectId || initialPositionedModel) && hasNoEdges && (
+      {/* If no nodes and no edges exist, show clear empty state with pipeline action */}
+      {diagramType !== "system_flow" && (projectId || initialPositionedModel) && hasNoData && (
         <div
           data-testid="no-dependencies-state"
           className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-canvas select-none z-10"
@@ -972,11 +1110,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
             </h2>
 
             <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-xs">
-              {positionedModel?.nodes.length === 0
-                ? "0 files parsed. Run analysis or select a valid project root to generate the graph."
-                : `${positionedModel?.nodes.length} component${
-                    positionedModel?.nodes.length === 1 ? "" : "s"
-                  } indexed, but 0 dependencies detected. Run analysis pipeline to extract imports, calls, and manifests.`}
+              0 files parsed. Run analysis or select a valid project root to generate the graph.
             </p>
 
             <button
@@ -992,8 +1126,8 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         </div>
       )}
 
-      {/* React Flow Canvas (rendered when edges exist) */}
-      {(projectId || initialPositionedModel) && !hasNoEdges && (
+      {/* React Flow Canvas (rendered when nodes exist — with or without edges) */}
+      {diagramType !== "system_flow" && (projectId || initialPositionedModel) && !hasNoData && (
         <div className="flex-1 w-full h-full relative" data-testid="react-flow-wrapper">
           <ReactFlow
             nodes={flowNodes}
@@ -1013,6 +1147,28 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
           >
             <Background color="var(--border-subtle, #21262D)" gap={20} size={1} />
 
+            {/* Informational banner when nodes exist but no edges detected */}
+            {hasNoEdges && (
+              <Panel position="top-center" className="!mt-3 !p-0 z-10">
+                <div
+                  data-testid="isolated-nodes-banner"
+                  className="flex items-center space-x-2 bg-surface border border-border-default rounded-md px-3 py-1.5 text-xs font-mono text-text-secondary shadow-sm"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                  <span>
+                    {positionedModel?.nodes.length} component{positionedModel?.nodes.length === 1 ? "" : "s"} indexed, 0 dependencies detected.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRunPipeline}
+                    className="ml-1 px-2 py-0.5 rounded bg-accent-default hover:bg-accent-hover text-white text-[11px] font-sans font-medium transition-colors"
+                  >
+                    Run Pipeline
+                  </button>
+                </div>
+              </Panel>
+            )}
+
             {/* Custom compact vertical zoom controls pill bottom-left */}
             <Panel position="bottom-left" className="!m-4 !p-0">
               <DiagramControls
@@ -1027,23 +1183,6 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
                 showFitAllPrompt={showFitAllPrompt}
               />
             </Panel>
-
-            {/* Floating "Fit All" button when clamped or overflowed */}
-            {showFitAllPrompt && (
-              <div className="absolute top-4 left-4 z-20">
-                <button
-                  type="button"
-                  onClick={() => {
-                    reactFlow.fitView({ padding: 0.1, minZoom: 0.1, duration: 600 });
-                    setShowFitAllPrompt(false);
-                  }}
-                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-surface border border-accent-default text-accent-text text-xs font-mono shadow-md hover:bg-hover transition-colors"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Fit All Graph Elements</span>
-                </button>
-              </div>
-            )}
 
             {/* Minimap bottom-right: 160x100, layer colors, hidden when graph <= 4 nodes */}
             {flowNodes.length > 4 && (

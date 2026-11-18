@@ -119,6 +119,8 @@ describe("CodeIntelligenceView Component", () => {
     vi.clearAllMocks();
   });
 
+  const openFilters = () => fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+
   it("renders table headers, row data, and result count", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
 
@@ -145,6 +147,8 @@ describe("CodeIntelligenceView Component", () => {
   it("filters symbols by language dropdown", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
 
+    openFilters();
+
     const langSelect = screen.getByTestId("filter-language");
 
     // Filter to Python
@@ -167,6 +171,8 @@ describe("CodeIntelligenceView Component", () => {
   it("filters symbols by kind dropdown", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
 
+    openFilters();
+
     const kindSelect = screen.getByTestId("filter-kind");
 
     // Filter to Class
@@ -179,6 +185,8 @@ describe("CodeIntelligenceView Component", () => {
   it("filters symbols by path prefix", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
 
+    openFilters();
+
     const pathInput = screen.getByTestId("filter-path-prefix");
 
     fireEvent.change(pathInput, { target: { value: "src/utils" } });
@@ -189,6 +197,8 @@ describe("CodeIntelligenceView Component", () => {
 
   it("filters symbols by min complexity", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
+
+    openFilters();
 
     const complexitySelect = screen.getByTestId("filter-min-complexity");
 
@@ -207,6 +217,8 @@ describe("CodeIntelligenceView Component", () => {
 
   it("filters symbols by flags (exported, error handling, side effects)", () => {
     render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
+
+    openFilters();
 
     const exportedCheckbox = screen.getByTestId("filter-exported");
     const errorCheckbox = screen.getByTestId("filter-error-handling");
@@ -344,5 +356,18 @@ describe("CodeIntelligenceView Component", () => {
     // The virtualizer MUST keep the DOM row count small (not 20,000)
     expect(renderedRows.length).toBeGreaterThan(0);
     expect(renderedRows.length).toBeLessThan(100);
+  });
+
+  it("keeps filters in a toolbar popover and selects a row with a soft pill", () => {
+    render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
+
+    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+    openFilters();
+    expect(screen.getByTestId("filter-language")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("parseFile"));
+    const row = screen.getByText("parseFile").closest("tr");
+    expect(row?.className).toContain("bg-accent-subtle");
+    expect(row?.className).not.toContain("border-accent");
   });
 });

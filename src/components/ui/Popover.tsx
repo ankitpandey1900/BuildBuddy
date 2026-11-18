@@ -114,3 +114,44 @@ export const MenuHeader: React.FC<{ children: React.ReactNode }> = ({ children }
     </div>
   );
 };
+
+export interface PopoverProps {
+  trigger: React.ReactNode;
+  children: React.ReactNode;
+  align?: "left" | "right";
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  className?: string;
+}
+
+export const Popover: React.FC<PopoverProps> = ({
+  trigger,
+  children,
+  align = "left",
+  isOpen,
+  onOpenChange,
+  className,
+}) => {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const open = isOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
+
+  return (
+    <div className="relative inline-flex">
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+      >
+        {trigger}
+      </div>
+      <Menu isOpen={open} onClose={() => setOpen(false)} align={align} className={className}>
+        {children}
+      </Menu>
+    </div>
+  );
+};

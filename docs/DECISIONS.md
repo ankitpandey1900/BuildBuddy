@@ -1,5 +1,40 @@
 # Architecture & Technical Decisions
 
+## 0.1 Complexity Finding Threshold
+
+### Decision
+
+Functions with a calculated cyclomatic complexity of 10 or more are recorded as `static` complexity findings. Scores from 10 through 14 are `medium`; scores of 15 or more are `high`.
+
+### Rationale
+
+The score is evidence-backed by the parsed branch and loop structure. The threshold is a review prompt, not a correctness or security claim. Missing error handling, dead code, and unsafe patterns remain out of the findings inventory until a rule can identify them without implying behavior that static analysis cannot establish.
+
+## 0.2 Credential Pattern Finding Scope
+
+Credential-shaped literals are stored as `security` findings with `static` confidence. Findings retain only the rule, file, and line; their evidence snippet is always `Sensitive value redacted`. Detected values are not copied into SQLite, documentation, or the interface. The initial rules ignore environment-variable references and certificate headers. Lexical duplicate-statement, test-file naming, and nearby error-handling signals are `inferred`; direct unsafe-sink and unreachable-statement matches are `static`.
+
+## 0. Initial API Extraction Scope
+
+API extraction initially supports literal Express route calls and FastAPI or Flask route decorators in TypeScript/JavaScript and Python. It records only the route declaration and directly following Python controller name where present. Middleware, request schemas, response schemas, authentication, service mappings, and dynamic paths remain unknown until supported by evidence-backed analyzers.
+
+## 0.3 Call Graph and ER Diagram Scope
+
+### Decision
+
+1. **Call Graph**: Built from `call_relationships` joined with `functions`, `symbols`, and `source_evidence`. Caller and callee functions are represented as component nodes grouped by their source file. Edges use `RelationshipType::Call` with confidence mapped from `resolution_status` (`confirmed`, `static`, or `inferred`). Dynamic calls are labeled as `calls [dynamic]`. Unresolved calls map to external nodes.
+2. **ER Diagram**: Built from `database_tables` and `database_fields` joined with `source_evidence`. Tables are represented as class nodes grouped by schema file. Foreign key relationships are extracted from explicit `REFERENCES` syntax in SQL declarations, mapped as `RelationshipType::DeclaredDependency` with `static` confidence, and labeled with their key field. Inferred database relationships without static SQL evidence are excluded.
+
+## 0.4 Deterministic Documentation and Engineering Reports Scope
+
+### Decision
+
+1. **Offline Synthesis**: All documentation and report types (`project_overview`, `hld`, `lld`, `api_documentation`, `database_documentation`, `dependency_inventory`, `adrs`, `security_report`, `tech_debt_report`) are synthesized purely through deterministic queries against the SQLite index, without invoking any external AI or LLM.
+2. **Anti-Hallucination & Secret Redaction**: Sentences or evidence containing credentials or secrets are completely scrubbed or redacted via `drop_secret_sentences` before writing to documents, reports, or frontend view models.
+3. **Engineering Language Standards**: Generated sections are validated against `check_banned_phrases` to prevent marketing buzzwords, filler phrases, and ungrounded speculation.
+4. **Revisions and Reversibility**: User edits to document sections increment a version counter in `document_revisions`, computing Blake3 hashes of each section, allowing complete inspection of historical snapshots and reversibility.
+5. **Path Sandboxing on Export**: Markdown and HTML exports require explicit target file validation via `validate_export_path`, strictly rejecting paths located within the analyzed project workspace to safeguard source files from accidental mutation.
+
 ## 1. Windows Build Setup
 
 ### Context
@@ -492,6 +527,34 @@ The pipeline runs in a background task via `PipelineRunner`, emitting structured
 
 ### 4. Default Ignores for Native / Mobile Build Outputs
 Added default ignore patterns for mobile and native build directories: `.gradle`, `android/.gradle`, `android/build`, `android/app/build`, `ios/build`, `ios/Pods`, `Pods`, `DerivedData`, `ios/DerivedData`, `*.apk`, `*.aab`, `*.aar`, `*.dex`, `*.ipa`, `*.xcarchive`, `*.dSYM`. Configurable via `.buildbuddyignore`.
+
+## 11. Architecture Diagram Refresh After Pipeline Completion
+
+### Decision
+The `ArchitectureView` now accepts a `lastAnalysisRunId` prop, derived from `scanSummary.analysis_run_id` in the project store. The `fetchDiagram` effect includes `lastAnalysisRunId` in its dependency array, so the diagram automatically re-fetches from the database whenever a pipeline run completes — without requiring the user to manually switch tabs or change the diagram type.
+
+When nodes exist but no edges are detected, the ReactFlow canvas still renders the nodes in a 4-column grid layout with an informational banner ("N components indexed, 0 dependencies detected") and a compact "Run Pipeline" button. The full "No dependencies detected" empty-state card only appears when both nodes and edges are 0 (truly unparsed project).
+
+### Rationale
+The prior behavior hid the ReactFlow canvas entirely whenever `edges.length === 0`, even when parsed nodes existed. This made the diagram appear permanently broken after a scan, because: (a) `triggerScan` runs the full `PipelineRunner` but nothing signaled the view to refetch, and (b) isolated nodes with legitimate meaning (single-file modules, config files) were hidden behind a misleading "0 files parsed" banner. The simplest fix that picks the right option is a prop-based refresh trigger and a split between "no data" vs "no edges" empty states.
+
+## 12. High-Level System Architecture Flow & Operational Workflow Diagrams
+
+### Decision
+1. **System Architecture & Data Flow Diagram (`DiagramType::SystemFlow`)**:
+   Synthesizes the multi-tier system topology:
+   - **Presentation & Client Layer**: Web/mobile clients connecting via `HTTPS / TLS 1.3`.
+   - **Application Engine Layer**: Detected web framework (`Next.js`, `FastAPI`, `Express`) + API route handlers.
+   - **Persistence Layer**: Database cluster nodes (`PostgreSQL`, `SQLite`, `Supabase`) listing declared schemas/tables + connection poolers / ORM (`Prisma`, `PgBouncer`, `Drizzle`).
+   - **External Ecosystem**: Third-party integrations (`GitHub OAuth`, `Webhooks`, external APIs).
+   - Provenance: Every edge links to a valid SQLite `source_evidence` entry.
+
+2. **Operational Workflow Flowcharts in HLD (`hld.rs`)**:
+   - In High-Level Design documentation, Section 1 (System Context) and Section 2 (Architecture Overview) embed visual Mermaid architecture flows.
+   - Section 5 ("Key Workflows & Operational Data Flows") generates deterministic request lifecycle and verification flowcharts featuring decision diamonds, step rectangles, and protocol edges.
+
+3. **Interactive Mermaid Diagram Viewer (`MermaidViewer.tsx`)**:
+   - Added an interactive visual diagram renderer in `DocumentationView` supporting zoom (`+`, `-`, fit), pan, copy syntax, and fullscreen toggle matching workbench visual tokens.
 
 
 

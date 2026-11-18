@@ -2,11 +2,7 @@ import React from "react";
 import { NodeProps } from "@xyflow/react";
 import { Folder, ChevronDown, ChevronRight } from "lucide-react";
 import type { DiagramGroup } from "../../../types/diagram";
-import {
-  classifyGroupLayer,
-  LAYER_STYLES,
-  type ArchitectureLayer,
-} from "../utils/layers";
+import { type ArchitectureLayer } from "../utils/layers";
 
 export interface GroupNodeData extends DiagramGroup {
   [key: string]: unknown;
@@ -20,8 +16,6 @@ export interface GroupNodeData extends DiagramGroup {
 
 export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
   const group = data as unknown as GroupNodeData;
-  const layer: ArchitectureLayer = group.layer || classifyGroupLayer(group);
-  const layerStyle = LAYER_STYLES[layer] || LAYER_STYLES.unclassified;
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,11 +57,7 @@ export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
       {/* Top-left label with count */}
       <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-border-subtle/80 text-[12px] font-sans text-text-secondary">
         <div className="flex items-center space-x-2 truncate">
-          <span
-            className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-            style={{ backgroundColor: layerStyle.accentColorDark }}
-          />
-          <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
+          <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
           <span className="font-semibold text-text-primary truncate" title={group.label}>
             {group.label}
           </span>

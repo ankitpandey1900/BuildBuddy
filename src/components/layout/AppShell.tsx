@@ -25,6 +25,7 @@ export interface AppShellProps {
   onSelectView: (view: ViewType) => void;
   onOpenFolder: () => void;
   onReopenProject: (path: string) => void;
+  onRemoveProject?: (projectId: number) => void;
   onTriggerScan: () => void;
   onCancelScan: () => void;
   onToggleTheme: () => void;
@@ -53,6 +54,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onSelectView,
   onOpenFolder,
   onReopenProject,
+  onRemoveProject,
   onTriggerScan,
   onCancelScan,
   onToggleTheme,
@@ -72,6 +74,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         theme={theme}
         onOpenFolder={onOpenFolder}
         onReopenProject={onReopenProject}
+        onRemoveProject={onRemoveProject}
         onTriggerScan={onTriggerScan}
         onCancelScan={onCancelScan}
         onToggleTheme={onToggleTheme}

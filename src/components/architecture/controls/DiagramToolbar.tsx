@@ -12,6 +12,9 @@ import {
   FileCode,
   Compass,
   Box,
+  GitFork,
+  Database,
+  Workflow,
   Plus,
   Minus,
   Maximize2,
@@ -44,10 +47,13 @@ export interface DiagramToolbarProps {
 }
 
 const DIAGRAM_SEGMENTS: { type: DiagramType; label: string; icon: React.FC<{ className?: string }> }[] = [
+  { type: "system_flow", label: "Structure Flow", icon: Workflow },
+  { type: "architecture_overview", label: "Overview", icon: Compass },
   { type: "module_dependency", label: "Modules", icon: Layers },
   { type: "file_dependency", label: "Files", icon: FileCode },
-  { type: "architecture_overview", label: "Overview", icon: Compass },
   { type: "class_diagram", label: "Classes", icon: Box },
+  { type: "call_graph", label: "Calls", icon: GitFork },
+  { type: "er_diagram", label: "ER", icon: Database },
 ];
 
 export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({

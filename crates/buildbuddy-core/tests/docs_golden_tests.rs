@@ -4,7 +4,10 @@ use rusqlite::Connection;
 
 use buildbuddy_core::arch::ArchitectureAnalyzer;
 use buildbuddy_core::docs::{
-    check_banned_phrases, DocStore, DependencyInventoryGenerator, ProjectOverviewGenerator,
+    check_banned_phrases, AdrGenerator, ApiDocGenerator, DatabaseDocGenerator,
+    DependencyInventoryGenerator, DocStore, HighLevelDesignGenerator,
+    LowLevelDesignGenerator, ProjectOverviewGenerator, SecurityReportGenerator,
+    TechDebtReportGenerator,
 };
 use buildbuddy_core::graph::{
     CycleDetector, FileImportItem, ProjectGraphResolver, UnusedDependencyDetector,
@@ -489,5 +492,25 @@ fn test_all_file_references_exist_and_within_bounds() {
             lines_in_file,
             rel_path
         );
+    }
+}
+
+#[test]
+fn test_all_document_generators_render_cleanly_without_banned_phrases() {
+    let dir = fixtures_dir().join("arch-react-express");
+    let (conn, project_id) = analyze_fixture_and_setup_db(&dir, false);
+
+    let hld = HighLevelDesignGenerator::generate(&conn, project_id).unwrap();
+    let lld = LowLevelDesignGenerator::generate(&conn, project_id).unwrap();
+    let api = ApiDocGenerator::generate(&conn, project_id).unwrap();
+    let db = DatabaseDocGenerator::generate(&conn, project_id).unwrap();
+    let sec = SecurityReportGenerator::generate(&conn, project_id).unwrap();
+    let debt = TechDebtReportGenerator::generate(&conn, project_id).unwrap();
+    let adrs = AdrGenerator::generate(&conn, project_id).unwrap();
+
+    for doc in &[hld, lld, api, db, sec, debt, adrs] {
+        let md = doc.render_markdown();
+        assert!(!md.is_empty(), "Document {} rendered empty markdown", doc.title);
+        assert!(check_banned_phrases(&md).is_ok(), "Banned phrases found in doc: {}", doc.title);
     }
 }

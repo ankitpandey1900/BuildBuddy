@@ -1,14 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  Boxes,
-  GitBranch,
-  RefreshCw,
-  AlertTriangle,
-  Package,
-  Layers,
-  ArrowRightLeft,
-} from "lucide-react";
+import { Boxes, GitBranch, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type {
   CircularDependencyCycle,
   DependencyOverview,
@@ -22,11 +17,18 @@ import { CircularDependencyList } from "./CircularDependencyList";
 interface DependenciesViewProps {
   currentProject: Project | null;
   onSelectFile?: (filePath: string) => void;
+  /** When set, the view renders this index and does not call the backend. */
+  initialEdges?: ImportEdge[];
+  initialCycles?: CircularDependencyCycle[];
+  initialOverview?: DependencyOverview | null;
 }
 
 export const DependenciesView: React.FC<DependenciesViewProps> = ({
   currentProject,
   onSelectFile,
+  initialEdges,
+  initialCycles,
+  initialOverview,
 }) => {
   const [overview, setOverview] = useState<DependencyOverview | null>(null);
   const [edges, setEdges] = useState<ImportEdge[]>([]);
@@ -85,113 +87,126 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
   };
 
   useEffect(() => {
+    if (initialEdges) {
+      setEdges(initialEdges);
+      setCycles(initialCycles ?? []);
+      setOverview(initialOverview ?? null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     loadData();
-  }, [loadData]);
+  }, [loadData, initialEdges, initialCycles, initialOverview]);
 
   if (!currentProject) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-text-muted">
-        <Boxes className="w-12 h-12 mb-3 text-text-muted/40 stroke-1" />
-        <p className="text-sm">Open a project workspace to analyze dependencies and graph cycles.</p>
+      <div className="flex-1 flex items-center justify-center bg-canvas">
+        <EmptyState
+          icon={<Boxes className="w-5 h-5" />}
+          title="No project open"
+          description="Open a project folder, then run analysis. Dependency edges are read from the local index."
+        />
       </div>
     );
   }
 
+  if (error && !overview && edges.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-canvas">
+        <EmptyState
+          title="Dependencies failed to load"
+          description={error}
+          action={
+            <Button variant="secondary" onClick={loadData}>
+              Retry
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const figures = [
+    {
+      label: "Internal edges",
+      value: overview?.internal_edges_count ?? edges.filter((e) => e.resolution_status === "internal").length,
+      hint: "Import edges resolved to a file inside this repository.",
+    },
+    {
+      label: "External packages",
+      value: overview?.external_dependencies_count ?? edges.filter((e) => e.resolution_status === "external").length,
+      hint: "Imports resolved to a package outside this repository.",
+    },
+    {
+      label: "Cycles",
+      value: cycles.length,
+      hint: "Strongly connected groups of internal imports.",
+    },
+    {
+      label: "Unused manifest deps",
+      value: overview?.unused_dependencies_count ?? 0,
+      hint: "Packages declared in a manifest with no matching import in the index.",
+    },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-canvas p-4 gap-4">
-      {/* Top Header & Metrics Bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-accent" />
-            Dependency Inventory & Graph Analysis
-          </h1>
-          <p className="text-micro text-text-muted">
-            Resolved module edges, package manifests, and strongly connected cycles.
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-canvas">
+      <div className="px-4 py-3 border-b border-border-default flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-subheading font-semibold text-text-primary">Dependencies</h1>
+          <p className="text-caption text-text-muted mt-0.5">
+            Module edges, package imports, and import cycles from the local index.
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {gitStatus?.is_git_repo && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-surface border border-border-default rounded text-micro font-mono text-text-secondary">
+            <div className="flex items-center gap-1.5 text-caption text-text-secondary">
               <GitBranch className="w-3.5 h-3.5 text-text-muted" />
               <span>{gitStatus.current_branch || "HEAD"}</span>
               {gitStatus.commit_hash && (
-                <span className="text-text-muted">
-                  ({gitStatus.commit_hash.substring(0, 7)})
-                </span>
+                <span className="font-mono text-text-muted">{gitStatus.commit_hash.substring(0, 7)}</span>
               )}
             </div>
           )}
-
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleResolveGraph}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1 bg-accent/15 text-accent border border-accent/30 rounded text-xs hover:bg-accent/25 transition-colors disabled:opacity-50"
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Resolve Graph</span>
-          </button>
+            Resolve graph
+          </Button>
         </div>
       </div>
 
-      {error && (
-        <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded">
-          {error}
-        </div>
+      {loading && edges.length === 0 && (
+        <EmptyState title="Loading dependencies" description="Reading import edges from the local database." />
       )}
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="p-3 bg-surface border border-border-default rounded-md flex flex-col">
-          <div className="flex items-center justify-between text-text-muted text-micro">
-            <span>Internal Edges</span>
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-          </div>
-          <span className="text-lg font-mono font-semibold text-text-primary mt-1">
-            {overview?.internal_edges_count ?? edges.filter(e => e.resolution_status === "internal").length}
-          </span>
-        </div>
+      {error && (
+        <p className="px-4 py-2 text-caption text-status-danger-text border-b border-border-subtle">{error}</p>
+      )}
 
-        <div className="p-3 bg-surface border border-border-default rounded-md flex flex-col">
-          <div className="flex items-center justify-between text-text-muted text-micro">
-            <span>External Packages</span>
-            <Package className="w-3.5 h-3.5" />
-          </div>
-          <span className="text-lg font-mono font-semibold text-text-primary mt-1">
-            {overview?.external_dependencies_count ?? edges.filter(e => e.resolution_status === "external").length}
-          </span>
-        </div>
-
-        <div className="p-3 bg-surface border border-border-default rounded-md flex flex-col">
-          <div className="flex items-center justify-between text-text-muted text-micro">
-            <span>Circular Cycles</span>
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-          </div>
-          <span className={`text-lg font-mono font-semibold mt-1 ${cycles.length > 0 ? "text-amber-400" : "text-text-primary"}`}>
-            {cycles.length}
-          </span>
-        </div>
-
-        <div className="p-3 bg-surface border border-border-default rounded-md flex flex-col">
-          <div className="flex items-center justify-between text-text-muted text-micro">
-            <span>Unused Manifest Deps</span>
-            <Layers className="w-3.5 h-3.5" />
-          </div>
-          <span className="text-lg font-mono font-semibold text-text-primary mt-1">
-            {overview?.unused_dependencies_count ?? 0}
-          </span>
-        </div>
+      <div className="flex items-stretch border-b border-border-default">
+        {figures.map((item, idx) => (
+          <Tooltip key={item.label} content={item.hint} wrapperClassName="flex flex-1 min-w-0">
+            <div
+              className={`w-full px-4 py-3 ${idx < figures.length - 1 ? "border-r border-border-subtle" : ""}`}
+              title={item.hint}
+            >
+              <div className="text-heading font-semibold text-text-primary tabular-nums">{item.value}</div>
+              <div className="text-caption text-text-muted mt-0.5">{item.label}</div>
+            </div>
+          </Tooltip>
+        ))}
       </div>
 
-      {/* Main Content Area: Split Table + Circular Cycles Panel */}
-      <div className="flex-1 flex gap-4 overflow-hidden">
-        <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <DependenciesTable edges={edges} onSelectFile={onSelectFile} />
         </div>
-
-        <div className="w-80 flex flex-col overflow-y-auto">
+        <div className="w-80 border-l border-border-default overflow-y-auto bg-surface">
           <CircularDependencyList cycles={cycles} onSelectFile={onSelectFile} />
         </div>
       </div>

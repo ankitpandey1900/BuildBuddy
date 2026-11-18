@@ -141,7 +141,6 @@ pub fn build_architecture_overview_diagram(
             metrics: None,
         });
 
-        // If connected to a module, create an entry edge
         if let Some(mod_id) = target_mod_id {
             if let Some(ev_id) = ev_id_opt {
                 if let Some(ev_key) = valid_evidence.get(&ev_id) {
@@ -168,15 +167,15 @@ pub fn build_architecture_overview_diagram(
         }
     }
 
-    // 4. Query call relationships that connect modules or symbols
+    // 4. Query call relationships (call edges between modules/externals)
     let mut call_stmt = conn.prepare(
-        "SELECT c.id, c.file_id, sf.relative_path, c.caller_symbol_id, caller_sym.stable_id,
-                c.callee_symbol_id, c.callee_name, c.resolution_status, c.source_evidence_id
-         FROM call_relationships c
-         JOIN files sf ON c.file_id = sf.id
-         LEFT JOIN symbols caller_sym ON c.caller_symbol_id = caller_sym.id
-         WHERE c.project_id = ?1
-         ORDER BY c.id ASC",
+        "SELECT cr.id, cr.file_id, f.relative_path, cr.caller_symbol_id, cs.stable_id,
+                cr.callee_symbol_id, cr.callee_name, cr.resolution_status, cr.source_evidence_id
+         FROM call_relationships cr
+         JOIN files f ON cr.file_id = f.id
+         LEFT JOIN symbols cs ON cr.caller_symbol_id = cs.id
+         WHERE cr.project_id = ?1
+         ORDER BY f.relative_path ASC, cr.id ASC",
     )?;
 
     let call_rows = call_stmt.query_map(params![project_id], |row| {
@@ -319,4 +318,3 @@ pub fn build_architecture_overview_diagram(
         dropped_edges,
     })
 }
-

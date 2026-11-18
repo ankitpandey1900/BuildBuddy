@@ -8,6 +8,7 @@ import {
   Search,
   RefreshCw,
   XCircle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
@@ -21,6 +22,7 @@ interface TopBarProps {
   theme: "dark" | "light";
   onOpenFolder: () => void;
   onReopenProject: (path: string) => void;
+  onRemoveProject?: (projectId: number) => void;
   onTriggerScan: () => void;
   onCancelScan: () => void;
   onToggleTheme: () => void;
@@ -35,6 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   theme,
   onOpenFolder,
   onReopenProject,
+  onRemoveProject,
   onTriggerScan,
   onCancelScan,
   onToggleTheme,
@@ -43,7 +46,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
-    <header className="h-10 bg-surface border-b border-border-default px-3 flex items-center justify-between select-none z-40 flex-shrink-0 relative w-full overflow-hidden">
+    <header className="h-12 bg-surface border-b border-border-default px-4 flex items-center justify-between select-none z-40 flex-shrink-0 relative w-full min-w-0">
       {/* Click outside backdrop when dropdown is open */}
       {dropdownOpen && (
         <div
@@ -57,17 +60,17 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-2 relative z-50 min-w-0">
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-sm hover:bg-hover text-text-primary text-body font-medium transition-colors duration-150 border border-transparent hover:border-border-default focus-ring cursor-pointer max-w-[240px]"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-body font-medium transition-colors duration-150 border border-transparent hover:border-border-default focus-ring cursor-pointer max-w-[280px]"
         >
-          <Folder className="w-4 h-4 text-accent flex-shrink-0" />
+          <Folder className="w-[18px] h-[18px] text-accent flex-shrink-0" strokeWidth={2.2} />
           <span className="truncate">
             {currentProject ? currentProject.name : "Select Project..."}
           </span>
-          <ChevronDown className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+          <ChevronDown className="w-4 h-4 text-text-muted flex-shrink-0" />
         </button>
 
         {dropdownOpen && (
-          <div className="absolute top-9 left-0 w-80 bg-surface border border-border-default shadow-menu rounded-md p-1.5 z-50 text-body font-sans">
+          <div className="absolute top-10 left-0 w-80 bg-surface border border-border-default shadow-menu rounded-md p-1.5 z-50 text-body font-sans">
             <button
               onClick={() => {
                 setDropdownOpen(false);
@@ -86,19 +89,38 @@ export const TopBar: React.FC<TopBarProps> = ({
                 </div>
                 <div className="max-h-56 overflow-y-auto">
                   {recentProjects.map((p) => (
-                    <button
+                    <div
                       key={p.id}
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        onReopenProject(p.root_path);
-                      }}
-                      className="w-full flex flex-col items-start px-2.5 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary group transition-colors duration-150 cursor-pointer"
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary group transition-colors duration-150 cursor-pointer"
                     >
-                      <span className="font-medium text-body">{p.name}</span>
-                      <span className="text-caption text-text-muted truncate w-full group-hover:text-text-secondary font-mono">
-                        {p.root_path.replace(/^(\\\\\?\\|\/\/\?\/)/, "")}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          onReopenProject(p.root_path);
+                        }}
+                        className="flex-1 flex flex-col items-start min-w-0 text-left cursor-pointer focus:outline-none"
+                      >
+                        <span className="font-medium text-body truncate w-full">{p.name}</span>
+                        <span className="text-caption text-text-muted truncate w-full group-hover:text-text-secondary font-mono">
+                          {p.root_path.replace(/^(\\\\\?\\|\/\/\?\/)/, "")}
+                        </span>
+                      </button>
+                      {onRemoveProject && (
+                        <button
+                          type="button"
+                          title="Remove from recent workspaces"
+                          aria-label={`Remove ${p.name} from recent workspaces`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemoveProject(p.id);
+                          }}
+                          className="p-1 rounded text-text-muted hover:text-danger hover:bg-surface opacity-0 group-hover:opacity-100 transition-all ml-1 flex-shrink-0 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </>
@@ -107,7 +129,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
 
         {/* Calm Offline Indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-elevated/70 border border-border-subtle text-caption text-text-muted">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-elevated/70 border border-border-subtle text-meta text-text-muted">
           <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" />
           <span>Offline</span>
         </div>
@@ -147,15 +169,15 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Middle: Command Palette Quick Trigger */}
-      <div className="flex-1 max-w-sm mx-4">
+      <div className="flex-1 max-w-md mx-6">
         <button
           onClick={onOpenCommandPalette}
           data-testid="topbar-search-trigger"
-          className="w-full h-7 px-2.5 flex items-center justify-between bg-elevated/70 border border-border-default rounded-sm text-body text-text-muted hover:border-border-strong hover:bg-elevated transition-colors duration-150 focus-ring cursor-pointer"
+          className="w-full h-8 px-3 flex items-center justify-between bg-elevated/70 border border-border-default rounded-sm text-body text-text-muted hover:border-border-strong hover:bg-elevated transition-colors duration-150 focus-ring cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5" />
-            <span className="text-secondary text-caption">Search files, commands...</span>
+            <Search className="w-4 h-4" />
+            <span className="text-secondary text-body">Search files, commands...</span>
           </div>
           <Kbd>Ctrl+K</Kbd>
         </button>
@@ -166,13 +188,13 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={onToggleTheme}
           aria-label="Toggle theme"
-          className="w-7 h-7 flex items-center justify-center rounded-sm hover:bg-hover text-text-muted hover:text-text-primary transition-colors duration-150 focus-ring cursor-pointer"
+          className="w-8 h-8 flex items-center justify-center rounded-sm hover:bg-hover text-text-muted hover:text-text-primary transition-colors duration-150 focus-ring cursor-pointer"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
         >
           {theme === "dark" ? (
-            <Sun className="w-3.5 h-3.5" />
+            <Sun className="w-4 h-4" />
           ) : (
-            <Moon className="w-3.5 h-3.5" />
+            <Moon className="w-4 h-4" />
           )}
         </button>
       </div>

@@ -428,6 +428,16 @@ impl ArchStore {
         let mut lang_map: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
         let mut total_lines = 0usize;
 
+        let is_binary_or_asset = |ext: &str| {
+            matches!(
+                ext,
+                "webp" | "jpg" | "jpeg" | "png" | "gif" | "svg" | "ico" | "bmp" | "avif"
+                | "woff" | "woff2" | "ttf" | "eot" | "otf"
+                | "pdf" | "mp4" | "webm" | "mp3" | "wav" | "zip" | "tar" | "gz"
+                | "lock" | "example" | "map" | "bin" | "exe"
+            )
+        };
+
         let lang_rows = lang_stmt.query_map(params![project_id], |row| {
             let ext: Option<String> = row.get(0)?;
             let file_count: usize = row.get(1)?;
@@ -437,21 +447,39 @@ impl ArchStore {
 
         for r in lang_rows {
             let (ext, f_count, l_count) = r?;
+            let ext_str = ext.as_deref().unwrap_or("").to_lowercase();
+
+            // Filter out non-code binary assets, media files, and 0-line metadata
+            if is_binary_or_asset(&ext_str) || (l_count == 0 && ext_str != "ts" && ext_str != "js" && ext_str != "py" && ext_str != "rs" && ext_str != "tsx") {
+                continue;
+            }
+
             total_lines += l_count;
-            let lang_name = match ext.as_deref().unwrap_or("") {
-                "ts" => "TypeScript",
-                "tsx" => "TypeScript (TSX)",
-                "js" => "JavaScript",
-                "jsx" => "JavaScript (JSX)",
-                "py" | "pyw" => "Python",
+            let lang_name = match ext_str.as_str() {
+                "ts" | "mts" | "cts" => "TypeScript",
+                "tsx" => "React (TSX)",
+                "js" | "mjs" | "cjs" => "JavaScript",
+                "jsx" => "React (JSX)",
+                "py" | "pyw" | "pyi" => "Python",
                 "rs" => "Rust",
                 "json" => "JSON",
                 "toml" => "TOML",
                 "md" | "markdown" => "Markdown",
-                "css" | "scss" => "CSS",
-                "html" => "HTML",
+                "css" | "scss" | "sass" | "less" => "CSS",
+                "html" | "htm" => "HTML",
                 "sql" => "SQL",
-                other if !other.is_empty() => other,
+                "prisma" => "Prisma Schema",
+                "yaml" | "yml" => "YAML",
+                "sh" | "bash" | "zsh" => "Shell",
+                "go" => "Go",
+                "java" => "Java",
+                "kt" | "kts" => "Kotlin",
+                "c" | "h" => "C",
+                "cpp" | "hpp" | "cc" => "C++",
+                "cs" => "C#",
+                "php" => "PHP",
+                "rb" => "Ruby",
+                "swift" => "Swift",
                 _ => "Other",
             };
             let entry = lang_map.entry(lang_name.to_string()).or_insert((0, 0));

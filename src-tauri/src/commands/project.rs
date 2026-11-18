@@ -90,3 +90,12 @@ pub async fn set_project_settings(
     update_project_settings(&conn, project_id, &settings_json).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn remove_project(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    crate::core::store::projects::delete_project(&conn, project_id).map_err(|e| e.to_string())
+}
+

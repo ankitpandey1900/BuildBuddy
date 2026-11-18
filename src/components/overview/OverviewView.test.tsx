@@ -342,8 +342,8 @@ describe("OverviewView Component", () => {
       />
     );
 
-    expect(screen.getByText("Scan Time: 2.15s")).toBeInTheDocument();
-    expect(screen.getByText("Parsed: 39/42 files")).toBeInTheDocument();
+    expect(screen.getByText(/Scan Time: 2\.15s/)).toBeInTheDocument();
+    expect(screen.getByText(/Parsed: 39\/42 files/)).toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
   });
 
@@ -375,5 +375,28 @@ describe("OverviewView Component", () => {
     expect(textContent).not.toMatch(/health score/i);
     expect(textContent).not.toMatch(/grade/i);
     expect(textContent).not.toMatch(/overall rating/i);
+  });
+
+  it("strips the Windows UNC prefix and offers Re-analyze", () => {
+    const onReanalyze = vi.fn();
+    render(
+      <OverviewView
+        currentProject={{
+          ...mockProject,
+          root_path: "\\\\?\\D:\\repo\\arch-react-express",
+        }}
+        initialData={{
+          ...mockOverviewData,
+          root_path: "\\\\?\\D:\\repo\\arch-react-express",
+        }}
+        onNavigateToView={vi.fn()}
+        onReanalyze={onReanalyze}
+      />
+    );
+
+    expect(screen.getByText("D:\\repo\\arch-react-express")).toBeInTheDocument();
+    expect(screen.queryByText(/\\\\\?\\/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Re-analyze" }));
+    expect(onReanalyze).toHaveBeenCalledTimes(1);
   });
 });

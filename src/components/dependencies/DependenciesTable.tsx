@@ -8,8 +8,12 @@ import {
   flexRender,
   SortingState,
 } from "@tanstack/react-table";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, FileCode, CheckCircle2, ExternalLink, Wrench } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, FileCode, ExternalLink } from "lucide-react";
 import type { ImportEdge } from "@/types/ipc";
+import { SearchInput } from "@/components/ui/Input";
+import { Toolbar, ToolbarGroup } from "@/components/ui/Toolbar";
+import { Badge } from "@/components/ui/Badge";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 export interface DependencyRow {
   name: string;
@@ -117,6 +121,7 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
   ]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "internal" | "external" | "dev">("all");
+  const [selectedName, setSelectedName] = useState<string | null>(null);
 
   const data = useMemo(() => {
     const rows = computeDependencyRows(edges);
@@ -138,7 +143,7 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
               title={row.name}
             >
               <FileCode className="w-3 h-3 text-text-muted flex-shrink-0" />
-              <span className="truncate">{row.name}</span>
+              <span className="truncate font-mono text-caption">{row.name}</span>
             </button>
           ) : (
             <span className="font-semibold text-text-primary flex items-center gap-1.5 truncate">
@@ -155,24 +160,21 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
           switch (kind) {
             case "internal":
               return (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
+                <Badge variant="confirmed" size="sm">
                   internal
-                </span>
+                </Badge>
               );
             case "external":
               return (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  <ExternalLink className="w-2.5 h-2.5" />
+                <Badge variant="static" size="sm">
                   external
-                </span>
+                </Badge>
               );
             case "dev":
               return (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                  <Wrench className="w-2.5 h-2.5" />
+                <Badge variant="unknown" size="sm">
                   dev
-                </span>
+                </Badge>
               );
           }
         },
@@ -180,19 +182,19 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
       columnHelper.accessor("version", {
         header: "Version",
         cell: (info) => (
-          <span className="text-text-muted font-mono">{info.getValue()}</span>
+          <span className="text-text-muted tabular-nums">{info.getValue()}</span>
         ),
       }),
       columnHelper.accessor("import_count", {
         header: "Imports",
         cell: (info) => (
-          <span className="font-mono text-right block">{info.getValue()}</span>
+          <span className="tabular-nums text-right block">{info.getValue()}</span>
         ),
       }),
       columnHelper.accessor("fan_in", {
         header: "Fan-In",
         cell: (info) => (
-          <span className="font-mono text-right block font-semibold text-text-primary">
+          <span className="tabular-nums text-right block font-medium text-text-primary">
             {info.getValue()}
           </span>
         ),
@@ -200,7 +202,7 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
       columnHelper.accessor("fan_out", {
         header: "Fan-Out",
         cell: (info) => (
-          <span className="font-mono text-right block text-text-secondary">
+          <span className="tabular-nums text-right block text-text-secondary">
             {info.getValue()}
           </span>
         ),
@@ -225,37 +227,31 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
   });
 
   return (
-    <div className="flex flex-col h-full bg-surface border border-border-default rounded-md overflow-hidden text-xs">
-      {/* Controls Bar */}
-      <div className="p-2.5 border-b border-border-default flex items-center justify-between gap-3 bg-canvas/30">
-        <div className="flex items-center gap-1">
-          {(["all", "internal", "external", "dev"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setKindFilter(tab)}
-              className={`px-2.5 py-1 rounded text-micro font-medium capitalize transition-colors ${
-                kindFilter === tab
-                  ? "bg-accent/15 text-accent border border-accent/30"
-                  : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-64">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            type="text"
+    <div className="flex flex-col h-full bg-surface border border-border-default rounded-md overflow-hidden text-body">
+      <Toolbar>
+        <ToolbarGroup>
+          <SegmentedControl
+            ariaLabel="Dependency category"
+            size="sm"
+            value={kindFilter}
+            onChange={(v) => setKindFilter(v)}
+            items={[
+              { id: "all", label: "all" },
+              { id: "internal", label: "internal" },
+              { id: "external", label: "external" },
+              { id: "dev", label: "dev" },
+            ]}
+          />
+        </ToolbarGroup>
+        <div className="w-64">
+          <SearchInput
             placeholder="Search dependencies..."
             value={globalFilter ?? ""}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="w-full pl-8 pr-2.5 py-1 bg-surface border border-border-default rounded text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            size="sm"
           />
         </div>
-      </div>
+      </Toolbar>
 
       {/* Table Content */}
       <div className="flex-1 overflow-auto">
@@ -297,7 +293,7 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-border-default/50 font-mono text-micro">
+          <tbody className="text-body">
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-text-muted">
@@ -308,10 +304,15 @@ export const DependenciesTable: React.FC<DependenciesTableProps> = ({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="hover:bg-hover/60 transition-colors group cursor-default"
+                  onClick={() => setSelectedName(row.original.name)}
+                  className={`h-9 border-b border-border-subtle transition-colors cursor-default ${
+                    selectedName === row.original.name
+                      ? "bg-accent-subtle text-text-primary"
+                      : "hover:bg-hover"
+                  }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-1.5 px-3">
+                    <td key={cell.id} className="px-3 align-middle">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

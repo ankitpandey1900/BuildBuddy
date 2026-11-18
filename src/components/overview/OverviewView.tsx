@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from "react";
 import {
   Folder,
-  Code2,
-  FileCode,
-  Package,
-  AlertCircle,
-  HelpCircle,
-  ExternalLink,
   Clock,
-  CheckCircle,
-  FileText,
+  FileCode,
+  Layers,
+  Code2,
   Boxes,
-  PlayCircle,
-  ArrowRight,
+  AlertTriangle,
+  FolderGit2,
 } from "lucide-react";
 import type {
   FrameworkDetection,
@@ -22,6 +17,31 @@ import type {
 } from "@/types/ipc";
 import { getOverviewData } from "@/lib/tauri";
 import { FrameworkEvidenceModal } from "./FrameworkEvidenceModal";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Tooltip } from "@/components/ui/Tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/Table";
+
+/** Distinct neutral palette for language slices — engineering-readable, not AI-gradient */
+const CHART_COLORS = [
+  "#4D9EF7", // blue
+  "#56C99A", // green
+  "#F5A623", // amber
+  "#9B8AFB", // purple
+  "#F87171", // rose
+  "#67C8E8", // teal
+  "#A8B3C0", // slate
+  "#C8D1D9", // light gray
+];
 
 interface OverviewViewProps {
   projectId?: number;
@@ -31,8 +51,28 @@ interface OverviewViewProps {
   onFilterFilesByLanguage?: (lang: string) => void;
   onFilterFilesByStatus?: (status: string) => void;
   onOpenFolder?: () => void;
+  onReanalyze?: () => void;
   initialData?: OverviewDataDto;
 }
+
+const stripUncPrefix = (path: string) => {
+  // Remove UNC prefix \\?\ or //?/
+  return path.replace(/^(\\{2}\?\\|\/\/\?\/)/u, "");
+};
+
+const formatAnalyzedAt = (iso?: string | null, durationMs?: number | null) => {
+  if (iso) {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
+  }
+  if (durationMs != null) {
+    return `Scan time ${(durationMs / 1000).toFixed(2)}s`;
+  }
+  return null;
+};
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
   projectId,
@@ -42,16 +82,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onFilterFilesByLanguage,
   onFilterFilesByStatus,
   onOpenFolder,
+  onReanalyze,
   initialData,
 }) => {
   const [data, setData] = useState<OverviewDataDto | null>(initialData || null);
   const [isLoading, setIsLoading] = useState(!initialData && !!projectId);
+  const [error, setError] = useState<string | null>(null);
   const [selectedFramework, setSelectedFramework] = useState<FrameworkDetection | null>(null);
 
   useEffect(() => {
     if (initialData) {
       setData(initialData);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
@@ -64,6 +107,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
     let isMounted = true;
     setIsLoading(true);
+    setError(null);
 
     getOverviewData(id)
       .then((res) => {
@@ -73,8 +117,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         }
       })
       .catch((err) => {
-        console.error("Failed to load overview data:", err);
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : String(err));
+          setIsLoading(false);
+        }
       });
 
     return () => {
@@ -82,451 +128,515 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     };
   }, [projectId, currentProject?.id, initialData]);
 
-  // 1. Empty State
   if (!currentProject && !data) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-canvas text-center">
-        <div className="w-12 h-12 rounded-md bg-bg-subtle border border-border-default flex items-center justify-center mb-4 text-text-muted">
-          <Folder className="w-6 h-6" />
-        </div>
-        <h2 className="text-heading font-semibold text-text-primary mb-2">No Project Loaded</h2>
-        <p className="text-body text-text-muted max-w-md mb-6">
-          Open a project workspace to inspect repository architecture, detected frameworks, entry points, and structural intelligence.
-        </p>
-        {onOpenFolder && (
-          <button
-            onClick={onOpenFolder}
-            className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-body font-medium rounded-md shadow-sm transition-colors"
-          >
-            Open Project Folder...
-          </button>
-        )}
+      <div className="flex-1 flex items-center justify-center bg-canvas">
+        <EmptyState
+          icon={<Folder className="w-5 h-5" />}
+          title="No Project Loaded"
+          description="Open a project workspace to inspect repository architecture, detected frameworks, entry points, and structural intelligence."
+          action={
+            onOpenFolder ? (
+              <Button variant="primary" onClick={onOpenFolder}>
+                Open Project Folder...
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
 
-  // 2. Loading State
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-canvas">
+        <EmptyState
+          icon={<Clock className="w-5 h-5" />}
+          title="Overview failed to load"
+          description={error}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const id = currentProject?.id;
+                if (!id) return;
+                setIsLoading(true);
+                setError(null);
+                getOverviewData(id)
+                  .then((res) => {
+                    setData(res);
+                    setIsLoading(false);
+                  })
+                  .catch((err) => {
+                    setError(err instanceof Error ? err.message : String(err));
+                    setIsLoading(false);
+                  });
+              }}
+            >
+              Retry
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (isLoading || !data) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 bg-canvas text-text-muted text-body font-mono">
-        <Clock className="w-4 h-4 animate-spin mr-2" />
-        Loading workspace architecture overview...
+      <div className="flex-1 flex items-center justify-center bg-canvas">
+        <EmptyState
+          icon={<Clock className="w-5 h-5" />}
+          title="Loading overview"
+          description="No completed analysis is available yet. Run analysis to fill this screen."
+          action={
+            onReanalyze ? (
+              <Button variant="primary" onClick={onReanalyze}>
+                Run analysis
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
 
   const { metrics, languages, frameworks, entry_points, completion } = data;
+  const analyzedAt = formatAnalyzedAt(completion?.completed_at, completion?.duration_ms);
+  const displayPath = stripUncPrefix(data.root_path);
+
+  // ── Donut chart math (enlarged for prominence) ───────────────────────────
+  const DONUT_R = 72;
+  const DONUT_CX = 95;
+  const DONUT_CY = 95;
+  const circumference = 2 * Math.PI * DONUT_R;
+  const totalLangFiles = languages.reduce((s, l) => s + l.file_count, 0);
+  const totalLangLines = languages.reduce((s, l) => s + l.line_count, 0);
+
+  const metricItems: {
+    testId: string;
+    value: number;
+    label: string;
+    title: string;
+    icon: React.ReactNode;
+    onClick?: () => void;
+    href?: string;
+  }[] = [
+    {
+      testId: "metric-files",
+      value: metrics.total_files,
+      label: "Files",
+      title: "Total source and asset files tracked in workspace. Click to view in Explorer.",
+      icon: <FileCode className="w-4 h-4 text-accent" />,
+      onClick: () => onNavigateToView("explorer"),
+    },
+    {
+      testId: "metric-modules",
+      value: metrics.total_modules,
+      label: "Modules",
+      title: "Directory modules clustered by import cohesion and directory structure. Click to view Architecture.",
+      icon: <Layers className="w-4 h-4 text-text-muted" />,
+      onClick: () => onNavigateToView("architecture"),
+    },
+    {
+      testId: "metric-symbols",
+      value: metrics.total_symbols,
+      label: "Symbols",
+      title: "Functions, classes, interfaces, and methods parsed into SQLite index. Click to view Code Intelligence.",
+      icon: <Code2 className="w-4 h-4 text-text-muted" />,
+      onClick: () => onNavigateToView("intelligence"),
+    },
+    {
+      testId: "metric-entry-points",
+      value: metrics.total_entry_points,
+      label: "Entry points",
+      title: "Application entry points from package manifests, server listeners, and main blocks.",
+      icon: <FolderGit2 className="w-4 h-4 text-text-muted" />,
+      href: "#entry-points-section",
+    },
+    {
+      testId: "metric-dependencies",
+      value: metrics.total_dependencies,
+      label: "Dependencies",
+      title: "External libraries declared in package manifests. Click to view Dependencies.",
+      icon: <Boxes className="w-4 h-4 text-text-muted" />,
+      onClick: () => onNavigateToView("dependencies"),
+    },
+    {
+      testId: "metric-unsupported",
+      value: metrics.unsupported_files_count + metrics.partial_files_count,
+      label: "Partial / unsupported",
+      title: "Files skipped due to unsupported language, binary content, size limits, or parse syntax issues. Click to view in Explorer.",
+      icon: <AlertTriangle className="w-4 h-4 text-text-muted" />,
+      onClick: () => {
+        onFilterFilesByStatus?.("unsupported");
+        onNavigateToView("explorer");
+      },
+    },
+  ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-canvas p-6 space-y-6">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border-default gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-title font-semibold text-text-primary">{data.project_name}</h1>
-            {completion && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-sm bg-status-success/10 text-status-success text-micro font-mono border border-status-success/20">
-                <CheckCircle className="w-3.5 h-3.5" />
-                {completion.status}
-              </span>
-            )}
-          </div>
-          <p className="text-caption font-mono text-text-muted truncate max-w-2xl mt-0.5">
-            {data.root_path}
-          </p>
-        </div>
-
-        {completion?.duration_ms != null && (
-          <div className="flex items-center gap-4 text-caption font-mono text-text-muted bg-surface px-3 py-1.5 rounded-sm border border-border-subtle">
-            <span>Scan Time: {(completion.duration_ms / 1000).toFixed(2)}s</span>
-            <span>Parsed: {completion.files_parsed}/{completion.files_scanned} files</span>
-          </div>
-        )}
-      </div>
-
-      {/* Metrics Cards Grid */}
-      <div>
-        <h2 className="text-subheading font-semibold text-text-primary mb-3">Core Workspace Metrics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {/* Metric 1: Total Files */}
-          <button
-            onClick={() => onNavigateToView("explorer")}
-            title="Total source and asset files tracked in workspace. Click to view in Explorer."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Total Files</span>
-              <FileText className="w-4 h-4 group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-files">
-              {metrics.total_files}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>View Explorer</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </button>
-
-          {/* Metric 2: Modules */}
-          <button
-            onClick={() => onNavigateToView("architecture")}
-            title="Directory modules clustered by import cohesion and directory structure. Click to view Architecture."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Modules</span>
-              <Boxes className="w-4 h-4 group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-modules">
-              {metrics.total_modules}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>View Architecture</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </button>
-
-          {/* Metric 3: Symbols */}
-          <button
-            onClick={() => onNavigateToView("intelligence")}
-            title="Functions, classes, interfaces, and methods parsed into SQLite index. Click to view Code Intelligence."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Symbols</span>
-              <Code2 className="w-4 h-4 group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-symbols">
-              {metrics.total_symbols}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>{metrics.total_functions} fn · {metrics.total_classes} cls</span>
-            </div>
-          </button>
-
-          {/* Metric 4: Entry Points */}
-          <a
-            href="#entry-points-section"
-            title="Application entry points from package manifests, server listeners, and main blocks."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Entry Points</span>
-              <PlayCircle className="w-4 h-4 group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-entry-points">
-              {metrics.total_entry_points}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>View Table Below</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </a>
-
-          {/* Metric 5: Dependencies */}
-          <button
-            onClick={() => onNavigateToView("dependencies")}
-            title="External libraries declared in package manifests. Click to view Dependencies."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Dependencies</span>
-              <Package className="w-4 h-4 group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-dependencies">
-              {metrics.total_dependencies}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>View Dependencies</span>
-              <ArrowRight className="w-3 h-3" />
-            </div>
-          </button>
-
-          {/* Metric 6: Unsupported / Partial Files */}
-          <button
-            onClick={() => {
-              if (onFilterFilesByStatus) {
-                onFilterFilesByStatus("unsupported");
-              }
-              onNavigateToView("explorer");
-            }}
-            title="Files skipped due to unsupported language, binary content, size limits, or parse syntax issues. Click to view in Explorer."
-            className="flex flex-col p-3 bg-surface border border-border-default hover:border-border-strong rounded-sm text-left transition-colors group"
-          >
-            <div className="flex items-center justify-between text-text-muted mb-1">
-              <span className="text-micro font-medium uppercase tracking-wider">Partial / Unsup.</span>
-              <AlertCircle className="w-4 h-4 text-status-warning" />
-            </div>
-            <div className="text-heading font-mono font-semibold text-text-primary" data-testid="metric-unsupported">
-              {metrics.unsupported_files_count + metrics.partial_files_count}
-            </div>
-            <div className="text-micro text-text-muted mt-1 flex items-center gap-1 group-hover:text-accent">
-              <span>{metrics.unsupported_files_count} unsup · {metrics.partial_files_count} part</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Frameworks Section */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-subheading font-semibold text-text-primary">Detected Frameworks</h2>
-            <span
-              className="text-text-muted"
-              title="Frameworks verified from manifest dependencies, configuration files, AST imports, and structural source patterns. No package name in a comment or string is counted."
-            >
-              <HelpCircle className="w-4 h-4" />
-            </span>
-          </div>
-          <span className="text-caption font-mono text-text-muted">
-            {frameworks.length} framework{frameworks.length === 1 ? "" : "s"} detected
-          </span>
-        </div>
-
-        {frameworks.length === 0 ? (
-          <div className="p-4 bg-surface border border-border-default rounded-sm text-body text-text-muted font-mono">
-            No active frameworks detected based on code and manifest evidence.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {frameworks.map((fw) => (
-              <div
-                key={fw.name}
-                data-testid={`framework-card-${fw.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
-                className="p-4 bg-surface border border-border-default rounded-sm flex flex-col justify-between space-y-3"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-body font-semibold text-text-primary">{fw.name}</span>
-                    <span
-                      className="px-1.5 py-0.5 rounded-sm text-micro font-sans font-medium border border-border-subtle bg-subtle text-text-secondary"
-                    >
-                      {fw.confidence}
-                    </span>
-                  </div>
-                  {fw.version && (
-                    <div className="text-caption font-mono text-text-muted">
-                      Constraint: {fw.version}
-                    </div>
-                  )}
-                  <div className="text-caption text-text-secondary mt-1">
-                    {fw.evidence.length} concrete verifiable evidence record{fw.evidence.length === 1 ? "" : "s"}.
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedFramework(fw)}
-                  aria-label={`Inspect evidence for ${fw.name}`}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-bg-subtle hover:bg-bg-elevated border border-border-default rounded-sm text-caption font-medium text-text-primary transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-accent" />
-                  <span>Inspect Evidence</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Declared Only Frameworks (Manifest only, no code usage) */}
-        {data.declared_only && data.declared_only.length > 0 && (
-          <div className="mt-4 p-3 bg-surface border border-border-subtle rounded-sm" data-testid="declared-only-section">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-caption font-semibold text-text-secondary uppercase tracking-wider">
-                Declared in Manifest (No Import Usage Detected)
-              </span>
-              <span
-                className="text-text-muted"
-                title="Packages declared in package.json or requirements.txt with no AST import statements or runtime code usage detected."
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {data.declared_only.map((decl) => (
-                <span
-                  key={decl.name}
-                  data-testid={`declared-framework-${decl.name.toLowerCase()}`}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-caption font-mono bg-bg-subtle border border-border-default text-text-muted"
-                >
-                  <span className="font-medium text-text-secondary">{decl.name}</span>
-                  {decl.version && <span className="text-micro text-text-muted">({decl.version})</span>}
-                  <span className="text-micro px-1 py-0.5 rounded bg-bg-canvas border border-border-subtle text-text-muted">
-                    {decl.dependency_type}
-                  </span>
+    <div className="flex-1 overflow-y-auto bg-canvas">
+      {/* Project header */}
+      <div className="px-6 py-5 border-b border-border-default">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-heading font-semibold text-text-primary">{data.project_name}</h1>
+            <p className="text-caption font-mono text-text-muted truncate max-w-2xl mt-1">
+              {displayPath}
+            </p>
+            <div className="text-caption text-text-secondary mt-1.5 flex items-center flex-wrap gap-2">
+              <span>{analyzedAt ? `Last analysis ${analyzedAt}` : "No completed analysis yet"}</span>
+              {completion?.duration_ms != null && (
+                <span className="text-text-muted">{` · Scan Time: ${(completion.duration_ms / 1000).toFixed(2)}s`}</span>
+              )}
+              {completion?.files_parsed != null && (
+                <span className="text-text-muted">
+                  {` · Parsed: ${completion.files_parsed}/${completion.files_scanned} files`}
                 </span>
-              ))}
+              )}
+              {completion?.status && (
+                <span className="ml-1 px-2 py-0.5 rounded text-[11px] font-mono bg-elevated border border-border-subtle text-text-secondary">
+                  {completion.status}
+                </span>
+              )}
             </div>
           </div>
-        )}
+          {onReanalyze && (
+            <Button variant="secondary" size="sm" onClick={onReanalyze}>
+              Re-analyze
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Languages & Modules Split Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Languages breakdown */}
-        <div className="bg-surface border border-border-default rounded-sm p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-subheading font-semibold text-text-primary">Languages</h2>
-            <span
-              className="text-text-muted"
-              title="File and line distribution parsed across workspace. Click any language to filter files in Explorer."
-            >
-              <HelpCircle className="w-4 h-4" />
-            </span>
-          </div>
-
-          {/* Distribution bar */}
-          <div className="h-2 w-full bg-bg-subtle rounded-sm flex overflow-hidden mb-4">
-            {languages.map((l, idx) => (
-              <div
-                key={l.name}
-                style={{ width: `${Math.max(l.percentage, 2)}%` }}
-                className={`h-full ${
-                  idx % 4 === 0
-                    ? "bg-accent"
-                    : idx % 4 === 1
-                    ? "bg-domain-backend-border"
-                    : idx % 4 === 2
-                    ? "bg-domain-database-border"
-                    : "bg-domain-external-border"
-                }`}
-                title={`${l.name}: ${l.percentage}% (${l.file_count} files)`}
-              />
-            ))}
-          </div>
-
-          <div className="space-y-1.5 flex-1 overflow-y-auto max-h-56">
-            {languages.map((lang) => (
-              <button
-                key={lang.name}
-                onClick={() => {
-                  if (onFilterFilesByLanguage) {
-                    onFilterFilesByLanguage(lang.name);
-                  }
-                  onNavigateToView("explorer");
-                }}
-                className="w-full flex items-center justify-between px-2 py-1.5 rounded-sm hover:bg-hover text-left transition-colors group"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-caption font-medium text-text-primary group-hover:text-accent">
-                    {lang.name}
-                  </span>
-                  <span className="text-micro font-mono text-text-muted">
-                    {lang.file_count} file{lang.file_count === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-caption font-mono text-text-secondary">
-                    {lang.line_count.toLocaleString()} lines
-                  </span>
-                  <span className="text-micro font-mono text-text-muted w-12 text-right">
-                    {lang.percentage}%
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Modules Layer Summary */}
-        <div className="bg-surface border border-border-default rounded-sm p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-subheading font-semibold text-text-primary">Architectural Layers</h2>
-            <span
-              className="text-text-muted"
-              title="Modules classified into architectural layers (frontend, backend, data, shared, config) strictly from evidence. Unsubstantiated architecture patterns are unclassified."
-            >
-              <HelpCircle className="w-4 h-4" />
-            </span>
-          </div>
-
-          <div className="space-y-2 flex-1 overflow-y-auto max-h-64">
-            {data.modules.length === 0 ? (
-              <div className="text-body text-text-muted font-mono">No module groups detected.</div>
-            ) : (
-              data.modules.map((m) => (
+      {/* Metric cards */}
+      <div className="flex items-stretch border-b border-border-default divide-x divide-border-subtle bg-surface/50">
+        {metricItems.map((item) => {
+          const body = (
+            <>
+              <div className="flex items-center justify-between w-full">
                 <div
-                  key={m.name}
-                  className="flex items-center justify-between p-2 rounded-sm bg-bg-subtle/50 border border-border-subtle"
+                  className="text-2xl font-bold text-text-primary tabular-nums leading-none"
+                  data-testid={item.testId}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-caption font-mono font-medium text-text-primary">{m.name}</span>
-                    <span className="text-micro font-mono text-text-muted">({m.file_count} files)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-micro font-mono text-text-muted">Cohesion: {m.cohesion_score}</span>
-                    <span className="px-1.5 py-0.5 rounded-sm text-micro font-sans font-medium border border-border-default bg-surface text-text-secondary">
-                      {m.layer}
-                    </span>
-                  </div>
+                  {item.value.toLocaleString()}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+                <span className="opacity-75 group-hover:opacity-100 transition-opacity">
+                  {item.icon}
+                </span>
+              </div>
+              <div className="text-[11px] text-text-muted mt-2 uppercase tracking-wider font-semibold">
+                {item.label}
+              </div>
+            </>
+          );
+          const cls =
+            "group w-full h-full px-4 py-3.5 text-left hover:bg-hover transition-colors duration-150 flex flex-col justify-between";
+          if (item.href) {
+            return (
+              <Tooltip key={item.testId} content={item.title} wrapperClassName="flex flex-1 min-w-0">
+                <a href={item.href} title={item.title} className={cls}>
+                  {body}
+                </a>
+              </Tooltip>
+            );
+          }
+          return (
+            <Tooltip key={item.testId} content={item.title} wrapperClassName="flex flex-1 min-w-0">
+              <button type="button" title={item.title} onClick={item.onClick} className={cls}>
+                {body}
+              </button>
+            </Tooltip>
+          );
+        })}
       </div>
 
-      {/* Entry Points Section */}
-      <div id="entry-points-section">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-subheading font-semibold text-text-primary">Application Entry Points</h2>
-            <span
-              className="text-text-muted"
-              title="Startup files and commands identified from package manifests, server listeners, framework configurations, and Python __main__ blocks."
-            >
-              <HelpCircle className="w-4 h-4" />
-            </span>
-          </div>
-          <span className="text-caption font-mono text-text-muted">
-            {entry_points.length} entry point{entry_points.length === 1 ? "" : "s"}
-          </span>
-        </div>
+      <div className="p-6 space-y-8">
+        {/* Languages — enlarged donut chart + proportional breakdown */}
+        <section>
+          <h2 className="text-subheading font-semibold text-text-primary border-b border-border-subtle pb-2 mb-4">
+            Languages
+          </h2>
+          {languages.length === 0 ? (
+            <p className="text-body text-text-secondary">None detected</p>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-8 p-6 bg-surface border border-border-default rounded-lg">
+              {/* Enlarged Donut chart (190x190) */}
+              <div className="flex flex-col items-center flex-shrink-0">
+                <svg
+                  width="190"
+                  height="190"
+                  viewBox="0 0 190 190"
+                  aria-label="Language distribution donut chart"
+                  className="flex-shrink-0 drop-shadow-sm"
+                >
+                  {/* Background track */}
+                  <circle
+                    cx={DONUT_CX}
+                    cy={DONUT_CY}
+                    r={DONUT_R}
+                    fill="none"
+                    stroke="var(--bg-elevated)"
+                    strokeWidth={22}
+                  />
+                  {/* Segments, rotated so 0° is at 12 o'clock */}
+                  <g transform={`rotate(-90 ${DONUT_CX} ${DONUT_CY})`}>
+                    {(() => {
+                      let cumulative = 0;
+                      return languages.map((lang, idx) => {
+                        const pct = lang.percentage;
+                        const dashLen = (pct / 100) * circumference;
+                        const offset = circumference * (1 - cumulative / 100);
+                        cumulative += pct;
+                        if (dashLen < 0.5) return null;
+                        return (
+                          <circle
+                            key={lang.name}
+                            cx={DONUT_CX}
+                            cy={DONUT_CY}
+                            r={DONUT_R}
+                            fill="none"
+                            stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                            strokeWidth={22}
+                            strokeDasharray={`${dashLen} ${circumference - dashLen}`}
+                            strokeDashoffset={offset}
+                          >
+                            <title>{`${lang.name}: ${pct.toFixed(1)}%`}</title>
+                          </circle>
+                        );
+                      });
+                    })()}
+                  </g>
+                  {/* Center: file count */}
+                  <text
+                    x={DONUT_CX}
+                    y={DONUT_CY - 7}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="var(--text-primary)"
+                    fontSize="28"
+                    fontWeight="800"
+                    fontFamily="system-ui, -apple-system, sans-serif"
+                  >
+                    {totalLangFiles.toLocaleString()}
+                  </text>
+                  <text
+                    x={DONUT_CX}
+                    y={DONUT_CY + 16}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="var(--text-muted)"
+                    fontSize="12"
+                    fontFamily="system-ui, -apple-system, sans-serif"
+                  >
+                    files
+                  </text>
+                </svg>
 
-        <div className="bg-surface border border-border-default rounded-sm overflow-hidden">
-          <table className="w-full text-left border-collapse" data-testid="entry-points-table">
-            <thead>
-              <tr className="border-b border-border-default bg-canvas text-caption font-sans font-medium text-text-muted">
-                <th className="py-2 px-3">Name</th>
-                <th className="py-2 px-3">Type</th>
-                <th className="py-2 px-3">File Location</th>
-                <th className="py-2 px-3">Code Snippet</th>
-                <th className="py-2 px-3 text-right">Confidence</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle text-caption font-mono">
-              {entry_points.map((ep, idx) => (
-                <tr key={`${ep.file_path}-${ep.start_line}-${idx}`} className="hover:bg-hover transition-colors">
-                  <td className="py-2 px-3 font-medium text-text-primary">{ep.name}</td>
-                  <td className="py-2 px-3">
-                    <span className="px-1.5 py-0.5 rounded-sm text-micro bg-bg-subtle text-text-secondary border border-border-subtle">
-                      {ep.entry_type}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3">
+                <div className="mt-2 text-caption font-mono text-text-muted text-center">
+                  {totalLangLines.toLocaleString()} total lines
+                </div>
+                <div className="mt-1 text-[11px] font-mono text-text-faint text-center">
+                  {languages.length} language{languages.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+
+              {/* Language list with visual progress indicator */}
+              <ul className="flex-1 divide-y divide-border-subtle min-w-0 w-full">
+                {languages.map((lang, idx) => (
+                  <li key={lang.name}>
                     <button
-                      onClick={() => onNavigateToFileLine && onNavigateToFileLine(ep.file_path, ep.start_line)}
-                      className="text-accent hover:underline flex items-center gap-1"
-                      title="Open file at line"
+                      type="button"
+                      onClick={() => {
+                        onFilterFilesByLanguage?.(lang.name);
+                        onNavigateToView("explorer");
+                      }}
+                      className="w-full flex items-center justify-between gap-4 py-2.5 hover:bg-hover rounded-sm px-2 text-left group transition-colors duration-150"
                     >
-                      <FileCode className="w-3.5 h-3.5" />
-                      <span>{ep.file_path}:{ep.start_line}</span>
+                      {/* Left: Swatch + Name + Visual bar */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span
+                          className="flex-shrink-0 w-3 h-3 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                          aria-hidden="true"
+                        />
+                        <span className="text-body font-semibold text-text-primary truncate">
+                          {lang.name}
+                        </span>
+                        <div className="hidden sm:flex flex-1 max-w-[140px] h-1.5 bg-elevated rounded-full overflow-hidden ml-1">
+                          <div
+                            style={{
+                              width: `${Math.max(lang.percentage, 2)}%`,
+                              backgroundColor: CHART_COLORS[idx % CHART_COLORS.length],
+                            }}
+                            className="h-full rounded-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right: Numbers */}
+                      <div className="text-caption text-text-muted flex items-center gap-4 flex-shrink-0 font-mono">
+                        <span className="text-text-secondary">{lang.file_count} files</span>
+                        <span>{lang.line_count.toLocaleString()} lines</span>
+                        <span className="w-14 text-right font-semibold text-text-primary">
+                          {lang.percentage}%
+                        </span>
+                      </div>
                     </button>
-                  </td>
-                  <td className="py-2 px-3 text-text-muted truncate max-w-xs">{ep.snippet}</td>
-                  <td className="py-2 px-3 text-right">
-                    <span className="px-1.5 py-0.5 rounded-sm text-micro uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border-subtle">
-                      {ep.confidence}
-                    </span>
-                  </td>
-                </tr>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        {/* Frameworks */}
+        <section>
+          <h2 className="text-subheading font-semibold text-text-primary border-b border-border-subtle pb-2 mb-4">
+            Frameworks
+          </h2>
+          {frameworks.length === 0 ? (
+            <p className="text-body text-text-secondary">
+              No active frameworks detected based on code and manifest evidence.
+            </p>
+          ) : (
+            <div className="divide-y divide-border-subtle border-y border-border-subtle">
+              {frameworks.map((fw) => (
+                <div
+                  key={fw.name}
+                  data-testid={`framework-card-${fw.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                  className="flex items-center justify-between gap-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-body font-medium text-text-primary">{fw.name}</span>
+                      <Badge variant={fw.confidence as "static" | "confirmed" | "inferred" | "unknown"} size="sm">
+                        {fw.confidence}
+                      </Badge>
+                    </div>
+                    <p className="text-caption text-text-muted mt-0.5">
+                      {fw.version ? `${fw.version} · ` : ""}
+                      {fw.confidence} · {fw.evidence.length} evidence record
+                      {fw.evidence.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    onClick={() => setSelectedFramework(fw)}
+                    aria-label={`Inspect evidence for ${fw.name}`}
+                  >
+                    View evidence
+                  </Button>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+
+          {data.declared_only && data.declared_only.length > 0 && (
+            <div className="mt-4" data-testid="declared-only-section">
+              <h3 className="text-body font-semibold text-text-primary mb-2">
+                Declared in Manifest (No Import Usage Detected)
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {data.declared_only.map((decl) => (
+                  <span
+                    key={decl.name}
+                    data-testid={`declared-framework-${decl.name.toLowerCase()}`}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-caption bg-elevated border border-border-subtle text-text-secondary"
+                  >
+                    <span className="font-medium">{decl.name}</span>
+                    {decl.version && <span className="font-mono text-text-muted">{decl.version}</span>}
+                    <span className="text-micro text-text-muted">{decl.dependency_type}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Entry points */}
+        <section id="entry-points-section">
+          <h2 className="text-subheading font-semibold text-text-primary border-b border-border-subtle pb-2 mb-4">
+            Entry points
+          </h2>
+          {entry_points.length === 0 ? (
+            <p className="text-body text-text-secondary">None detected</p>
+          ) : (
+            <Card className="overflow-hidden p-0">
+              <Table data-testid="entry-points-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>File Location</TableHead>
+                    <TableHead>Code Snippet</TableHead>
+                    <TableHead className="text-right">Confidence</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entry_points.map((ep, idx) => (
+                    <TableRow key={`${ep.file_path}-${ep.start_line}-${idx}`} className="h-9">
+                      <TableCell className="font-medium">{ep.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="neutral" size="sm">
+                          {ep.entry_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToFileLine?.(ep.file_path, ep.start_line)}
+                          className="text-accent-text hover:underline flex items-center gap-1 font-mono text-caption"
+                          title="Open file at line"
+                        >
+                          <FileCode className="w-3.5 h-3.5" />
+                          <span>
+                            {ep.file_path}:{ep.start_line}
+                          </span>
+                        </button>
+                      </TableCell>
+                      <TableCell className="font-mono text-caption text-text-muted max-w-xs truncate">
+                        {ep.snippet}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={ep.confidence as "static" | "confirmed" | "inferred" | "unknown"}
+                          size="sm"
+                        >
+                          {ep.confidence}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </section>
+
+        {/* Architecture layers */}
+        <section>
+          <h2 className="text-subheading font-semibold text-text-primary border-b border-border-subtle pb-2 mb-4">
+            Architecture layers
+          </h2>
+          {data.modules.length === 0 ? (
+            <p className="text-body text-text-secondary">None detected</p>
+          ) : (
+            <ul className="divide-y divide-border-subtle border-y border-border-subtle">
+              {data.modules.map((m) => (
+                <li key={m.name} className="flex items-center justify-between py-2.5 px-1">
+                  <span className="text-body text-text-primary">{m.name}</span>
+                  <span className="text-caption text-text-muted">
+                    {m.file_count} files · {m.layer}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
-      {/* Framework Evidence Modal */}
       <FrameworkEvidenceModal
         framework={selectedFramework}
         onClose={() => setSelectedFramework(null)}

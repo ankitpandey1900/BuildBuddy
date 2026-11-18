@@ -38,7 +38,7 @@ describe("WelcomeView Component", () => {
         "Understand what you've built. Know how it works. Take control of your codebase."
       )
     ).toBeInTheDocument();
-    expect(screen.getByText(/100% Local Analysis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Analysis runs locally on this device/i)).toBeInTheDocument();
   });
 
   it("triggers onOpenFolder when clicking Open Project Folder button", () => {
@@ -100,5 +100,22 @@ describe("WelcomeView Component", () => {
     });
 
     expect(handleReopen).toHaveBeenCalledWith("/workspace/my-app");
+  });
+
+  it("renders remove button and triggers onRemoveProject when clicked", () => {
+    const handleRemove = vi.fn();
+    render(
+      <WelcomeView
+        onOpenFolder={vi.fn()}
+        onReopenProject={vi.fn()}
+        onRemoveProject={handleRemove}
+        recentProjects={mockRecentProjects}
+      />
+    );
+
+    const removeBtn = screen.getByTestId("remove-project-1");
+    expect(removeBtn).toBeInTheDocument();
+    fireEvent.click(removeBtn);
+    expect(handleRemove).toHaveBeenCalledWith(1);
   });
 });

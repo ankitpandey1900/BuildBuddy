@@ -11,10 +11,13 @@ export type RelationshipType =
 export type DiagramConfidence = "confirmed" | "static" | "inferred" | "unknown";
 
 export type DiagramType =
-  | "file_dependency"
-  | "module_dependency"
+  | "system_flow"
   | "architecture_overview"
-  | "class_diagram";
+  | "module_dependency"
+  | "file_dependency"
+  | "class_diagram"
+  | "call_graph"
+  | "er_diagram";
 
 export interface SourceRef {
   file_path: string;

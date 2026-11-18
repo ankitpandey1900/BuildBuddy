@@ -97,5 +97,46 @@ describe("FileTree Component", () => {
     fireEvent.click(screen.getByText(".ts"));
     expect(handleLang).toHaveBeenCalledWith("ts");
   });
+
+  it("uses 28px rows, a soft selection pill, and hides dot and ignored folders", () => {
+    const hidden: FileRecord[] = [
+      ...mockFiles,
+      {
+        ...mockFiles[0],
+        id: 3,
+        relative_path: ".git/config",
+        file_name: "config",
+        extension: null,
+        line_count: 4,
+      },
+      {
+        ...mockFiles[0],
+        id: 4,
+        relative_path: "node_modules/left-pad/index.js",
+        file_name: "index.js",
+        extension: "js",
+        line_count: 12,
+      },
+    ];
+    render(
+      <FileTree
+        files={hidden}
+        selectedFile={mockFiles[0]}
+        searchQuery=""
+        onSearchChange={vi.fn()}
+        languageFilter="all"
+        onLanguageFilterChange={vi.fn()}
+        onSelectFile={vi.fn()}
+        onOpenFolder={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("config")).not.toBeInTheDocument();
+    expect(screen.queryByText("index.js")).not.toBeInTheDocument();
+    expect(screen.getByText("main.ts")).toBeInTheDocument();
+    const row = screen.getByText("main.ts").closest(".h-7");
+    expect(row?.className).toContain("h-7");
+    expect(row?.className).toContain("bg-accent-subtle");
+  });
 });
 

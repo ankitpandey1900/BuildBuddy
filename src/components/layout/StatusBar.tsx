@@ -19,11 +19,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     : "No project open";
 
   return (
-    <footer className="h-6 bg-surface border-t border-border-default px-3 flex items-center justify-between text-caption font-mono text-text-muted select-none flex-shrink-0 z-10">
+    <footer className="h-6 bg-surface border-t border-border-default px-3 flex items-center justify-between text-caption font-sans text-text-muted select-none flex-shrink-0 z-10">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           <HardDrive className="w-3 h-3 text-text-muted" />
-          <span title={displayPath}>{displayPath}</span>
+          <span className="font-mono" title={displayPath}>{displayPath}</span>
         </div>
 
         {currentProject && (
@@ -40,9 +40,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {isScanning ? (
           <span className="text-accent animate-pulse">Analyzing codebase...</span>
         ) : (
-          <div className="flex items-center gap-1 text-emerald-500">
+          <div className="flex items-center gap-1 text-status-success-text font-medium">
             <CheckCircle2 className="w-3 h-3" />
-            <span>Offline</span>
+            <span>Offline Analysis Engine</span>
           </div>
         )}
         <span className="text-border-strong">•</span>
