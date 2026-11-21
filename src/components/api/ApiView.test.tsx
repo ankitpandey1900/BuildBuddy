@@ -19,6 +19,6 @@ describe("ApiView", () => {
   it("states the next action when no endpoint is stored", () => {
     render(<ApiView projectId={1} initialEndpoints={[]} />);
     expect(screen.getByText("No API endpoints detected")).toBeInTheDocument();
-    expect(screen.getByText(/Run analysis on an Express, FastAPI, or Flask project/)).toBeInTheDocument();
+    expect(screen.getByText(/Run analysis on an Express, Next\.js, FastAPI, or Flask project/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,53 @@
-import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import * as React from "react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
+import { cn } from "@/lib/utils";
+
+const Tabs = TabsPrimitive.Root;
+
+const TabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center rounded-md bg-subtle p-0.5 text-text-muted border border-border-subtle",
+      className
+    )}
+    {...props}
+  />
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
+
+const TabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-2.5 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-focus disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-surface data-[state=active]:text-text-primary data-[state=active]:shadow-xs hover:text-text-primary cursor-pointer",
+      className
+    )}
+    {...props}
+  />
+));
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn(
+      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-focus",
+      className
+    )}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export interface TabItem<T extends string = string> {
   id: T;
@@ -9,61 +56,4 @@ export interface TabItem<T extends string = string> {
   count?: number;
 }
 
-export interface TabsProps<T extends string = string> {
-  tabs: TabItem<T>[];
-  activeTab: T;
-  onChange: (id: T) => void;
-  className?: string;
-}
-
-export function Tabs<T extends string = string>({
-  tabs,
-  activeTab,
-  onChange,
-  className,
-}: TabsProps<T>) {
-  return (
-    <div
-      role="tablist"
-      className={twMerge(
-        clsx("flex items-center gap-1 border-b border-border-default px-2 select-none", className)
-      )}
-    >
-      {tabs.map((tab) => {
-        const isActive = tab.id === activeTab;
-        return (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={isActive}
-            tabIndex={isActive ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            className={twMerge(
-              clsx(
-                "flex items-center gap-1.5 px-3 py-2 text-body font-sans font-medium transition-colors duration-150 relative -mb-[1px] border-b-2 focus-ring cursor-pointer",
-                isActive
-                  ? "border-accent text-text-primary font-semibold"
-                  : "border-transparent text-text-muted hover:text-text-primary hover:border-border-strong"
-              )
-            )}
-          >
-            {tab.icon && <span className="w-3.5 h-3.5 flex items-center">{tab.icon}</span>}
-            <span>{tab.label}</span>
-            {tab.count !== undefined && (
-              <span
-                className={clsx(
-                  "ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-sans",
-                  isActive
-                    ? "bg-accent-subtle text-accent-text"
-                    : "bg-elevated text-text-muted"
-                )}
-              >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+export { Tabs, TabsList, TabsTrigger, TabsContent };

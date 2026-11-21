@@ -514,3 +514,43 @@ fn test_all_document_generators_render_cleanly_without_banned_phrases() {
         assert!(check_banned_phrases(&md).is_ok(), "Banned phrases found in doc: {}", doc.title);
     }
 }
+
+#[test]
+fn test_adr_upsert_section_and_revision_tracking() {
+    let dir = fixtures_dir().join("arch-react-express");
+    let (mut conn, project_id) = analyze_fixture_and_setup_db(&dir, false);
+
+    // Initial ADR document generation
+    let initial_adr = AdrGenerator::generate(&conn, project_id).unwrap();
+    DocStore::save_document(&mut conn, project_id, &initial_adr).unwrap();
+
+    // Verify initial revisions count is 1
+    let revisions = DocStore::list_revisions(&conn, project_id, buildbuddy_core::docs::DocumentType::ArchitectureDecisionRecords).unwrap();
+    assert_eq!(revisions.len(), 1);
+
+    // Upsert a new ADR section
+    DocStore::upsert_section(
+        &mut conn,
+        project_id,
+        buildbuddy_core::docs::DocumentType::ArchitectureDecisionRecords,
+        "adr_0002_custom_storage",
+        "ADR-0002: Custom Storage Engine",
+        "### ADR-0002: Custom Storage Engine\n\n- **Status**: Accepted\n\n#### Context\nOffline requirements.\n\n#### Decision\nUse SQLite.\n\n#### Consequences\nLocal file DB.",
+    ).unwrap();
+
+    // Retrieve document and verify the new section is present
+    let updated = DocStore::get_document(&conn, project_id, buildbuddy_core::docs::DocumentType::ArchitectureDecisionRecords)
+        .unwrap()
+        .expect("ADR document must exist");
+
+    let added_sec = updated.sections.iter().find(|s| s.section_key == "adr_0002_custom_storage");
+    assert!(added_sec.is_some(), "Upserted ADR section must be present");
+    assert_eq!(added_sec.unwrap().title, "ADR-0002: Custom Storage Engine");
+    assert_eq!(added_sec.unwrap().state, buildbuddy_core::docs::DocumentSectionState::UserEdited);
+
+    // Verify a new revision was recorded
+    let updated_revisions = DocStore::list_revisions(&conn, project_id, buildbuddy_core::docs::DocumentType::ArchitectureDecisionRecords).unwrap();
+    assert_eq!(updated_revisions.len(), 2);
+    assert_eq!(updated_revisions[0].revision_number, 2);
+    assert!(updated_revisions[0].content_markdown.contains("ADR-0002: Custom Storage Engine"));
+}

@@ -510,4 +510,118 @@ describe("InspectorPanel Component", () => {
     expect(screen.getByText("dbPath")).toBeInTheDocument();
     expect(screen.getByText("initEngine")).toBeInTheDocument();
   });
+
+  it("renders file inspector with metrics grid, truncated hash, and provenance", () => {
+    render(
+      <InspectorPanel
+        isOpen={true}
+        onToggle={vi.fn()}
+        width={340}
+        selectedFile={mockFile}
+      />
+    );
+
+    expect(screen.getByTestId("file-inspector-section")).toBeInTheDocument();
+    expect(screen.getByText("parser.ts")).toBeInTheDocument();
+    expect(screen.getByText("src/core/parser.ts")).toBeInTheDocument();
+    expect(screen.getByText("120")).toBeInTheDocument();
+    expect(screen.getByText("ts")).toBeInTheDocument();
+    expect(screen.getByText("Indexed")).toBeInTheDocument();
+    expect(screen.getByText(/BLAKE3:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Provenance tracked:/i)).toBeInTheDocument();
+  });
+
+  it("renders clean simplified error notification with Re-scan button and collapsible diagnostics when file has parse error", () => {
+    const errorFile: FileRecord = {
+      ...mockFile,
+      id: 2,
+      file_name: "route.ts",
+      relative_path: "apps/api/src/app/api/academies/[id]/route.ts",
+      status: "error",
+      error_message: "CHECK constraint failed: evidence_type IN ('ast_node', 'manifest_entry')",
+    };
+
+    const onTriggerScan = vi.fn();
+
+    render(
+      <InspectorPanel
+        isOpen={true}
+        onToggle={vi.fn()}
+        width={340}
+        selectedFile={errorFile}
+        onTriggerScan={onTriggerScan}
+      />
+    );
+
+    expect(screen.getByText("Analysis Update Recommended")).toBeInTheDocument();
+    expect(screen.getByText(/Symbols or dependencies for this file are pending index sync/i)).toBeInTheDocument();
+
+    const rescanBtn = screen.getByRole("button", { name: /Re-scan Project/i });
+    expect(rescanBtn).toBeInTheDocument();
+    fireEvent.click(rescanBtn);
+    expect(onTriggerScan).toHaveBeenCalledTimes(1);
+
+    expect(screen.getByText("Technical diagnostics")).toBeInTheDocument();
+    expect(screen.getByText(/CHECK constraint failed/i)).toBeInTheDocument();
+  });
+
+  it("renders rich file intelligence with architectural role, API endpoints, exported symbols, internal imports, and blast radius", () => {
+    const routeFile: FileRecord = {
+      ...mockFile,
+      id: 3,
+      file_name: "route.ts",
+      relative_path: "apps/api/src/app/api/academies/[id]/route.ts",
+      status: "parsed",
+    };
+
+    const mockFileIntel = {
+      file_path: "apps/api/src/app/api/academies/[id]/route.ts",
+      role: "API Gateway Route Handler",
+      explanation: "Exposes 1 HTTP endpoint(s) (GET /api/academies/[id]) for external consumers.",
+      blast_radius_level: "low" as const,
+      direct_dependants_count: 0,
+      direct_dependants: [],
+      external_packages_used: ["next/server", "zod"],
+      internal_dependencies: ["apps/api/src/lib/prisma.ts"],
+      exported_symbols: [
+        {
+          name: "GET",
+          kind: "function",
+          line_number: 15,
+          is_exported: true,
+          complexity: 4,
+        },
+      ],
+      api_endpoints: [
+        {
+          method: "GET",
+          route: "/api/academies/[id]",
+          framework: "Next.js App Router",
+        },
+      ],
+    };
+
+    render(
+      <InspectorPanel
+        isOpen={true}
+        onToggle={vi.fn()}
+        width={340}
+        selectedFile={routeFile}
+        initialFileIntelligence={mockFileIntel}
+      />
+    );
+
+    expect(screen.getByText("API Gateway Route Handler")).toBeInTheDocument();
+    expect(screen.getByText(/Exposes 1 HTTP endpoint/i)).toBeInTheDocument();
+    expect(screen.getByText("Declared API Endpoints (1)")).toBeInTheDocument();
+    expect(screen.getAllByText("GET").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("/api/academies/[id]")).toBeInTheDocument();
+    expect(screen.getByText("Exported Symbols (1)")).toBeInTheDocument();
+    expect(screen.getByText("CC 4")).toBeInTheDocument();
+    expect(screen.getByText("Imports Project Files (1)")).toBeInTheDocument();
+    expect(screen.getByText("apps/api/src/lib/prisma.ts")).toBeInTheDocument();
+    expect(screen.getByText("External Packages (2)")).toBeInTheDocument();
+    expect(screen.getByText("next/server")).toBeInTheDocument();
+    expect(screen.getByText("zod")).toBeInTheDocument();
+  });
 });

@@ -2,13 +2,21 @@ import React, { useEffect, useState } from "react";
 import {
   ChevronRight,
   ChevronLeft,
-  FileText,
   Hash,
   Layers,
   ShieldCheck,
   ExternalLink,
   Loader2,
   X,
+  Copy,
+  Check,
+  RefreshCw,
+  Globe,
+  Radio,
+  FileCode,
+  Package,
+  ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import type {
   ClassDetailResponse,
@@ -17,10 +25,11 @@ import type {
   SymbolRecord,
   CallDetailItem,
   SideEffectMarker,
+  FileIntelligenceDto,
 } from "@/types/ipc";
 import type { SelectedDiagramElement } from "@/types/diagram";
 import { Badge } from "@/components/ui/Badge";
-import { getClassDetail, getSymbolDetail } from "@/lib/tauri";
+import { getClassDetail, getSymbolDetail, getFileIntelligence } from "@/lib/tauri";
 
 export interface InspectorPanelProps {
   isOpen: boolean;
@@ -33,9 +42,11 @@ export interface InspectorPanelProps {
   onClearDiagramElement?: () => void;
   onSelectSymbol?: (symbol: SymbolRecord | null) => void;
   onNavigateToSource?: (filePath: string, line: number) => void;
+  onTriggerScan?: () => void;
   // Optional pre-loaded detail for tests
   initialSymbolDetail?: SymbolDetail | null;
   initialClassDetail?: ClassDetailResponse | null;
+  initialFileIntelligence?: FileIntelligenceDto | null;
 }
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -49,9 +60,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onClearDiagramElement,
   onSelectSymbol,
   onNavigateToSource,
+  onTriggerScan,
   initialSymbolDetail,
   initialClassDetail,
+  initialFileIntelligence,
 }) => {
+  const [copiedHash, setCopiedHash] = useState(false);
+  const [copiedPath, setCopiedPath] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
   const [activeSymbolId, setActiveSymbolId] = useState<number | null>(
@@ -66,7 +81,25 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const [classDetail, setClassDetail] = useState<ClassDetailResponse | null>(
     initialClassDetail ?? null
   );
+  const [fileIntel, setFileIntel] = useState<FileIntelligenceDto | null>(
+    initialFileIntelligence ?? null
+  );
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Load file intelligence & blast radius whenever selectedFile changes
+  useEffect(() => {
+    if (initialFileIntelligence) {
+      setFileIntel(initialFileIntelligence);
+      return;
+    }
+    if (!selectedFile) {
+      setFileIntel(null);
+      return;
+    }
+    getFileIntelligence(selectedFile.project_id, selectedFile.relative_path)
+      .then(setFileIntel)
+      .catch(() => setFileIntel(null));
+  }, [selectedFile, initialFileIntelligence]);
 
   // Sync when selectedSymbol prop changes from outside
   useEffect(() => {
@@ -763,84 +796,352 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
           </>
         ) : selectedFile ? (
           /* File Inspector Mode */
-          <div className="flex flex-col gap-4" data-testid="file-inspector-section">
-            <div className="flex items-start gap-2.5 pb-3 border-b border-border-subtle">
-              <FileText className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-              <div className="flex flex-col min-w-0">
-                <span className="font-semibold text-text-primary text-body truncate">
-                  {selectedFile.file_name}
-                </span>
-                <span className="text-caption font-mono text-text-muted break-all">
+          <div className="flex flex-col gap-3" data-testid="file-inspector-section">
+            {/* Header: File identity and actions */}
+            <div className="flex flex-col gap-1.5 pb-2.5 border-b border-border-subtle">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileCode className="w-4 h-4 text-accent flex-shrink-0" />
+                  <span className="font-semibold text-text-primary text-body truncate" title={selectedFile.file_name}>
+                    {selectedFile.file_name}
+                  </span>
+                </div>
+                {onNavigateToSource && (
+                  <button
+                    onClick={() => onNavigateToSource(selectedFile.relative_path, 1)}
+                    className="text-caption font-sans text-accent hover:underline flex items-center gap-1 flex-shrink-0"
+                    title="Open file in Explorer"
+                    data-testid="file-inspector-view-source"
+                  >
+                    <span>View Source</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-1 text-micro font-mono text-text-muted bg-canvas px-2 py-1 rounded border border-border-subtle">
+                <span className="truncate" title={selectedFile.relative_path}>
                   {selectedFile.relative_path}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedFile.relative_path);
+                    setCopiedPath(true);
+                    setTimeout(() => setCopiedPath(false), 1500);
+                  }}
+                  className="p-0.5 rounded hover:bg-hover text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
+                  title="Copy relative path"
+                >
+                  {copiedPath ? <Check className="w-3 h-3 text-status-success-text" /> : <Copy className="w-3 h-3" />}
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-caption font-mono">
-              <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro font-medium font-sans">Lines</span>
-                <span className="text-text-primary font-medium text-body">
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-4 gap-1.5 text-center font-mono text-micro">
+              <div className="bg-canvas p-1.5 rounded border border-border-subtle flex flex-col items-center">
+                <span className="text-text-muted text-[10px] font-sans">Lines</span>
+                <span className="text-text-primary font-medium text-caption">
                   {selectedFile.line_count.toLocaleString()}
                 </span>
               </div>
-              <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro font-medium font-sans">Size</span>
-                <span className="text-text-primary font-medium text-body">
+              <div className="bg-canvas p-1.5 rounded border border-border-subtle flex flex-col items-center">
+                <span className="text-text-muted text-[10px] font-sans">Size</span>
+                <span className="text-text-primary font-medium text-caption truncate max-w-full">
                   {formatBytes(selectedFile.size_bytes)}
                 </span>
               </div>
-              <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro font-medium font-sans">Extension</span>
-                <span className="text-text-primary font-medium text-body">
-                  {selectedFile.extension ? `.${selectedFile.extension}` : "none"}
+              <div className="bg-canvas p-1.5 rounded border border-border-subtle flex flex-col items-center">
+                <span className="text-text-muted text-[10px] font-sans">Type</span>
+                <span className="text-text-primary font-medium text-caption uppercase truncate max-w-full">
+                  {selectedFile.extension || "none"}
                 </span>
               </div>
-              <div className="bg-canvas p-2 rounded border border-border-subtle flex flex-col">
-                <span className="text-text-muted text-micro font-medium font-sans">Status</span>
+              <div className="bg-canvas p-1.5 rounded border border-border-subtle flex flex-col items-center justify-center">
+                <span className="text-text-muted text-[10px] font-sans">Index</span>
                 <Badge
                   variant={
                     selectedFile.status === "parsed"
                       ? "confirmed"
                       : selectedFile.status === "error"
-                      ? "unknown"
+                      ? "warning"
                       : "neutral"
                   }
                   size="sm"
+                  className="mt-0.5"
                 >
-                  {selectedFile.status}
+                  {selectedFile.status === "parsed"
+                    ? "Indexed"
+                    : selectedFile.status === "error"
+                    ? "Needs Re-scan"
+                    : selectedFile.status}
                 </Badge>
               </div>
             </div>
 
-            {selectedFile.status === "error" && selectedFile.error_message && (
-              <div className="flex flex-col gap-1">
-                <span className="text-status-danger-text text-micro font-medium font-sans">
-                  Error Details
-                </span>
-                <div className="p-2 bg-status-danger-bg/20 border border-status-danger-border rounded font-mono text-micro text-status-danger-text break-all select-text">
-                  {selectedFile.error_message}
+            {/* File Parsing / Status Alert - Clean & Actionable (No Raw SQL Shock) */}
+            {selectedFile.status === "error" && (
+              <div className="p-2.5 rounded border border-status-warning-border bg-status-warning-bg/15 flex flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-status-warning-text flex-shrink-0 mt-0.5" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-caption font-semibold text-text-primary font-sans">
+                      Analysis Update Recommended
+                    </span>
+                    <span className="text-micro text-text-secondary leading-snug">
+                      Symbols or dependencies for this file are pending index sync. Re-scanning will index all routes and functions.
+                    </span>
+                  </div>
+                </div>
+
+                {onTriggerScan && (
+                  <button
+                    type="button"
+                    onClick={onTriggerScan}
+                    className="self-start flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface hover:bg-hover border border-border-default text-text-primary text-caption font-medium transition-colors shadow-subtle"
+                  >
+                    <RefreshCw className="w-3 h-3 text-accent" />
+                    <span>Re-scan Project</span>
+                  </button>
+                )}
+
+                {selectedFile.error_message && (
+                  <details className="text-[11px] font-mono text-text-muted cursor-pointer pt-1 border-t border-border-subtle/50">
+                    <summary className="hover:text-text-primary select-none">Technical diagnostics</summary>
+                    <pre className="mt-1 p-1.5 bg-canvas rounded border border-border-subtle text-status-danger-text overflow-x-auto whitespace-pre-wrap select-text text-[10px]">
+                      {selectedFile.error_message}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Architectural Role & Workflow Purpose */}
+            {fileIntel && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-accent" />
+                    <span>{fileIntel.role}</span>
+                  </span>
+                  <Badge
+                    variant={
+                      fileIntel.blast_radius_level === "critical"
+                        ? "danger"
+                        : fileIntel.blast_radius_level === "warning"
+                        ? "warning"
+                        : "neutral"
+                    }
+                    size="sm"
+                  >
+                    {fileIntel.blast_radius_level === "critical"
+                      ? "High Blast Radius"
+                      : fileIntel.blast_radius_level === "warning"
+                      ? "Medium Impact"
+                      : "Leaf Component"}
+                  </Badge>
+                </div>
+                <p className="text-caption text-text-secondary leading-relaxed font-sans">
+                  {fileIntel.explanation}
+                </p>
+              </div>
+            )}
+
+            {/* Declared API Endpoints (If API Route / Controller) */}
+            {fileIntel?.api_endpoints && fileIntel.api_endpoints.length > 0 && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-accent" />
+                    <span>Declared API Endpoints ({fileIntel.api_endpoints.length})</span>
+                  </span>
+                  <span className="text-[10px] text-text-muted font-mono">
+                    {fileIntel.api_endpoints[0].framework}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {fileIntel.api_endpoints.map((ep, idx) => {
+                    const method = ep.method.toUpperCase();
+                    const methodBadgeClass =
+                      method === "GET"
+                        ? "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                        : method === "POST"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : method === "PUT" || method === "PATCH"
+                        ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                        : method === "DELETE"
+                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                        : "bg-purple-500/10 text-purple-400 border-purple-500/30";
+
+                    return (
+                      <div
+                        key={`${ep.method}-${ep.route}-${idx}`}
+                        className="p-1.5 bg-surface rounded border border-border-subtle flex items-center justify-between gap-2 font-mono text-micro"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className={`px-1.5 py-0.2 rounded font-bold text-[10px] border ${methodBadgeClass}`}
+                          >
+                            {method}
+                          </span>
+                          <span className="font-semibold text-text-primary truncate" title={ep.route}>
+                            {ep.route}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-text-muted text-micro font-medium font-sans">
-                <Hash className="w-3 h-3" />
-                <span>Content Hash (BLAKE3)</span>
+            {/* Exported Symbols & Handlers */}
+            {fileIntel && fileIntel.exported_symbols.length > 0 && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                    <FileCode className="w-3.5 h-3.5 text-accent" />
+                    <span>Exported Symbols ({fileIntel.exported_symbols.length})</span>
+                  </span>
+                </div>
+                <div className="space-y-1 max-h-40 overflow-y-auto pr-1 font-mono text-micro">
+                  {fileIntel.exported_symbols.map((sym) => (
+                    <div
+                      key={`${sym.name}-${sym.line_number}`}
+                      className="p-1.5 bg-surface rounded border border-border-subtle flex items-center justify-between gap-1.5 text-text-secondary"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToSource?.(selectedFile.relative_path, sym.line_number)}
+                        className="hover:underline text-text-primary font-medium truncate text-left"
+                        title={`Jump to line ${sym.line_number}`}
+                      >
+                        {sym.name}
+                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {sym.complexity != null && sym.complexity > 1 && (
+                          <span
+                            className="px-1 py-0.2 rounded bg-subtle text-text-muted text-[10px] border border-border-subtle"
+                            title={`Cyclomatic complexity: ${sym.complexity}`}
+                          >
+                            CC {sym.complexity}
+                          </span>
+                        )}
+                        <span className="text-text-muted text-[10px] uppercase font-sans">
+                          {sym.kind} · L{sym.line_number}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="p-1.5 bg-canvas rounded border border-border-subtle font-mono text-micro text-text-muted break-all select-text">
-                {selectedFile.content_hash || "Not hashed"}
+            )}
+
+            {/* Internal Project Dependencies (What this file imports) */}
+            {fileIntel && fileIntel.internal_dependencies.length > 0 && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-2">
+                <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                  <ArrowRight className="w-3.5 h-3.5 text-accent" />
+                  <span>Imports Project Files ({fileIntel.internal_dependencies.length})</span>
+                </span>
+                <div className="space-y-1 max-h-36 overflow-y-auto pr-1 font-mono text-micro">
+                  {fileIntel.internal_dependencies.map((dep) => (
+                    <button
+                      key={dep}
+                      type="button"
+                      onClick={() => onNavigateToSource?.(dep, 1)}
+                      className="w-full text-left p-1 rounded bg-surface hover:bg-hover border border-border-subtle text-accent hover:underline truncate block"
+                      title={`Jump to ${dep}`}
+                    >
+                      {dep}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* External Packages Used */}
+            {fileIntel && fileIntel.external_packages_used.length > 0 && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-2">
+                <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-accent" />
+                  <span>External Packages ({fileIntel.external_packages_used.length})</span>
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {fileIntel.external_packages_used.map((pkg) => (
+                    <span
+                      key={pkg}
+                      className="px-1.5 py-0.5 rounded text-micro font-mono bg-elevated border border-border-subtle text-text-secondary"
+                    >
+                      {pkg}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Blast Radius & Direct Dependents */}
+            {fileIntel && (
+              <div className="p-2.5 bg-canvas rounded border border-border-default space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-caption font-semibold text-text-primary flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-accent" />
+                    <span>Blast Radius ({fileIntel.direct_dependants_count} dependents)</span>
+                  </span>
+                </div>
+                <p className="text-micro text-text-muted font-sans leading-snug">
+                  {fileIntel.direct_dependants_count > 0
+                    ? "If you modify this file, the following files will be affected:"
+                    : "Leaf component: no other internal files directly import this file."}
+                </p>
+                {fileIntel.direct_dependants.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-1 font-mono text-micro">
+                    {fileIntel.direct_dependants.map((depPath) => (
+                      <button
+                        key={depPath}
+                        type="button"
+                        onClick={() => onNavigateToSource?.(depPath, 1)}
+                        className="w-full text-left p-1 rounded bg-surface hover:bg-hover border border-border-subtle text-accent hover:underline truncate block"
+                        title={`Jump to ${depPath}`}
+                      >
+                        → {depPath}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Content Hash (BLAKE3) - Clean, Compact Single-line Row */}
+            <div className="flex items-center justify-between gap-2 p-1.5 bg-canvas rounded border border-border-subtle text-micro font-mono text-text-muted">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Hash className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate" title={selectedFile.content_hash}>
+                  BLAKE3: {selectedFile.content_hash ? `${selectedFile.content_hash.slice(0, 12)}...${selectedFile.content_hash.slice(-8)}` : "None"}
+                </span>
+              </div>
+              {selectedFile.content_hash && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedFile.content_hash);
+                    setCopiedHash(true);
+                    setTimeout(() => setCopiedHash(false), 1500);
+                  }}
+                  className="p-1 rounded hover:bg-hover text-text-muted hover:text-text-primary transition-colors flex-shrink-0"
+                  title="Copy full BLAKE3 hash"
+                >
+                  {copiedHash ? <Check className="w-3 h-3 text-status-success-text" /> : <Copy className="w-3 h-3" />}
+                </button>
+              )}
             </div>
 
-            <div className="p-2.5 bg-accent/5 rounded border border-accent/20 flex flex-col gap-1 text-micro text-text-secondary">
-              <div className="flex items-center gap-1 text-accent font-medium font-mono">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Provenance Tracked</span>
-              </div>
-              <p>
-                Static structural analysis records exact line spans and source evidence in SQLite.
-              </p>
+            {/* Provenance Badge */}
+            <div className="p-2 bg-accent/5 rounded border border-accent/20 flex items-center gap-2 text-micro text-text-secondary">
+              <ShieldCheck className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+              <span className="font-sans leading-tight">
+                Provenance tracked: SQLite stores verified AST line ranges and static evidence.
+              </span>
             </div>
           </div>
         ) : (

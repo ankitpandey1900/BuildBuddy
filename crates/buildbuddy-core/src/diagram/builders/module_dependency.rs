@@ -121,6 +121,7 @@ pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Re
                     import_count: None,
                     complexity: None,
                 }),
+                members: Vec::new(),
             });
         }
     } else {
@@ -145,6 +146,7 @@ pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Re
                     import_count: None,
                     complexity: None,
                 }),
+                members: Vec::new(),
             });
         }
     }
@@ -273,6 +275,7 @@ pub fn build_module_dependency_diagram(conn: &Connection, project_id: i64) -> Re
             height: ext_h,
             source_ref: None,
             metrics: None,
+            members: Vec::new(),
         });
     }
 

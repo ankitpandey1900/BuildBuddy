@@ -12,7 +12,7 @@ describe("Button UI Primitive", () => {
   it("renders primary variant correctly", () => {
     render(<Button variant="primary">Primary Action</Button>);
     const button = screen.getByRole("button", { name: "Primary Action" });
-    expect(button.className).toContain("bg-accent");
+    expect(button.className).toContain("bg-neutral-900");
     expect(button.className).toContain("text-white");
   });
 

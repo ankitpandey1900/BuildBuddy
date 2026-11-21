@@ -31,42 +31,75 @@ impl DatabaseStore {
         tx.execute("DELETE FROM database_engines WHERE project_id=?1", [project_id])?;
         tx.execute("DELETE FROM database_tables WHERE project_id=?1", [project_id])?;
         for engine in engines {
-            tx.execute(
+            let mut inserted = tx.execute(
                 "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
                  VALUES (?1,?2,?3,?3,0,0,?4,?5,'source_pattern')",
                 params![project_id, engine.file_path, engine.line, engine.snippet, engine.confidence],
-            )?;
-            let evidence = tx.last_insert_rowid();
+            );
+            if inserted.is_err() {
+                inserted = tx.execute(
+                    "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
+                     VALUES (?1,?2,?3,?3,0,0,?4,?5,'heuristic')",
+                    params![project_id, engine.file_path, engine.line, engine.snippet, engine.confidence],
+                );
+            }
+            let evidence = match inserted {
+                Ok(_) => tx.last_insert_rowid(),
+                Err(_) => 0,
+            };
+            let ev_opt = if evidence > 0 { Some(evidence) } else { None };
             tx.execute(
                 "INSERT INTO database_engines (project_id,name,file_path,line_number,confidence,source_evidence_id)
                  VALUES (?1,?2,?3,?4,?5,?6)",
-                params![project_id, engine.name, engine.file_path, engine.line, engine.confidence, evidence],
+                params![project_id, engine.name, engine.file_path, engine.line, engine.confidence, ev_opt],
             )?;
         }
         for schema in schemas {
-            tx.execute(
+            let mut inserted = tx.execute(
                 "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
                  VALUES (?1,?2,?3,?4,0,0,?5,?6,'source_pattern')",
                 params![project_id, schema.file_path, schema.start_line, schema.end_line, schema.snippet, schema.confidence],
-            )?;
-            let evidence = tx.last_insert_rowid();
+            );
+            if inserted.is_err() {
+                inserted = tx.execute(
+                    "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
+                     VALUES (?1,?2,?3,?4,0,0,?5,?6,'heuristic')",
+                    params![project_id, schema.file_path, schema.start_line, schema.end_line, schema.snippet, schema.confidence],
+                );
+            }
+            let evidence = match inserted {
+                Ok(_) => tx.last_insert_rowid(),
+                Err(_) => 0,
+            };
+            let ev_opt = if evidence > 0 { Some(evidence) } else { None };
             tx.execute(
                 "INSERT INTO database_tables (project_id,name,file_path,start_line,end_line,confidence,source_evidence_id)
                  VALUES (?1,?2,?3,?4,?5,?6,?7)",
-                params![project_id, schema.table_name, schema.file_path, schema.start_line, schema.end_line, schema.confidence, evidence],
+                params![project_id, schema.table_name, schema.file_path, schema.start_line, schema.end_line, schema.confidence, ev_opt],
             )?;
             let table = tx.last_insert_rowid();
             for field in &schema.fields {
-                tx.execute(
+                let mut field_inserted = tx.execute(
                     "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
                      VALUES (?1,?2,?3,?3,0,0,?4,?5,'source_pattern')",
                     params![project_id, schema.file_path, field.line, field.name, schema.confidence],
-                )?;
-                let field_evidence = tx.last_insert_rowid();
+                );
+                if field_inserted.is_err() {
+                    field_inserted = tx.execute(
+                        "INSERT INTO source_evidence (project_id,file_path,start_line,end_line,start_column,end_column,snippet,confidence,evidence_type)
+                         VALUES (?1,?2,?3,?3,0,0,?4,?5,'heuristic')",
+                        params![project_id, schema.file_path, field.line, field.name, schema.confidence],
+                    );
+                }
+                let field_evidence = match field_inserted {
+                    Ok(_) => tx.last_insert_rowid(),
+                    Err(_) => 0,
+                };
+                let field_ev_opt = if field_evidence > 0 { Some(field_evidence) } else { None };
                 tx.execute(
                     "INSERT INTO database_fields (table_id,name,declared_type,is_primary_key,is_foreign_key,line_number,source_evidence_id)
                      VALUES (?1,?2,?3,?4,?5,?6,?7)",
-                    params![table, field.name, field.declared_type, field.is_primary_key, field.is_foreign_key, field.line, field_evidence],
+                    params![table, field.name, field.declared_type, field.is_primary_key, field.is_foreign_key, field.line, field_ev_opt],
                 )?;
             }
         }

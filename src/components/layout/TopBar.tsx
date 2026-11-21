@@ -9,6 +9,7 @@ import {
   RefreshCw,
   XCircle,
   X,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
@@ -27,6 +28,7 @@ interface TopBarProps {
   onCancelScan: () => void;
   onToggleTheme: () => void;
   onOpenCommandPalette: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -42,6 +44,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onCancelScan,
   onToggleTheme,
   onOpenCommandPalette,
+  onOpenSettings,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -60,9 +63,9 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="flex items-center gap-2 relative z-50 min-w-0">
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-body font-medium transition-colors duration-150 border border-transparent hover:border-border-default focus-ring cursor-pointer max-w-[280px]"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-hover text-text-primary text-body font-medium transition-colors duration-150 border border-transparent hover:border-border-default focus-ring cursor-pointer max-w-[280px] group"
         >
-          <Folder className="w-[18px] h-[18px] text-accent flex-shrink-0" strokeWidth={2.2} />
+          <Folder className="w-[18px] h-[18px] text-text-muted group-hover:text-text-primary flex-shrink-0 transition-colors" strokeWidth={2} />
           <span className="truncate">
             {currentProject ? currentProject.name : "Select Project..."}
           </span>
@@ -70,28 +73,28 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
 
         {dropdownOpen && (
-          <div className="absolute top-10 left-0 w-80 bg-surface border border-border-default shadow-menu rounded-md p-1.5 z-50 text-body font-sans">
+          <div className="absolute top-10 left-0 w-80 bg-surface border border-border-default shadow-menu rounded-xl p-2 z-50 text-body font-sans">
             <button
               onClick={() => {
                 setDropdownOpen(false);
                 onOpenFolder();
               }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary mb-1 border-b border-border-subtle cursor-pointer transition-colors duration-150"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg hover:bg-hover text-text-primary mb-1 border-b border-border-subtle cursor-pointer transition-colors duration-150"
             >
-              <FolderOpen className="w-4 h-4 text-accent" />
-              <span className="font-medium">Open Project Folder...</span>
+              <FolderOpen className="w-4 h-4 text-text-muted" />
+              <span className="font-medium text-xs">Open Project Folder...</span>
             </button>
 
             {recentProjects.length > 0 && (
               <>
-                <div className="px-2.5 py-1 text-caption text-text-muted font-medium">
+                <div className="px-3 py-1.5 text-[10px] uppercase font-bold tracking-wider text-text-muted">
                   Recent Workspaces
                 </div>
                 <div className="max-h-56 overflow-y-auto">
                   {recentProjects.map((p) => (
                     <div
                       key={p.id}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 text-left rounded-sm hover:bg-hover text-text-primary group transition-colors duration-150 cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2 text-left rounded-lg hover:bg-hover text-text-primary group transition-colors duration-150 cursor-pointer"
                     >
                       <button
                         type="button"
@@ -129,15 +132,15 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
 
         {/* Calm Offline Indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-elevated/70 border border-border-subtle text-meta text-text-muted">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-elevated/80 border border-border-subtle text-meta text-text-muted">
           <span className="w-1.5 h-1.5 rounded-full bg-status-success-text" />
           <span>Offline</span>
         </div>
 
         {/* Scan / Analysis Status */}
         {isScanning ? (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent-subtle border border-accent/25 rounded-sm text-caption text-accent-text font-sans animate-in fade-in duration-150">
-            <RefreshCw className="w-3 h-3 animate-spin flex-shrink-0" />
+          <div className="flex items-center gap-2 px-2.5 py-1 bg-elevated border border-border-default rounded-md text-caption text-text-primary font-sans animate-in fade-in duration-150">
+            <RefreshCw className="w-3 h-3 animate-spin flex-shrink-0 text-status-success-text" />
             <span className="truncate max-w-[180px]">
               {scanProgress?.stage === "parsing"
                 ? `Parsing (${scanProgress.files_scanned} files)`
@@ -150,9 +153,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             <button
               onClick={onCancelScan}
               title="Cancel scan"
-              className="hover:text-status-danger-text p-0.5 rounded-sm transition-colors"
+              className="text-text-muted hover:text-status-danger-text p-0.5 rounded-sm transition-colors cursor-pointer"
             >
-              <XCircle className="w-3 h-3" />
+              <XCircle className="w-3.5 h-3.5" />
             </button>
           </div>
         ) : currentProject ? (
@@ -169,21 +172,21 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Middle: Command Palette Quick Trigger */}
-      <div className="flex-1 max-w-md mx-6">
+      <div className="flex-1 max-w-md mx-2 sm:mx-6 min-w-0">
         <button
           onClick={onOpenCommandPalette}
           data-testid="topbar-search-trigger"
-          className="w-full h-8 px-3 flex items-center justify-between bg-elevated/70 border border-border-default rounded-sm text-body text-text-muted hover:border-border-strong hover:bg-elevated transition-colors duration-150 focus-ring cursor-pointer"
+          className="w-full h-8 px-3 flex items-center justify-between bg-elevated/70 border border-border-default rounded-md text-body text-text-muted hover:border-border-strong hover:bg-elevated transition-colors duration-150 focus-ring cursor-pointer min-w-0"
         >
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            <span className="text-secondary text-body">Search files, commands...</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Search className="w-4 h-4 flex-shrink-0" />
+            <span className="text-text-secondary text-body truncate">Search files, commands...</span>
           </div>
-          <Kbd>Ctrl+K</Kbd>
+          <Kbd className="flex-shrink-0">Ctrl+K</Kbd>
         </button>
       </div>
 
-      {/* Right: Theme Toggle (No clipped edges) */}
+      {/* Right: Theme Toggle & Settings */}
       <div className="flex items-center gap-1 pr-1 flex-shrink-0">
         <button
           onClick={onToggleTheme}
@@ -197,6 +200,17 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Moon className="w-4 h-4" />
           )}
         </button>
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            aria-label="Settings"
+            className="w-8 h-8 flex items-center justify-center rounded-sm hover:bg-hover text-text-muted hover:text-text-primary transition-colors duration-150 focus-ring cursor-pointer"
+            title="Settings (Ctrl+,)"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </header>
   );

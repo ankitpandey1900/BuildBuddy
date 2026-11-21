@@ -123,6 +123,8 @@ pub struct DiagramNode {
     pub source_ref: Option<SourceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics: Option<NodeMetrics>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<String>,
 }
 
 /// Optional metrics attached to a node.
@@ -304,6 +306,8 @@ pub struct PositionedNode {
     pub source_ref: Option<SourceRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics: Option<NodeMetrics>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<String>,
 }
 
 /// An edge positioned with bend points / route by the layout engine.
@@ -390,6 +394,7 @@ mod tests {
                     end_line: 10,
                 }),
                 metrics: None,
+                members: Vec::new(),
             }],
             edges: vec![DiagramEdge {
                 id: "e1".to_string(),

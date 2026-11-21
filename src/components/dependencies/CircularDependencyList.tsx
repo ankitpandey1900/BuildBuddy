@@ -21,21 +21,24 @@ export const CircularDependencyList: React.FC<CircularDependencyListProps> = ({
 
   return (
     <div className="flex flex-col">
-      <div className="px-3 py-2 text-body font-semibold text-text-primary border-b border-border-subtle">
+      <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-primary border-b border-border-default bg-surface/50">
         {cycles.length} Circular Import Cycle{cycles.length > 1 ? "s" : ""}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="p-3 flex flex-col gap-2.5">
         {cycles.map((cycle, idx) => (
           <div
             key={idx}
-            className="px-3 py-2 border-b border-border-subtle text-caption flex flex-col gap-1.5"
+            className="p-3 rounded-lg border border-border-default bg-canvas/60 hover:border-border-strong text-caption flex flex-col gap-2 transition-all duration-150"
           >
             <div className="text-text-secondary font-sans text-caption font-medium flex items-center justify-between">
-              <span>Cycle #{idx + 1} ({cycle.cycle_files.length} files)</span>
+              <span className="font-semibold text-text-primary">Cycle #{idx + 1}</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-text-muted">
+                {cycle.cycle_files.length} files
+              </span>
             </div>
 
-            <div className="flex flex-col gap-1 pl-1 font-mono text-micro text-text-primary">
+            <div className="flex flex-col gap-1 pl-0.5 font-mono text-micro text-text-primary">
               {cycle.cycle_files.map((file, fileIdx) => {
                 const isLast = fileIdx === cycle.cycle_files.length - 1;
                 return (
@@ -48,7 +51,7 @@ export const CircularDependencyList: React.FC<CircularDependencyListProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectFile?.(file)}
-                      className="hover:underline hover:text-accent truncate text-left"
+                      className="hover:underline hover:text-accent truncate text-left text-text-secondary hover:text-text-primary transition-colors"
                       title={file}
                     >
                       {file}

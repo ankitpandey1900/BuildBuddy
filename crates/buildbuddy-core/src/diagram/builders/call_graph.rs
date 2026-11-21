@@ -113,6 +113,7 @@ pub fn build_call_graph(conn: &Connection, project_id: i64) -> Result<DiagramRep
                     import_count: None,
                     complexity: Some(complexity),
                 }),
+                members: Vec::new(),
             });
         }
     }
@@ -144,7 +145,7 @@ pub fn build_call_graph(conn: &Connection, project_id: i64) -> Result<DiagramRep
             row.get::<_, String>(9)?,
             row.get::<_, String>(10)?,
             row.get::<_, i64>(11)?,
-            row.get::<_, i64>(12)?,
+            row.get::<_, Option<i64>>(12)?.unwrap_or(0),
         ))
     })?;
 
@@ -191,6 +192,7 @@ pub fn build_call_graph(conn: &Connection, project_id: i64) -> Result<DiagramRep
                     end_line: 1,
                 }),
                 metrics: None,
+                members: Vec::new(),
             });
         }
 
@@ -214,6 +216,7 @@ pub fn build_call_graph(conn: &Connection, project_id: i64) -> Result<DiagramRep
                 height: comp_h,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
         }
 

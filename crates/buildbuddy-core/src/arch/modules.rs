@@ -108,14 +108,40 @@ impl ModuleGrouper {
             return ".".to_string();
         }
 
-        let container_roots = ["src", "app", "packages", "crates", "apps", "modules", "pkg"];
+        // 1. Monorepo architectures (apps/*, packages/*, crates/*, modules/*, services/*)
+        if parts.len() >= 3 && matches!(parts[0], "apps" | "packages" | "crates" | "modules" | "services") {
+            let pkg_prefix = format!("{}/{}", parts[0], parts[1]);
+            let sub = &parts[2..];
+            if !sub.is_empty() {
+                // e.g. apps/web/src/... or apps/web/app/...
+                if sub[0] == "src" && sub.len() > 1 {
+                    if (sub[1] == "app" || sub[1] == "pages") && sub.len() > 2 {
+                        if sub.len() > 3 && (sub[2] == "api" || sub[2] == "(api)") {
+                            return format!("{}/{}/{}/{}", pkg_prefix, sub[0], sub[1], sub[2]);
+                        }
+                        return format!("{}/{}/{}", pkg_prefix, sub[0], sub[1]);
+                    }
+                    return format!("{}/{}/{}", pkg_prefix, sub[0], sub[1]);
+                } else if sub[0] == "app" || sub[0] == "pages" {
+                    if sub.len() > 2 && (sub[1] == "api" || sub[1] == "(api)") {
+                        return format!("{}/{}/{}", pkg_prefix, sub[0], sub[1]);
+                    }
+                    return format!("{}/{}", pkg_prefix, sub[0]);
+                } else if sub.len() > 1 && !sub[0].ends_with(".ts") && !sub[0].ends_with(".js") && !sub[0].ends_with(".json") && !sub[0].ends_with(".prisma") {
+                    return format!("{}/{}", pkg_prefix, sub[0]);
+                }
+            }
+            return pkg_prefix;
+        }
 
-        // Handle nested Next.js inside src (e.g. "src/app/api/auth/route.ts" -> "src/app/api")
+        // 2. Handle nested Next.js inside src (e.g. "src/app/api/auth/route.ts" -> "src/app/api")
         if parts.len() > 3 && parts[0] == "src" && (parts[1] == "app" || parts[1] == "pages") {
             return format!("{}/{}/{}", parts[0], parts[1], parts[2]);
         }
 
-        // Handle standard container directories (e.g. "src/components", "app/api", "packages/core")
+        let container_roots = ["src", "app", "packages", "crates", "apps", "modules", "pkg"];
+
+        // 3. Handle standard container directories (e.g. "src/components", "app/api", "packages/core")
         if parts.len() > 2 && container_roots.contains(&parts[0]) {
             return format!("{}/{}", parts[0], parts[1]);
         }
@@ -127,13 +153,40 @@ impl ModuleGrouper {
     fn classify_layer(mod_dir: &str, files: &[String]) -> LayerLabel {
         let dir_lower = mod_dir.to_lowercase();
 
-        // 1. Frontend layer evidence
+        // 1. Backend layer evidence (check first so app/api is classified as Backend)
+        if dir_lower.contains("api")
+            || dir_lower.contains("routes")
+            || dir_lower.contains("controllers")
+            || dir_lower.contains("handlers")
+            || dir_lower.contains("server")
+            || dir_lower.contains("backend")
+            || dir_lower.contains("services")
+        {
+            return LayerLabel::Backend;
+        }
+
+        // 2. Data layer evidence
+        if dir_lower.contains("prisma")
+            || dir_lower.contains("models")
+            || dir_lower.contains("entities")
+            || dir_lower.contains("data")
+            || dir_lower.contains("db")
+            || dir_lower.contains("migrations")
+            || dir_lower.contains("schemas")
+            || dir_lower.contains("repositories")
+        {
+            return LayerLabel::Data;
+        }
+
+        // 3. Frontend layer evidence
         if dir_lower.contains("client")
             || dir_lower.contains("frontend")
             || dir_lower.contains("ui")
             || dir_lower.contains("components")
             || dir_lower.contains("pages")
             || dir_lower.contains("views")
+            || dir_lower.contains("hooks")
+            || dir_lower.contains("styles")
         {
             return LayerLabel::Frontend;
         }

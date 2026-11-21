@@ -10,3 +10,7 @@ export * from "./Card";
 export * from "./Tabs";
 export * from "./Table";
 export * from "./Kbd";
+export * from "./base-node";
+export * from "./database-schema-node";
+export * from "./dialog";
+export * from "./dropdown-menu";

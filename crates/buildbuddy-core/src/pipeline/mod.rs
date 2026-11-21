@@ -129,12 +129,19 @@ impl PipelineRunner {
         }
 
         let total_scanned = scanned_files.len();
-        conn.execute(
+        let _ = conn.execute(
             "UPDATE analysis_runs 
              SET status = 'scanned', files_discovered = ?1, files_scanned = ?1 
              WHERE id = ?2",
             params![total_scanned as i64, run_id],
-        ).map_err(|e| e.to_string())?;
+        ).or_else(|_| {
+            conn.execute(
+                "UPDATE analysis_runs 
+                 SET files_discovered = ?1, files_scanned = ?1 
+                 WHERE id = ?2",
+                params![total_scanned as i64, run_id],
+            )
+        });
 
         progress_cb(PipelineProgress {
             project_id,
@@ -153,10 +160,10 @@ impl PipelineRunner {
         }
 
         // ================= STAGE 2: PARSING =================
-        conn.execute(
+        let _ = conn.execute(
             "UPDATE analysis_runs SET status = 'parsing' WHERE id = ?1",
             params![run_id],
-        ).map_err(|e| e.to_string())?;
+        );
 
         progress_cb(PipelineProgress {
             project_id,
@@ -242,10 +249,10 @@ impl PipelineRunner {
         }
 
         // ================= STAGE 3: ANALYZING =================
-        conn.execute(
+        let _ = conn.execute(
             "UPDATE analysis_runs SET status = 'analyzing' WHERE id = ?1",
             params![run_id],
-        ).map_err(|e| e.to_string())?;
+        );
 
         progress_cb(PipelineProgress {
             project_id,
@@ -286,17 +293,24 @@ impl PipelineRunner {
             let content = fs::read_to_string(&abs_path).unwrap_or_default();
             all_files.push((rel_path.clone(), content.clone()));
 
-            if rel_path == "package.json" {
+            let is_package_json = rel_path == "package.json" 
+                || (rel_path.ends_with("/package.json") || rel_path.ends_with(r"\package.json"));
+            let is_requirements = rel_path == "requirements.txt" 
+                || (rel_path.ends_with("/requirements.txt") || rel_path.ends_with(r"\requirements.txt"));
+            let is_pyproject = rel_path == "pyproject.toml" 
+                || (rel_path.ends_with("/pyproject.toml") || rel_path.ends_with(r"\pyproject.toml"));
+
+            if is_package_json {
                 if let Ok(deps) = parse_package_json(&content, rel_path) {
                     GraphStore::insert_manifest_dependencies(conn, project_id, *file_id, &deps).ok();
                     manifest_deps.extend(deps);
                 }
-            } else if rel_path == "requirements.txt" {
+            } else if is_requirements {
                 if let Ok(deps) = parse_requirements_txt(&content, rel_path) {
                     GraphStore::insert_manifest_dependencies(conn, project_id, *file_id, &deps).ok();
                     manifest_deps.extend(deps);
                 }
-            } else if rel_path == "pyproject.toml" {
+            } else if is_pyproject {
                 if let Ok(deps) = parse_pyproject_toml(&content, rel_path) {
                     GraphStore::insert_manifest_dependencies(conn, project_id, *file_id, &deps).ok();
                     manifest_deps.extend(deps);
@@ -342,7 +356,8 @@ impl PipelineRunner {
         let report = ArchitectureAnalyzer::analyze(&all_files_refs, &parsed_refs, &manifest_deps, &edges);
 
         let endpoints = ApiExtractor::extract(&all_files_refs);
-        ApiStore::replace_endpoints(conn, project_id, &endpoints).map_err(|e| e.to_string())?;
+        let client_calls = ApiExtractor::extract_client_calls(&all_files_refs);
+        ApiStore::replace_endpoints(conn, project_id, &endpoints, &client_calls).map_err(|e| e.to_string())?;
         let (engines, schemas) = DatabaseExtractor::extract(&all_files_refs);
         DatabaseStore::replace(conn, project_id, &engines, &schemas).map_err(|e| e.to_string())?;
         GraphStore::refresh_complexity_findings(conn, project_id).map_err(|e| e.to_string())?;

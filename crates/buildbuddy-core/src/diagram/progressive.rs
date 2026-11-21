@@ -59,6 +59,7 @@ pub fn build_collapsed_overview(model: &DiagramModel) -> CollapsedOverview {
                 height: h,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
         }
     }
@@ -194,6 +195,7 @@ mod tests {
                 height: 40.0,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
         }
         let model = DiagramModel {
@@ -223,6 +225,7 @@ mod tests {
                 height: 40.0,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
         }
 

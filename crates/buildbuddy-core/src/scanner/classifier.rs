@@ -39,6 +39,7 @@ pub fn classify_file(path: &Path) -> Option<LanguageInfo> {
         "rb" => Some(LanguageInfo { name: "Ruby", category: "programming" }),
         "swift" => Some(LanguageInfo { name: "Swift", category: "programming" }),
         "sql" => Some(LanguageInfo { name: "SQL", category: "data" }),
+        "prisma" => Some(LanguageInfo { name: "Prisma Schema", category: "data" }),
         "json" => Some(LanguageInfo { name: "JSON", category: "data" }),
         "yaml" | "yml" => Some(LanguageInfo { name: "YAML", category: "data" }),
         "toml" => Some(LanguageInfo { name: "TOML", category: "config" }),

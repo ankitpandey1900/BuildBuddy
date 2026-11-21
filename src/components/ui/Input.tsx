@@ -1,6 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
 
 export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -30,14 +29,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           value={value}
-          className={twMerge(
-            clsx(
-              "w-full bg-elevated border border-border-default rounded-sm text-text-primary placeholder:text-text-muted transition-colors duration-150 ease-out focus-ring font-sans",
-              prefixIcon ? "pl-7" : "pl-2.5",
-              hasValue && onClear ? "pr-7" : suffix ? "pr-8" : "pr-2.5",
-              sizeClasses[size],
-              className
-            )
+          className={cn(
+            "w-full bg-elevated border border-border-default rounded-sm text-text-primary placeholder:text-text-muted transition-colors duration-150 ease-out focus-ring font-sans",
+            prefixIcon ? "pl-7" : "pl-2.5",
+            hasValue && onClear ? "pr-7" : suffix ? "pr-8" : "pr-2.5",
+            sizeClasses[size],
+            className
           )}
           {...props}
         />

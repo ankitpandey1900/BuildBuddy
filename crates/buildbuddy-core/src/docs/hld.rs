@@ -196,6 +196,24 @@ impl HighLevelDesignGenerator {
 
         let primary_fw = frameworks.first().map(|f| f.0.clone()).unwrap_or_else(|| "Modular".to_string());
 
+        let endpoints: Vec<String> = {
+            let mut stmt = conn.prepare("SELECT route FROM api_endpoints WHERE project_id = ?1 ORDER BY route ASC LIMIT 3")?;
+            let rows = stmt.query_map(params![project_id], |r| r.get(0))?;
+            rows.collect::<Result<Vec<_>>>().unwrap_or_default()
+        };
+
+        let db_tables: Vec<String> = {
+            let mut stmt = conn.prepare("SELECT name FROM database_tables WHERE project_id = ?1 ORDER BY name ASC LIMIT 3")?;
+            let rows = stmt.query_map(params![project_id], |r| r.get(0))?;
+            rows.collect::<Result<Vec<_>>>().unwrap_or_default()
+        };
+
+        let external_deps: Vec<String> = {
+            let mut stmt = conn.prepare("SELECT package_name FROM manifest_dependencies WHERE project_id = ?1 AND dependency_type = 'runtime' ORDER BY package_name ASC LIMIT 3")?;
+            let rows = stmt.query_map(params![project_id], |r| r.get(0))?;
+            rows.collect::<Result<Vec<_>>>().unwrap_or_default()
+        };
+
         // Multi-tier layered architecture (Matches Image 3)
         text.push_str("#### 2.1 Multi-Tier Layered Architecture\n\n");
         text.push_str("```mermaid\n");
@@ -204,16 +222,31 @@ impl HighLevelDesignGenerator {
         text.push_str("        User[\"Client Applications / Users\\n(Web, Mobile & CLI)\"]\n");
         text.push_str("    end\n");
         text.push_str(&format!("    subgraph Layer2 [\"2. {} Fullstack Engine ({})\"]\n", project_name, primary_fw));
-        text.push_str("        Shell[\"Presentation Shell / SSR Hydration\"] --> Handlers[\"Domain API & Route Handlers\"]\n");
+        if endpoints.is_empty() {
+            text.push_str("        Shell[\"Presentation Shell / SSR Hydration\"] --> Handlers[\"Domain API & Route Handlers\"]\n");
+        } else {
+            let sample_ep = endpoints.join(", ");
+            text.push_str(&format!("        Shell[\"Presentation Shell / SSR Hydration\"] --> Handlers[\"Domain API & Route Handlers\\n({})\"]\n", sample_ep));
+        }
         text.push_str("        Handlers --> ORM[\"Type-Safe ORM / Query Client\"]\n");
         text.push_str("    end\n");
         text.push_str("    subgraph Layer3 [\"3. Persistence & Database Layer\"]\n");
         text.push_str("        Pooler[\"Connection Pooler / Gateway\"]\n");
-        text.push_str("        DB[(\"Primary Database Cluster\\n(Tables, Audits, State)\")]\n");
+        if db_tables.is_empty() {
+            text.push_str("        DB[(\"Primary Database Cluster\\n(Tables, Audits, State)\")]\n");
+        } else {
+            let sample_tbl = db_tables.join(", ");
+            text.push_str(&format!("        DB[(\"Primary Database Cluster\\n({})\")]\n", sample_tbl));
+        }
         text.push_str("        Pooler --> DB\n");
         text.push_str("    end\n");
         text.push_str("    subgraph Layer4 [\"4. External Ecosystem\"]\n");
-        text.push_str("        ExtServ[\"Third-Party Services & Webhooks\"]\n");
+        if external_deps.is_empty() {
+            text.push_str("        ExtServ[\"Third-Party Services & Webhooks\"]\n");
+        } else {
+            let sample_ext = external_deps.join(", ");
+            text.push_str(&format!("        ExtServ[\"Third-Party Services & Webhooks\\n({})\"]\n", sample_ext));
+        }
         text.push_str("    end\n");
         text.push_str("    User -->|\"HTTPS / WSS\"| Shell\n");
         text.push_str("    ORM -->|\"Direct / Pool Connection\"| Pooler\n");

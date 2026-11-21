@@ -1,13 +1,35 @@
-import React, { useState } from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import * as React from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { cn } from "@/lib/utils";
+
+const TooltipProvider = TooltipPrimitive.Provider;
+const TooltipRoot = TooltipPrimitive.Root;
+const TooltipTrigger = TooltipPrimitive.Trigger;
+const TooltipPortal = TooltipPrimitive.Portal;
+
+const TooltipContent = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 overflow-hidden rounded-sm border border-border-default bg-elevated px-2 py-1 text-[11px] font-sans font-medium text-text-primary shadow-menu animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        className
+      )}
+      {...props}
+    />
+  </TooltipPrimitive.Portal>
+));
+TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
 export interface TooltipProps {
   content: React.ReactNode;
   children: React.ReactElement;
   side?: "top" | "bottom" | "left" | "right";
   className?: string;
-  /** Classes for the positioning wrapper, so the child can stretch in a flex row. */
   wrapperClassName?: string;
   delayMs?: number;
 }
@@ -17,52 +39,25 @@ export const Tooltip: React.FC<TooltipProps> = ({
   children,
   side = "top",
   className,
-  wrapperClassName,
   delayMs = 250,
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
-
-  const show = () => {
-    const id = setTimeout(() => setIsVisible(true), delayMs);
-    setTimeoutId(id);
-  };
-
-  const hide = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    setIsVisible(false);
-  };
-
-  const sideClasses = {
-    top: "bottom-full left-1/2 -translate-x-1/2 mb-1.5",
-    bottom: "top-full left-1/2 -translate-x-1/2 mt-1.5",
-    left: "right-full top-1/2 -translate-y-1/2 mr-1.5",
-    right: "left-full top-1/2 -translate-y-1/2 ml-1.5",
-  };
-
+  if (!content) return children;
   return (
-    <div
-      className={twMerge(clsx("relative inline-flex", wrapperClassName))}
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
-      {children}
-      {isVisible && content && (
-        <div
-          role="tooltip"
-          className={twMerge(
-            clsx(
-              "absolute z-50 px-2 py-1 bg-elevated border border-border-default text-text-primary text-[11px] font-sans font-medium rounded-sm shadow-menu whitespace-nowrap pointer-events-none transition-opacity duration-150 ease-out",
-              sideClasses[side],
-              className
-            )
-          )}
-        >
+    <TooltipProvider delayDuration={delayMs}>
+      <TooltipRoot>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent side={side} className={className}>
           {content}
-        </div>
-      )}
-    </div>
+        </TooltipContent>
+      </TooltipRoot>
+    </TooltipProvider>
   );
+};
+
+export {
+  TooltipRoot,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+  TooltipPortal,
 };

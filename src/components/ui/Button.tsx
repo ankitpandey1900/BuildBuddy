@@ -1,69 +1,69 @@
-import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "plain" | "subtle" | "danger" | "icon";
-  size?: "sm" | "md" | "lg";
+const buttonVariants = cva(
+  "inline-flex items-center justify-center font-sans font-medium transition-colors duration-150 ease-out select-none border disabled:opacity-50 disabled:cursor-not-allowed focus-ring cursor-pointer",
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-neutral-900 text-white border-neutral-900 hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:border-white dark:hover:bg-neutral-100 active:opacity-95 shadow-xs font-medium",
+        secondary:
+          "bg-surface text-text-primary border-border-default hover:bg-hover hover:border-border-strong active:bg-active",
+        plain:
+          "bg-transparent text-text-secondary border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
+        subtle:
+          "bg-transparent text-text-secondary border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
+        danger:
+          "bg-surface text-status-danger-text border-status-danger-text/30 hover:bg-status-danger-bg active:opacity-90",
+        icon:
+          "bg-transparent text-text-muted border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
+        outline:
+          "border border-border-default bg-surface hover:bg-hover hover:text-text-primary text-text-primary",
+        ghost:
+          "hover:bg-hover hover:text-text-primary text-text-secondary border-transparent",
+      },
+      size: {
+        sm: "text-caption h-6 px-2 gap-1 rounded-sm",
+        md: "text-body h-7 px-2.5 gap-1.5 rounded-sm",
+        lg: "text-body h-8 px-3 gap-2 rounded-sm",
+        icon: "h-7 w-7 p-0 rounded-sm",
+      },
+    },
+    defaultVariants: {
+      variant: "secondary",
+      size: "md",
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
   icon?: React.ReactNode;
 }
 
-export const Button: React.FC<ButtonProps> = ({
-  variant = "secondary",
-  size = "md",
-  icon,
-  children,
-  className,
-  disabled,
-  ...props
-}) => {
-  const base =
-    "inline-flex items-center justify-center font-sans font-medium transition-colors duration-150 ease-out cursor-pointer select-none border disabled:opacity-50 disabled:cursor-not-allowed focus-ring";
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, icon, children, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    const isIconOnly = variant === "icon" || (!children && Boolean(icon));
+    const effectiveSize = isIconOnly ? "icon" : size;
 
-  const sizeClasses = {
-    sm: "text-caption h-6 px-2 gap-1 rounded-sm",
-    md: "text-body h-7 px-2.5 gap-1.5 rounded-sm",
-    lg: "text-body h-8 px-3 gap-2 rounded-sm",
-  };
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size: effectiveSize, className }))}
+        ref={ref}
+        {...props}
+      >
+        {icon && <span className="flex-shrink-0 flex items-center justify-center">{icon}</span>}
+        {children}
+      </Comp>
+    );
+  }
+);
+Button.displayName = "Button";
 
-  const iconOnlySizeClasses = {
-    sm: "w-6 h-6 p-0 rounded-sm",
-    md: "w-7 h-7 p-0 rounded-sm",
-    lg: "w-8 h-8 p-0 rounded-sm",
-  };
-
-  const isIconOnly = variant === "icon" || (!children && Boolean(icon));
-
-  const variantClasses = {
-    primary:
-      "bg-accent text-white border-accent hover:bg-accent-hover active:opacity-95 shadow-xs",
-    secondary:
-      "bg-surface text-text-primary border-border-default hover:bg-hover hover:border-border-strong active:bg-active",
-    plain:
-      "bg-transparent text-text-secondary border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
-    subtle:
-      "bg-transparent text-text-secondary border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
-    danger:
-      "bg-surface text-status-danger-text border-status-danger-text/30 hover:bg-status-danger-bg active:opacity-90",
-    icon:
-      "bg-transparent text-text-muted border-transparent hover:bg-hover hover:text-text-primary active:bg-active",
-  };
-
-  return (
-    <button
-      className={twMerge(
-        clsx(
-          base,
-          isIconOnly ? iconOnlySizeClasses[size] : sizeClasses[size],
-          variantClasses[variant],
-          className
-        )
-      )}
-      disabled={disabled}
-      {...props}
-    >
-      {icon && <span className="flex-shrink-0 flex items-center justify-center">{icon}</span>}
-      {children}
-    </button>
-  );
-};
+export { Button, buttonVariants };

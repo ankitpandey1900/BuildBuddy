@@ -1,7 +1,32 @@
-import React, { useRef, useEffect } from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import * as React from "react";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { cn } from "@/lib/utils";
 
+// Official shadcn/ui Popover primitives powered by Radix UI
+const PopoverRoot = PopoverPrimitive.Root;
+const PopoverTrigger = PopoverPrimitive.Trigger;
+const PopoverAnchor = PopoverPrimitive.Anchor;
+
+const PopoverContent = React.forwardRef<
+  React.ElementRef<typeof PopoverPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Content
+      ref={ref}
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 w-72 rounded-md border border-border-default bg-surface p-4 text-text-primary shadow-menu outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        className
+      )}
+      {...props}
+    />
+  </PopoverPrimitive.Portal>
+));
+PopoverContent.displayName = PopoverPrimitive.Content.displayName;
+
+// Backward-compatible Popover & Menu wrappers
 export interface MenuProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,9 +44,9 @@ export const Menu: React.FC<MenuProps> = ({
   align = "left",
   ariaLabel = "Menu",
 }) => {
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -38,20 +63,15 @@ export const Menu: React.FC<MenuProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
-
-      {/* Floating Menu with soft elevation */}
       <div
         ref={menuRef}
         role="menu"
         aria-label={ariaLabel}
-        className={twMerge(
-          clsx(
-            "absolute top-full mt-1 bg-surface border border-border-default rounded-md shadow-menu py-1 z-50 text-body font-sans select-none animate-in fade-in zoom-in-95 duration-150",
-            align === "right" ? "right-0" : "left-0",
-            className
-          )
+        className={cn(
+          "absolute top-full mt-1 bg-surface border border-border-default rounded-md shadow-menu py-1 z-50 text-body font-sans select-none animate-in fade-in zoom-in-95 duration-150",
+          align === "right" ? "right-0" : "left-0",
+          className
         )}
       >
         {children}
@@ -79,14 +99,12 @@ export const MenuItem: React.FC<MenuItemProps> = ({
     <button
       role="menuitem"
       disabled={disabled}
-      className={twMerge(
-        clsx(
-          "w-full flex items-center justify-between px-3 py-1.5 text-left text-body transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-          danger
-            ? "text-status-danger-text hover:bg-status-danger-bg"
-            : "text-text-primary hover:bg-hover",
-          className
-        )
+      className={cn(
+        "w-full flex items-center justify-between px-3 py-1.5 text-left text-body transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+        danger
+          ? "text-status-danger-text hover:bg-status-danger-bg"
+          : "text-text-primary hover:bg-hover",
+        className
       )}
       {...props}
     >
@@ -154,4 +172,11 @@ export const Popover: React.FC<PopoverProps> = ({
       </Menu>
     </div>
   );
+};
+
+export {
+  PopoverRoot,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverAnchor,
 };

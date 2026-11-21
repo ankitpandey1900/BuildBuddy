@@ -67,6 +67,8 @@ pub fn run() {
             commands::graph::get_findings,
             commands::graph::get_circular_dependencies,
             commands::graph::get_import_edges,
+            commands::graph::get_package_inventory,
+            commands::graph::get_file_intelligence,
             commands::graph::get_git_status,
             commands::graph::resolve_and_persist_project_graph,
             commands::arch::get_overview_data,

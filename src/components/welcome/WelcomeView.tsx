@@ -1,20 +1,15 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   FolderOpen,
   Clock,
-  ShieldCheck,
   ArrowRight,
   FolderGit2,
   X,
-  GitGraph,
-  Layers,
-  Code2,
-  FileSearch,
+  Search,
+  CheckCircle2,
 } from "lucide-react";
 import type { Project } from "@/types/ipc";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Kbd } from "@/components/ui/Kbd";
 
 export interface WelcomeViewProps {
   onOpenFolder: () => void;
@@ -23,26 +18,14 @@ export interface WelcomeViewProps {
   recentProjects: Project[];
 }
 
-const CAPABILITY_CARDS = [
+const SAMPLE_PROJECTS = [
   {
-    icon: <Layers className="w-4 h-4" strokeWidth={2} />,
-    title: "Architecture Diagrams",
-    desc: "Auto-generated HLD & LLD flow diagrams grounded in your actual AST.",
+    name: "Full-Stack Web (React + Express)",
+    path: "fixtures/arch-react-express",
   },
   {
-    icon: <GitGraph className="w-4 h-4" strokeWidth={2} />,
-    title: "Dependency Graph",
-    desc: "Visualize module imports, circular refs, and external package usage.",
-  },
-  {
-    icon: <Code2 className="w-4 h-4" strokeWidth={2} />,
-    title: "Code Intelligence",
-    desc: "SQLite-indexed symbols — functions, classes, interfaces, callers, callees.",
-  },
-  {
-    icon: <FileSearch className="w-4 h-4" strokeWidth={2} />,
-    title: "Smart Documentation",
-    desc: "Generated docs from live AST evidence — not AI hallucinations.",
+    name: "FastAPI Microservice",
+    path: "fixtures/arch-fastapi",
   },
 ];
 
@@ -53,6 +36,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   recentProjects = [],
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -85,167 +69,160 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
     [onOpenFolder, onReopenProject]
   );
 
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return recentProjects;
+    const q = searchQuery.toLowerCase();
+    return recentProjects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.root_path.toLowerCase().includes(q)
+    );
+  }, [recentProjects, searchQuery]);
+
   return (
     <div
       data-testid="welcome-screen"
-      className="flex-1 flex flex-col items-center justify-center p-8 md:p-14 overflow-y-auto bg-canvas text-text-primary select-none font-sans"
+      className="flex-1 flex flex-col items-center justify-center p-6 md:p-10 overflow-y-auto bg-canvas text-text-primary select-none font-sans"
     >
-      <div className="w-full max-w-3xl flex flex-col items-center text-center space-y-8">
-        {/* Logo + Title */}
-        <div className="flex flex-col items-center space-y-3">
-          <div className="w-14 h-14 rounded-xl bg-surface border border-border-default flex items-center justify-center shadow-sm">
-            <FolderGit2 className="w-7 h-7 text-accent" strokeWidth={2} />
+      <div className="w-full max-w-xl flex flex-col space-y-6 my-auto">
+        {/* Header Branding */}
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="w-12 h-12 rounded-xl bg-surface border border-border-default flex items-center justify-center shadow-xs">
+            <FolderGit2 className="w-6 h-6 text-text-primary" strokeWidth={1.8} />
           </div>
-          <div>
-            <h1 className="text-display font-semibold tracking-tight text-text-primary">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
               BuildBuddy
             </h1>
-            <p className="text-subheading text-text-secondary mt-1 max-w-xl leading-relaxed">
+            <p className="text-xs text-text-secondary max-w-md mx-auto leading-relaxed">
               Understand what you've built. Know how it works. Take control of your codebase.
             </p>
           </div>
         </div>
 
-        {/* Capability cards */}
-        <div className="grid grid-cols-2 gap-3 w-full text-left">
-          {CAPABILITY_CARDS.map((cap) => (
-            <div
-              key={cap.title}
-              className="flex items-start gap-3 px-4 py-3 rounded-md bg-surface border border-border-default"
-            >
-              <span className="mt-0.5 flex-shrink-0 text-accent">{cap.icon}</span>
-              <div>
-                <div className="text-body font-semibold text-text-primary leading-snug">{cap.title}</div>
-                <div className="text-caption text-text-muted mt-0.5 leading-snug">{cap.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Drop zone */}
+        {/* Dropzone Hero */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           data-testid="welcome-dropzone"
-          className={`w-full min-h-48 p-8 rounded-lg border-2 border-dashed transition-all duration-150 flex flex-col items-center justify-center gap-4 ${
+          className={`w-full p-6 rounded-lg border border-dashed transition-all duration-150 flex flex-col items-center justify-center text-center gap-3 ${
             isDragOver
-              ? "border-accent bg-accent-subtle/40 scale-[1.01]"
-              : "border-border-default bg-surface/40 hover:bg-surface/70 hover:border-border-strong"
+              ? "border-border-strong bg-hover scale-[1.01]"
+              : "border-border-default bg-surface hover:border-border-strong"
           }`}
         >
-          <div className="flex flex-col items-center gap-1.5">
-            <FolderOpen
-              className={`w-9 h-9 transition-colors ${isDragOver ? "text-accent" : "text-text-muted"}`}
-              strokeWidth={1.6}
-            />
-            <span className="text-subheading font-semibold text-text-primary">
-              {isDragOver ? "Drop folder to analyze" : "Open a repository folder"}
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-sm font-medium text-text-primary">
+              {isDragOver ? "Drop directory to analyze" : "Open a repository"}
             </span>
-            <span className="text-caption text-text-muted">
-              Drag & drop any local project directory, or use the dialog below
+            <span className="text-xs text-text-muted">
+              Drag and drop any project folder, or browse your local disk.
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 mt-1">
             <Button
               variant="primary"
-              size="lg"
+              size="md"
               onClick={onOpenFolder}
               data-testid="welcome-open-btn"
-              icon={<FolderOpen className="w-[17px] h-[17px]" />}
+              icon={<FolderOpen className="w-4 h-4" />}
             >
               Open Project Folder...
             </Button>
-            <div className="hidden sm:flex items-center gap-1 text-caption text-text-muted">
-              <span>or press</span>
-              <Kbd>Ctrl+O</Kbd>
-            </div>
           </div>
         </div>
 
-        {/* Recent Projects */}
+        {/* Sample Fixtures */}
+        <div className="flex items-center justify-center gap-2 text-xs text-text-muted">
+          <span>Try a sample:</span>
+          {SAMPLE_PROJECTS.map((sample) => (
+            <button
+              key={sample.path}
+              type="button"
+              onClick={() => onReopenProject(sample.path)}
+              className="px-2 py-0.5 rounded border border-border-default bg-surface hover:bg-hover hover:text-text-primary text-text-secondary transition-colors cursor-pointer text-xs flex items-center gap-1"
+            >
+              <span>{sample.name}</span>
+              <ArrowRight className="w-3 h-3 text-text-muted" />
+            </button>
+          ))}
+        </div>
+
+        {/* Recent Workspaces */}
         {recentProjects.length > 0 && (
-          <div className="w-full text-left space-y-2">
+          <div className="space-y-2 pt-2 border-t border-border-default">
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5 text-caption font-semibold text-text-muted">
-                <Clock className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
+                <Clock className="w-3.5 h-3.5 text-text-muted" />
                 <span>Recent Projects</span>
+                <span className="text-[11px] text-text-muted font-mono">({recentProjects.length})</span>
               </div>
-              {onRemoveProject && recentProjects.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => recentProjects.forEach((p) => onRemoveProject(p.id))}
-                  className="text-[11px] text-text-muted hover:text-danger transition-colors cursor-pointer"
-                >
-                  Clear all
-                </button>
+
+              {recentProjects.length > 2 && (
+                <div className="relative w-40">
+                  <Search className="w-3 h-3 text-text-muted absolute left-2 top-2" />
+                  <input
+                    type="text"
+                    placeholder="Filter projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-7 pl-6 pr-2 bg-surface border border-border-default rounded text-xs text-text-primary placeholder:text-text-muted focus:border-border-focus focus:outline-none"
+                  />
+                </div>
               )}
             </div>
-            <Card className="divide-y divide-border-subtle overflow-hidden p-0">
-              {recentProjects.map((project) => (
+
+            <div className="rounded-md border border-border-default bg-surface divide-y divide-border-subtle max-h-56 overflow-y-auto">
+              {filteredProjects.map((project) => (
                 <div
-                  key={project.id || project.root_path}
-                  data-testid="welcome-recent-item"
-                  className="group/item w-full flex items-center justify-between px-4 py-3 hover:bg-hover transition-colors duration-150"
+                  key={project.id}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-hover transition-colors group cursor-pointer text-left"
                 >
                   <button
                     type="button"
                     onClick={() => onReopenProject(project.root_path)}
-                    className="flex-1 flex items-center gap-3 min-w-0 text-left focus:outline-none"
+                    className="flex-1 flex flex-col items-start min-w-0 text-left focus:outline-none"
                   >
-                    <FolderGit2
-                      className="w-4 h-4 text-text-muted flex-shrink-0 group-hover/item:text-accent transition-colors"
-                      strokeWidth={2}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-body font-semibold text-text-primary truncate">
-                        {project.name}
-                      </div>
-                      <div className="text-caption font-mono text-text-muted truncate">
-                        {project.root_path}
-                      </div>
-                    </div>
+                    <span className="text-xs font-medium text-text-primary group-hover:text-text-primary transition-colors truncate w-full">
+                      {project.name}
+                    </span>
+                    <span className="text-[11px] text-text-muted font-mono truncate w-full">
+                      {project.root_path.replace(/^(\\\\\?\\|\/\/\?\/)/, "")}
+                    </span>
                   </button>
 
-                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                    {onRemoveProject && (
-                      <button
-                        type="button"
-                        title="Remove from recent projects"
-                        aria-label={`Remove ${project.name} from recent projects`}
-                        data-testid={`remove-project-${project.id}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveProject(project.id);
-                        }}
-                        className="p-1.5 rounded hover:bg-elevated text-text-muted hover:text-danger opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-all duration-150 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  {onRemoveProject && (
                     <button
                       type="button"
-                      onClick={() => onReopenProject(project.root_path)}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="p-1 text-text-muted opacity-0 group-hover/item:opacity-100 transition-opacity cursor-pointer"
+                      data-testid={`remove-project-${project.id}`}
+                      title="Remove from recent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveProject(project.id);
+                      }}
+                      className="p-1 rounded text-text-muted hover:text-status-danger-text opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0 cursor-pointer"
                     >
-                      <ArrowRight className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  </div>
+                  )}
                 </div>
               ))}
-            </Card>
+            </div>
           </div>
         )}
 
-        {/* Local Analysis Assurance Note */}
-        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-md bg-surface border border-border-default text-caption text-text-secondary w-full">
-          <ShieldCheck className="w-4 h-4 text-status-success-text flex-shrink-0" />
-          <span>
-            Analysis runs locally on this device. Parsing, indexes, and dependency intelligence do not require a network or LLM.
-          </span>
+        {/* Minimal Offline Guarantee Footer */}
+        <div className="flex items-center justify-center gap-3 text-[11px] text-text-muted pt-2">
+          <div className="flex items-center gap-1 text-status-success-text">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Analysis runs locally on this device</span>
+          </div>
+          <span>•</span>
+          <span>Read-only inspection</span>
+          <span>•</span>
+          <span>Zero telemetry</span>
         </div>
       </div>
     </div>

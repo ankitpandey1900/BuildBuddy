@@ -9,12 +9,14 @@ import type {
 } from "../../types/diagram";
 import { getNodeSizeForKind } from "../../types/diagram";
 import type { LayoutOptions } from "./types";
+import { computeStratifiedFallbackLayout } from "./fallback";
 
 const elk = new ELK();
 
 /**
  * Pure layout function.
  * Maps a normalized DiagramModel into a PositionedModel using ELK.js layered layout.
+ * Gracefully falls back to stratified rank layout if ELK encounters unsupported subgraphs.
  */
 export async function layout(
   model: DiagramModel,
@@ -27,7 +29,20 @@ export async function layout(
   let layerSpacing = 50;
   let groupPadding = options.groupPadding ?? 30;
 
-  if (preset === "compact") {
+  // Semantic layout parameter tuning per diagram type
+  if (model.diagram_type === "er_diagram") {
+    nodeSpacing = options.nodeSpacing ?? (preset === "compact" ? 36 : 64);
+    layerSpacing = preset === "compact" ? 56 : 88;
+    groupPadding = 36;
+  } else if (model.diagram_type === "system_flow") {
+    nodeSpacing = options.nodeSpacing ?? (preset === "compact" ? 32 : 52);
+    layerSpacing = preset === "compact" ? 48 : 76;
+    groupPadding = 36;
+  } else if (model.diagram_type === "file_dependency" || model.diagram_type === "module_dependency") {
+    nodeSpacing = options.nodeSpacing ?? (preset === "compact" ? 24 : 44);
+    layerSpacing = preset === "compact" ? 36 : 60;
+    groupPadding = 32;
+  } else if (preset === "compact") {
     nodeSpacing = 24;
     layerSpacing = 36;
     groupPadding = 20;
@@ -38,7 +53,7 @@ export async function layout(
   }
 
   // Top padding must clear the group header bar (~42px) with comfortable breathing room
-  const groupPaddingTop = Math.max(groupPadding + 28, 58);
+  const groupPaddingTop = Math.max(groupPadding + 44, 76);
 
   // 1. Validate endpoints and detect dense graph for adaptive layout optimizations
   const validNodeIds = new Set<string>();
@@ -50,15 +65,13 @@ export async function layout(
   }
 
   const validEdges = model.edges.filter(
-    (edge) => validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
+    (edge) => validNodeIds.has(edge.from) && validNodeIds.has(edge.to) && edge.from !== edge.to
   );
 
   // Fallback / optimization: For large/dense graphs (>300 edges or >100 nodes),
-  // crossing minimization dominates runtime (O(E * N) to O(E^2)).
-  // Disabling crossing minimization (NONE) keeps layered hierarchy & orthogonal routing
-  // while bringing layout time under 1.5s.
+  // crossing minimization dominates runtime. Disabling crossing minimization (NONE) keeps
+  // layered hierarchy & orthogonal routing while bringing layout time under 1.5s.
   const isDenseGraph = validEdges.length > 300 || model.nodes.length > 100;
-  const crossingStrategy = isDenseGraph ? "NONE" : "LAYER_SWEEP";
 
   // Build lookup of groups
   const groupChildrenMap = new Map<string, any[]>();
@@ -67,24 +80,72 @@ export async function layout(
   }
 
   const rootChildren: any[] = [];
+  const externalChildren: any[] = [];
+  const allExternalNodes = model.nodes.filter((n) => n.kind === "external" && !n.group_id);
+  const shouldGroupExternals = allExternalNodes.length > 3;
 
   for (const node of model.nodes) {
     const size = getNodeSizeForKind(node.kind);
     const w = node.width > 0 ? node.width : size.width;
     const h = node.height > 0 ? node.height : size.height;
 
+    // Allocate sufficient layout footprint in ELK for styled cards without clipping
+    let minW = 210;
+    let minH = 64;
+    if (model.diagram_type === "er_diagram") {
+      minW = 240;
+      minH = Math.max(h, 72);
+    } else if (model.diagram_type === "system_flow") {
+      minW = 230;
+      minH = Math.max(h, 68);
+    }
+
+    const footprintW = Math.max(w, minW);
+    const footprintH = Math.max(h, minH);
+
     const elkNode = {
       id: node.id,
-      width: w,
-      height: h,
+      width: footprintW,
+      height: footprintH,
       labels: [{ text: node.label }],
     };
 
     if (node.group_id && groupChildrenMap.has(node.group_id)) {
       groupChildrenMap.get(node.group_id)!.push(elkNode);
+    } else if (node.kind === "external" && shouldGroupExternals) {
+      externalChildren.push(elkNode);
     } else {
       rootChildren.push(elkNode);
     }
+  }
+
+  // Check if graph has compound hierarchy (contains sub-groups or grouped externals)
+  const hasCompoundHierarchy = model.groups.length > 0 || externalChildren.length > 0;
+
+  // Critical fix for ELK hierarchy-aware processor:
+  // ELK layered layout with "elk.hierarchyHandling": "INCLUDE_CHILDREN" does not support
+  // "LAYER_SWEEP" crossing minimization on compound graphs with cross-hierarchy edges,
+  // throwing UnsupportedGraphException. For compound graphs, we use INTERACTIVE (or NONE for dense graphs).
+  const crossingStrategy = isDenseGraph
+    ? "NONE"
+    : hasCompoundHierarchy
+    ? "INTERACTIVE"
+    : "LAYER_SWEEP";
+
+  if (externalChildren.length > 0) {
+    rootChildren.push({
+      id: "group:layer:external",
+      labels: [{ text: "External Dependencies" }],
+      children: externalChildren,
+      layoutOptions: {
+        "elk.padding": "[top=30,left=16,bottom=16,right=16]",
+        "elk.algorithm": "layered",
+        "elk.direction": direction,
+        "elk.aspectRatio": "1.4",
+        "elk.spacing.nodeNode": "16",
+        "elk.layered.spacing.nodeNodeBetweenLayers": "24",
+      },
+    });
   }
 
   // Sort groups in layered top-to-bottom order: frontend, shared, backend, data, external
@@ -117,11 +178,13 @@ export async function layout(
         "elk.padding": `[top=${groupPaddingTop},left=${groupPadding},bottom=${groupPadding},right=${groupPadding}]`,
         "elk.algorithm": "layered",
         "elk.direction": direction,
+        "elk.separateConnectedComponents": "false",
+        "elk.spacing.componentComponent": "32",
         "elk.spacing.nodeNode": String(nodeSpacing),
         "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
         "elk.layered.thoroughness": "1",
         "elk.layered.cycleBreaking.strategy": "GREEDY",
-        "elk.layered.crossingMinimization.strategy": crossingStrategy,
+        "elk.layered.crossingMinimization.strategy": isDenseGraph ? "NONE" : "INTERACTIVE",
         "elk.layered.layering.strategy": "NETWORK_SIMPLEX",
         "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       },
@@ -129,12 +192,20 @@ export async function layout(
     existingIds.add(group.id);
   }
 
-  // 2. Build ELK edges
-  const elkEdges = validEdges.map((edge) => ({
+  // 2. Build ELK edges: deduplicate multiple parallel edges between the same (from, to) nodes
+  // so ELK doesn't blow up edge spacing channels into huge parallel stripes across the canvas
+  const uniqueElkPairs = new Map<string, { id: string; from: string; to: string }>();
+  for (const edge of validEdges) {
+    const pairKey = `${edge.from}->${edge.to}`;
+    if (!uniqueElkPairs.has(pairKey)) {
+      uniqueElkPairs.set(pairKey, { id: edge.id, from: edge.from, to: edge.to });
+    }
+  }
+
+  const elkEdges = Array.from(uniqueElkPairs.values()).map((edge) => ({
     id: edge.id,
     sources: [edge.from],
     targets: [edge.to],
-    labels: edge.label ? [{ text: edge.label, width: 80, height: 16 }] : [],
   }));
 
   // 3. Assemble root ELK graph
@@ -145,10 +216,12 @@ export async function layout(
       "elk.direction": direction,
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.layered.mergeEdges": "true",
-      "elk.aspectRatio": "1.6",
+      "elk.aspectRatio": model.diagram_type === "er_diagram" ? "1.3" : "1.6",
+      "elk.separateConnectedComponents": "false",
+      "elk.spacing.componentComponent": "48",
       "elk.spacing.nodeNode": String(nodeSpacing),
-      "elk.spacing.edgeNode": "20",
-      "elk.spacing.edgeEdge": "12",
+      "elk.spacing.edgeNode": "24",
+      "elk.spacing.edgeEdge": "16",
       "elk.layered.spacing.nodeNodeBetweenLayers": String(layerSpacing),
       "elk.hierarchyHandling": "INCLUDE_CHILDREN",
       "elk.layered.thoroughness": "2",
@@ -156,14 +229,29 @@ export async function layout(
       "elk.layered.crossingMinimization.strategy": crossingStrategy,
       "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
       "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+      "elk.layered.nodePlacement.favorStraightEdges": "true",
+      "elk.layered.compaction.postCompaction.strategy": "EDGE_LENGTH",
       "org.eclipse.elk.randomSeed": "1",
     },
     children: rootChildren,
     edges: elkEdges,
   };
 
-  // 4. Run ELK layout
-  const elkResult = await elk.layout(rootGraph);
+  // 4. Run ELK layout with resilient fallback
+  let elkResult: any;
+  try {
+    elkResult = await elk.layout(rootGraph);
+  } catch (layoutError) {
+    console.warn(
+      `[BuildBuddy Diagram Layout] ELK layout failed for ${model.diagram_type} (${model.nodes.length} nodes, ${model.edges.length} edges). Gracefully falling back to stratified rank layout. Error:`,
+      layoutError
+    );
+    return computeStratifiedFallbackLayout(model, {
+      direction: direction === "RIGHT" ? "RIGHT" : "DOWN",
+      nodeSpacingX: nodeSpacing,
+      nodeSpacingY: layerSpacing,
+    });
+  }
 
   // 5. Extract positioned nodes and groups
   const positionedNodes: PositionedNode[] = [];
@@ -180,8 +268,9 @@ export async function layout(
 
     if (origNodeMap.has(n.id)) {
       const origNode = origNodeMap.get(n.id)!;
-      const finalW = n.width && n.width > 0 ? n.width : origNode.width;
-      const finalH = n.height && n.height > 0 ? n.height : origNode.height;
+      const size = getNodeSizeForKind(origNode.kind);
+      const finalW = origNode.width && origNode.width > 0 ? origNode.width : size.width;
+      const finalH = origNode.height && origNode.height > 0 ? origNode.height : size.height;
       positionedNodes.push({
         ...origNode,
         x: absX,
@@ -265,40 +354,9 @@ export async function layout(
   }
 
   const positionedEdges: PositionedEdge[] = model.edges.map((edge) => {
-    let points = edgePointsMap.get(edge.id) ?? [];
-    if (points.length === 0) {
-      // Fallback orthogonal route respecting layout direction
-      const src = nodePosMap.get(edge.from);
-      const tgt = nodePosMap.get(edge.to);
-      if (src && tgt) {
-        if (direction === "RIGHT") {
-          const startX = src.x + src.w;
-          const startY = src.y + src.h / 2;
-          const endX = tgt.x;
-          const endY = tgt.y + tgt.h / 2;
-          const midX = (startX + endX) / 2;
-          points = [
-            { x: startX, y: startY },
-            { x: midX, y: startY },
-            { x: midX, y: endY },
-            { x: endX, y: endY },
-          ];
-        } else {
-          const startX = src.x + src.w / 2;
-          const startY = src.y + src.h;
-          const endX = tgt.x + tgt.w / 2;
-          const endY = tgt.y;
-          const midY = (startY + endY) / 2;
-          points = [
-            { x: startX, y: startY },
-            { x: startX, y: midY },
-            { x: endX, y: midY },
-            { x: endX, y: endY },
-          ];
-        }
-      }
-    }
-
+    const pairKey = `${edge.from}->${edge.to}`;
+    const primaryEdgeId = uniqueElkPairs.get(pairKey)?.id;
+    const points = (primaryEdgeId ? edgePointsMap.get(primaryEdgeId) : edgePointsMap.get(edge.id)) ?? [];
     return {
       ...edge,
       points,
@@ -309,6 +367,15 @@ export async function layout(
   positionedNodes.sort((a, b) => a.id.localeCompare(b.id));
   positionedEdges.sort((a, b) => a.id.localeCompare(b.id));
   positionedGroups.sort((a, b) => a.id.localeCompare(b.id));
+
+  // Safety check: if for any unexpected reason ELK returned an empty node list when nodes were provided
+  if (positionedNodes.length === 0 && model.nodes.length > 0) {
+    return computeStratifiedFallbackLayout(model, {
+      direction: direction === "RIGHT" ? "RIGHT" : "DOWN",
+      nodeSpacingX: nodeSpacing,
+      nodeSpacingY: layerSpacing,
+    });
+  }
 
   return {
     diagram_type: model.diagram_type,

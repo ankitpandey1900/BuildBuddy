@@ -172,19 +172,47 @@ impl DocStore {
         section_key: &str,
         content: &str,
     ) -> Result<()> {
+        Self::upsert_section(conn, project_id, doc_type, section_key, section_key, content)
+    }
+
+    pub fn upsert_section(
+        conn: &mut Connection,
+        project_id: i64,
+        doc_type: DocumentType,
+        section_key: &str,
+        title: &str,
+        content: &str,
+    ) -> Result<()> {
         let tx = conn.transaction()?;
         let doc_id: i64 = tx.query_row(
-            "SELECT id FROM documents WHERE project_id = ?1 AND doc_type = ?2",
-            params![project_id, doc_type.as_str()],
+            "INSERT INTO documents (project_id, doc_type, title, created_at, updated_at)
+             VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT(project_id, doc_type) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+             RETURNING id",
+            params![project_id, doc_type.as_str(), format!("{:?}: {}", doc_type, project_id)],
             |r| r.get(0),
         )?;
 
         let hash = blake3::hash(content.as_bytes()).to_hex().to_string();
+        
+        let sort_order: i32 = tx.query_row(
+            "SELECT COALESCE(MAX(sort_order), 0) + 10 FROM document_sections WHERE document_id = ?1",
+            params![doc_id],
+            |r| r.get(0),
+        ).unwrap_or(10);
+
         tx.execute(
-            "UPDATE document_sections
-             SET content = ?1, content_hash = ?2, state = 'user_edited', generated_at = CURRENT_TIMESTAMP
-             WHERE document_id = ?3 AND section_key = ?4",
-            params![content, hash, doc_id, section_key],
+            "INSERT INTO document_sections (
+                document_id, section_key, title, sort_order, content,
+                content_hash, state, generated_at, evidence_keys
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'user_edited', CURRENT_TIMESTAMP, '[]')
+             ON CONFLICT(document_id, section_key) DO UPDATE SET
+                 title = excluded.title,
+                 content = excluded.content,
+                 content_hash = excluded.content_hash,
+                 state = 'user_edited',
+                 generated_at = CURRENT_TIMESTAMP",
+            params![doc_id, section_key, title, sort_order, content, hash],
         )?;
 
         let next_rev: i64 = tx.query_row(

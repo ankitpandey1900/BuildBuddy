@@ -45,7 +45,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             end_column INTEGER NOT NULL,
             snippet TEXT,
             confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
-            evidence_type TEXT CHECK(evidence_type IN ('ast_node', 'manifest_entry', 'import_stmt', 'export_stmt', 'call_site', 'type_annotation', 'heuristic', 'config_file', 'source_pattern', 'entry_point')) NOT NULL,
+            evidence_type TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
 
@@ -428,6 +428,83 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
     // Backward-compatibility: add error_message column to files if upgrading existing DB
     conn.execute("ALTER TABLE files ADD COLUMN error_message TEXT", []).ok();
+
+    // Backward-compatibility: Ensure analysis_runs CHECK constraint allows 'scanned', 'parsing', 'analyzing'
+    let current_analysis_sql: Option<String> = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='analysis_runs'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+
+    if let Some(sql) = current_analysis_sql {
+        if !sql.contains("'scanned'") {
+            let _ = conn.execute_batch(
+                "PRAGMA foreign_keys = OFF;
+                 CREATE TABLE IF NOT EXISTS analysis_runs_migrated (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                     started_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                     completed_at DATETIME,
+                     status TEXT CHECK(status IN ('in_progress', 'scanned', 'parsing', 'analyzing', 'completed', 'failed', 'cancelled')) NOT NULL,
+                     is_incremental INTEGER DEFAULT 0 NOT NULL,
+                     files_discovered INTEGER DEFAULT 0 NOT NULL,
+                     files_scanned INTEGER DEFAULT 0 NOT NULL,
+                     files_parsed INTEGER DEFAULT 0 NOT NULL,
+                     duration_ms INTEGER,
+                     error_summary TEXT
+                 );
+                 INSERT INTO analysis_runs_migrated (id, project_id, started_at, completed_at, status, is_incremental, files_discovered, files_scanned, files_parsed, duration_ms, error_summary)
+                 SELECT id, project_id, started_at, completed_at, status, is_incremental, files_discovered, files_scanned, files_parsed, duration_ms, error_summary FROM analysis_runs;
+                 DROP TABLE analysis_runs;
+                 ALTER TABLE analysis_runs_migrated RENAME TO analysis_runs;
+                 PRAGMA foreign_keys = ON;"
+            );
+        }
+    }
+
+    // Backward-compatibility: Ensure source_evidence CHECK constraint allows all modern evidence types
+    let current_evidence_sql: Option<String> = conn
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='source_evidence'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+
+    if let Some(sql) = current_evidence_sql {
+        // If table has restrictive CHECK constraint on evidence_type, remove constraint so unexpected types never crash
+        let sql_lower = sql.to_lowercase();
+        if sql_lower.contains("evidence_type in") {
+            let _ = conn.execute("PRAGMA foreign_keys = OFF;", []);
+            let _ = conn.execute("DROP TABLE IF EXISTS source_evidence_migrated;", []);
+            let mig_res = conn.execute_batch(
+                "CREATE TABLE source_evidence_migrated (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                     file_path TEXT NOT NULL,
+                     start_line INTEGER NOT NULL,
+                     end_line INTEGER NOT NULL,
+                     start_column INTEGER NOT NULL,
+                     end_column INTEGER NOT NULL,
+                     snippet TEXT,
+                     confidence TEXT CHECK(confidence IN ('confirmed', 'static', 'inferred', 'unknown')) NOT NULL,
+                     evidence_type TEXT NOT NULL,
+                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                 );
+                 INSERT INTO source_evidence_migrated (id, project_id, file_path, start_line, end_line, start_column, end_column, snippet, confidence, evidence_type, created_at)
+                 SELECT id, project_id, file_path, start_line, end_line, start_column, end_column, snippet, confidence, evidence_type, created_at FROM source_evidence;
+                 DROP TABLE source_evidence;
+                 ALTER TABLE source_evidence_migrated RENAME TO source_evidence;
+                 CREATE INDEX IF NOT EXISTS idx_source_evidence_lookup ON source_evidence(project_id, file_path, start_line);"
+            );
+            if let Err(e) = mig_res {
+                eprintln!("Warning: Failed to migrate source_evidence schema: {}", e);
+            }
+            let _ = conn.execute("PRAGMA foreign_keys = ON;", []);
+        }
+    }
 
     // Backward-compatibility / auto-heal: backfill missing source_evidence_id in import_edges
     // to preserve all real relationships with complete provenance

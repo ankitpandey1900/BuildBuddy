@@ -62,11 +62,13 @@ pub async fn save_document_section(
     doc_type: String,
     section_key: String,
     content: String,
+    title: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let dtype = doc_type.parse::<DocumentType>().map_err(|e| e.to_string())?;
     let mut conn = state.conn().map_err(|e| e.to_string())?;
-    DocStore::update_section(&mut conn, project_id, dtype, &section_key, &content).map_err(|e| e.to_string())
+    let sec_title = title.as_deref().unwrap_or(&section_key);
+    DocStore::upsert_section(&mut conn, project_id, dtype, &section_key, sec_title, &content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -2,111 +2,316 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Dark Theme Default - 3 Layered Slate Surfaces */
-  --bg-canvas: #11151B;
-  --bg-surface: #191E26;
-  --bg-elevated: #252C36;
-  --bg-subtle: #222832;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.09);
+@layer base {
 
-  --text-primary: #F0F3F6;
-  --text-secondary: #C2CAD5;
-  --text-muted: #8994A3;
-  --text-faint: #4C5562;
+  :root,
+  .dark,
+  [data-theme='dark'] {
+    color-scheme: dark;
 
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-default: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.22);
-  --border-focus: #3B82F6;
+    /* Absolute Dark Mode (Tallymate Inspired: #0c0c0e, #141416, #27272a) */
+    --primary: 211 100% 52%;
+    /* #0A84FF Apple System Blue */
+    --primary-foreground: 0 0% 100%;
 
-  --accent-default: #4B8DF8;
-  --accent-hover: #6CA5FC;
-  --accent-subtle: rgba(75, 141, 248, 0.16);
-  --accent-text: #76ADFF;
+    --background: 240 11% 5%;
+    /* #0C0C0E absolute deep dark canvas */
+    --foreground: 240 5% 96%;
+    /* #F5F5F7 primary text */
 
-  /* Semantic status colors */
-  --status-success-bg: rgba(34, 197, 94, 0.14);
-  --status-success-text: #4ADE80;
-  --status-success-border: rgba(74, 222, 128, 0.35);
-  --status-warning-bg: rgba(234, 179, 8, 0.14);
-  --status-warning-text: #FACC15;
-  --status-warning-border: rgba(250, 204, 21, 0.35);
-  --status-danger-bg: rgba(239, 68, 68, 0.14);
-  --status-danger-text: #F87171;
-  --status-danger-border: rgba(248, 113, 113, 0.4);
+    --card: 240 5% 8%;
+    /* #141416 surface background */
+    --card-foreground: 240 5% 96%;
 
-  /* Domain / Architecture Layer Tokens */
-  --domain-frontend-bg: rgba(59, 130, 246, 0.12);
-  --domain-frontend-border: #60A5FA;
-  --domain-backend-bg: rgba(16, 185, 129, 0.12);
-  --domain-backend-border: #34D399;
-  --domain-database-bg: rgba(245, 158, 11, 0.12);
-  --domain-database-border: #FBBF24;
-  --domain-shared-bg: rgba(139, 92, 246, 0.12);
-  --domain-shared-border: #A78BFA;
-  --domain-config-bg: rgba(100, 116, 139, 0.12);
-  --domain-config-border: #94A3B8;
-  --domain-external-bg: rgba(236, 72, 153, 0.12);
-  --domain-external-border: #F472B6;
+    --popover: 240 7% 11%;
+    /* #1A1A1E elevated surface */
+    --popover-foreground: 240 5% 96%;
 
-  /* Elevation Shadows */
-  --shadow-menu: 0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
-  --shadow-modal: 0 16px 40px -8px rgba(0, 0, 0, 0.45), 0 4px 12px -2px rgba(0, 0, 0, 0.25);
+    --secondary: 240 6% 12%;
+    /* #1E1E22 */
+    --secondary-foreground: 240 5% 65%;
+    /* #A1A1AA secondary text */
+
+    --muted: 240 6% 12%;
+    /* #1E1E22 input surface */
+    --muted-foreground: 240 4% 46%;
+    /* #71717A muted text */
+
+    --accent: 211 100% 52%;
+    /* #0A84FF */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 5% 16%;
+    /* #27272A borders */
+    --input: 240 5% 16%;
+    /* #27272A */
+    --ring: 211 100% 52%;
+    /* #0A84FF */
+
+    --radius: 0.375rem;
+
+    /* Semantic Workbench Mappings */
+    --bg-canvas: #0C0C0E;
+    --bg-surface: #141416;
+    --bg-elevated: #1E1E22;
+    --bg-subtle: #1E1E22;
+    --bg-hover: #1C1C1F;
+    --bg-active: #27272A;
+
+    --text-primary: #F5F5F7;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
+    --text-faint: #52525B;
+
+    --border-subtle: #1F1F23;
+    --border-default: #27272A;
+    --border-strong: #3F3F46;
+    --border-focus: #0A84FF;
+
+    --accent-default: #0A84FF;
+    --accent-hover: #0071E3;
+    --accent-subtle: rgba(10, 132, 255, 0.12);
+    --accent-text: #0A84FF;
+
+    /* Semantic Status Colors (Restrained) */
+    --status-success-bg: rgba(48, 209, 88, 0.12);
+    --status-success-text: #30D158;
+    --status-success-border: rgba(48, 209, 88, 0.25);
+
+    --status-warning-bg: rgba(255, 159, 10, 0.12);
+    --status-warning-text: #FF9F0A;
+    --status-warning-border: rgba(255, 159, 10, 0.25);
+
+    --status-danger-bg: rgba(255, 69, 58, 0.12);
+    --status-danger-text: #FF453A;
+    --status-danger-border: rgba(255, 69, 58, 0.25);
+
+    --status-info-bg: rgba(10, 132, 255, 0.12);
+    --status-info-text: #0A84FF;
+    --status-info-border: rgba(10, 132, 255, 0.25);
+
+    /* Domain / Architectural Layer Tokens (Muted Neutral Accents) */
+    --domain-frontend-bg: rgba(10, 132, 255, 0.08);
+    --domain-frontend-border: #0A84FF;
+    --domain-backend-bg: rgba(94, 92, 230, 0.08);
+    --domain-backend-border: #5E5CE6;
+    --domain-database-bg: rgba(48, 209, 88, 0.08);
+    --domain-database-border: #30D158;
+    --domain-shared-bg: rgba(255, 159, 10, 0.08);
+    --domain-shared-border: #FF9F0A;
+    --domain-config-bg: rgba(191, 90, 242, 0.08);
+    --domain-config-border: #BF5AF2;
+    --domain-external-bg: rgba(142, 142, 147, 0.08);
+    --domain-external-border: #8E8E93;
+
+    /* Elevation Shadows */
+    --shadow-menu: 0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+    --shadow-modal: 0 12px 32px -4px rgba(0, 0, 0, 0.65), 0 2px 6px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .light,
+  [data-theme='light'] {
+    color-scheme: light;
+
+    /* Apple-Inspired Clarity Light Mode */
+    --primary: 211 100% 50%;
+    /* #007AFF Apple System Blue */
+    --primary-foreground: 0 0% 100%;
+
+    --background: 240 5% 96%;
+    /* #F5F5F7 main background */
+    --foreground: 240 4% 12%;
+    /* #1D1D1F primary text */
+
+    --card: 0 0% 100%;
+    /* #FFFFFF primary surface */
+    --card-foreground: 240 4% 12%;
+
+    --popover: 0 0% 100%;
+    /* #FFFFFF elevated surface */
+    --popover-foreground: 240 4% 12%;
+
+    --secondary: 220 9% 95%;
+    /* #F0F1F3 secondary surface */
+    --secondary-foreground: 240 3% 44%;
+    /* #6E6E73 secondary text */
+
+    --muted: 220 9% 95%;
+    /* #F0F1F3 */
+    --muted-foreground: 240 3% 57%;
+    /* #8E8E93 muted text */
+
+    --accent: 211 100% 50%;
+    /* #007AFF */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    /* #FF3B30 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 91%;
+    /* #E5E5EA borders */
+    --input: 0 0% 100%;
+    /* #FFFFFF */
+    --ring: 211 100% 50%;
+    /* #007AFF */
+
+    /* Semantic Workbench Mappings */
+    --bg-canvas: #F5F5F7;
+    --bg-surface: #FFFFFF;
+    --bg-elevated: #FFFFFF;
+    --bg-subtle: #F0F1F3;
+    --bg-hover: rgba(0, 0, 0, 0.04);
+    --bg-active: rgba(0, 0, 0, 0.07);
+
+    --text-primary: #1D1D1F;
+    --text-secondary: #6E6E73;
+    --text-muted: #8E8E93;
+    --text-faint: #AEAEB2;
+
+    --border-subtle: #EFEFF4;
+    --border-default: #E5E5EA;
+    --border-strong: #D1D1D6;
+    --border-focus: #007AFF;
+
+    --accent-default: #007AFF;
+    --accent-hover: #0062CC;
+    --accent-subtle: rgba(0, 122, 255, 0.08);
+    --accent-text: #007AFF;
+
+    /* Semantic Status Colors */
+    --status-success-bg: rgba(52, 199, 89, 0.10);
+    --status-success-text: #34C759;
+    --status-success-border: rgba(52, 199, 89, 0.22);
+
+    --status-warning-bg: rgba(255, 149, 0, 0.10);
+    --status-warning-text: #FF9500;
+    --status-warning-border: rgba(255, 149, 0, 0.22);
+
+    --status-danger-bg: rgba(255, 59, 48, 0.10);
+    --status-danger-text: #FF3B30;
+    --status-danger-border: rgba(255, 59, 48, 0.22);
+
+    --status-info-bg: rgba(0, 122, 255, 0.10);
+    --status-info-text: #007AFF;
+    --status-info-border: rgba(0, 122, 255, 0.22);
+
+    /* Architectural Layer Tokens */
+    --domain-frontend-bg: rgba(0, 122, 255, 0.06);
+    --domain-frontend-border: #007AFF;
+    --domain-backend-bg: rgba(88, 86, 214, 0.06);
+    --domain-backend-border: #5856D6;
+    --domain-database-bg: rgba(52, 199, 89, 0.06);
+    --domain-database-border: #34C759;
+    --domain-shared-bg: rgba(255, 149, 0, 0.06);
+    --domain-shared-border: #FF9500;
+    --domain-config-bg: rgba(175, 82, 222, 0.06);
+    --domain-config-border: #AF52DE;
+    --domain-external-bg: rgba(142, 142, 147, 0.06);
+    --domain-external-border: #8E8E93;
+
+    /* Elevation Shadows */
+    --shadow-menu: 0 4px 16px -2px rgba(0, 0, 0, 0.08), 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    --shadow-modal: 0 12px 32px -4px rgba(0, 0, 0, 0.12), 0 2px 6px 0 rgba(0, 0, 0, 0.06);
+  }
 }
 
-[data-theme='light'] {
-  --bg-canvas: #F6F7F9;
-  --bg-surface: #FFFFFF;
-  --bg-elevated: #F0F2F5;
-  --bg-subtle: #F0F2F5;
-  --bg-hover: rgba(0, 0, 0, 0.04);
-  --bg-active: rgba(0, 0, 0, 0.07);
+/* React Flow MiniMap Theme Integration */
+.react-flow__minimap {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-default) !important;
+}
 
-  --text-primary: #191C21;
-  --text-secondary: #4B535E;
-  --text-muted: #6E7783;
-  --text-faint: #9AA2AD;
+.dark .react-flow__minimap-mask,
+[data-theme='dark'] .react-flow__minimap-mask {
+  fill: rgba(17, 18, 20, 0.75) !important;
+}
 
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-default: rgba(0, 0, 0, 0.12);
-  --border-strong: rgba(0, 0, 0, 0.22);
-  --border-focus: #2563EB;
+.light .react-flow__minimap-mask,
+[data-theme='light'] .react-flow__minimap-mask {
+  fill: rgba(245, 245, 247, 0.75) !important;
+}
 
-  --accent-default: #2563EB;
-  --accent-hover: #1D4ED8;
-  --accent-subtle: rgba(37, 99, 235, 0.10);
-  --accent-text: #2563EB;
+/* Apple System Typography and Selection */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-primary);
+  background-color: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  /* Semantic status colors */
-  --status-success-bg: rgba(22, 163, 74, 0.10);
-  --status-success-text: #16A34A;
-  --status-success-border: rgba(22, 163, 74, 0.28);
-  --status-warning-bg: rgba(202, 138, 4, 0.10);
-  --status-warning-text: #CA8A04;
-  --status-warning-border: rgba(202, 138, 4, 0.28);
-  --status-danger-bg: rgba(220, 38, 38, 0.10);
-  --status-danger-text: #DC2626;
-  --status-danger-border: rgba(220, 38, 38, 0.28);
+/* Minimal Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
 
-  /* Domain / Architecture Layer Tokens */
-  --domain-frontend-bg: rgba(37, 99, 235, 0.08);
-  --domain-frontend-border: #2563EB;
-  --domain-backend-bg: rgba(5, 150, 105, 0.08);
-  --domain-backend-border: #059669;
-  --domain-database-bg: rgba(217, 119, 6, 0.08);
-  --domain-database-border: #D97706;
-  --domain-shared-bg: rgba(124, 58, 237, 0.08);
-  --domain-shared-border: #7C3AED;
-  --domain-config-bg: rgba(71, 85, 105, 0.08);
-  --domain-config-border: #475569;
-  --domain-external-bg: rgba(219, 39, 119, 0.08);
-  --domain-external-border: #DB2777;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  /* Elevation Shadows */
-  --shadow-menu: 0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 16px 40px -8px rgba(0, 0, 0, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Accessible Focus Ring: 2px solid on :focus-visible only */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+/* Respect Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* React Flow MiniMap Theme Integration */
+.react-flow__minimap {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-default) !important;
+}
+
+.dark .react-flow__minimap-mask,
+[data-theme='dark'] .react-flow__minimap-mask {
+  fill: rgba(14, 15, 19, 0.75) !important;
+}
+
+.light .react-flow__minimap-mask,
+[data-theme='light'] .react-flow__minimap-mask {
+  fill: rgba(248, 250, 252, 0.75) !important;
 }
 
 /* System Typography and Selection */
@@ -143,13 +348,16 @@ body {
 :focus {
   outline: none;
 }
+
 :focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 1px;
 }
+
 .focus-ring {
   outline: none;
 }
+
 .focus-ring:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 1px;
@@ -157,6 +365,7 @@ body {
 
 /* Respect Prefers Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   ::before,
   ::after {

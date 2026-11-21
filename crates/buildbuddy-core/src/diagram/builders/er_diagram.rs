@@ -52,7 +52,7 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
         "SELECT t.id, t.name, t.file_path, t.start_line, t.end_line, t.confidence,
                 t.source_evidence_id, COALESCE(se.snippet, '')
          FROM database_tables t
-         JOIN source_evidence se ON t.source_evidence_id = se.id
+         LEFT JOIN source_evidence se ON t.source_evidence_id = se.id
          WHERE t.project_id = ?1
          ORDER BY t.name ASC",
     )?;
@@ -81,7 +81,7 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
             start_line: row.get::<_, i64>(3)? as usize,
             end_line: row.get::<_, i64>(4)? as usize,
             snippet: row.get(7)?,
-            _evidence_id: row.get(6)?,
+            _evidence_id: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
         })
     })?;
 
@@ -122,12 +122,24 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
                 row.get::<_, i64>(2)? != 0,
                 row.get::<_, i64>(3)? != 0,
                 row.get::<_, i64>(4)? as usize,
-                row.get::<_, i64>(5)?,
+                row.get::<_, Option<i64>>(5)?.unwrap_or(0),
             ))
         })?.collect::<Result<Vec<_>>>()?;
 
         let field_count = fields.len();
         let height = (field_count as f64 * 22.0 + 44.0).max(64.0);
+
+        let member_fields: Vec<String> = fields
+            .iter()
+            .map(|(name, dtype, is_pk, is_fk, _, _)| {
+                format!(
+                    "{}|{}|{}",
+                    if *is_pk { "PK" } else if *is_fk { "FK" } else { "-" },
+                    name,
+                    dtype
+                )
+            })
+            .collect();
 
         nodes.push(DiagramNode {
             id: node_id.clone(),
@@ -148,10 +160,11 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
                 import_count: None,
                 complexity: None,
             }),
+            members: member_fields,
         });
 
         // Check each field for FK
-        for (field_name, _dtype, _is_pk, is_fk, _line, ev_id) in &fields {
+        for (field_name, dtype, _is_pk, is_fk, _line, ev_id) in &fields {
             if *is_fk {
                 // Determine target table from snippet lines
                 let mut target_table_opt = None;
@@ -160,6 +173,16 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
                         if let Some(target) = parse_referenced_table(line) {
                             target_table_opt = Some(target);
                             break;
+                        }
+                    }
+                }
+
+                // If not found via SQL REFERENCES, check if declared_type matches another table/model (Prisma / ORM)
+                if target_table_opt.is_none() {
+                    let clean_target = dtype.trim_end_matches("[]").trim_end_matches('?').trim();
+                    if !clean_target.is_empty() {
+                        if let Some(matched) = table_rows.iter().find(|t| t.name.eq_ignore_ascii_case(clean_target)) {
+                            target_table_opt = Some(matched.name.clone());
                         }
                     }
                 }
@@ -178,6 +201,7 @@ pub fn build_er_diagram(conn: &Connection, project_id: i64) -> Result<DiagramRep
                             height: 64.0,
                             source_ref: None,
                             metrics: None,
+                            members: Vec::new(),
                         });
                     }
 

@@ -82,18 +82,18 @@ export const PipelineProgress: React.FC<PipelineProgressProps> = ({
                   )}
                   <div
                     data-testid={`pipeline-stage-${s.id}`}
-                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
                       isFailed
                         ? "text-status-danger-text bg-status-danger-bg/40 font-semibold"
                         : isActive
-                        ? "text-accent bg-accent-subtle font-semibold"
+                        ? "text-white bg-neutral-800 dark:bg-[#27272a] shadow-xs font-semibold"
                         : isPast
                         ? "text-text-secondary"
                         : "text-text-muted"
                     }`}
                   >
                     {isActive ? (
-                      <Loader2 className="w-2.5 h-2.5 animate-spin text-accent" />
+                      <Loader2 className="w-2.5 h-2.5 animate-spin text-status-success-text" />
                     ) : isPast ? (
                       <CheckCircle2 className="w-2.5 h-2.5 text-status-success-text" />
                     ) : null}
@@ -135,14 +135,14 @@ export const PipelineProgress: React.FC<PipelineProgressProps> = ({
 
       {/* Progress Bar */}
       {stage !== "error" && (
-        <div className="w-full h-1 bg-subtle rounded-full overflow-hidden relative">
+        <div className="w-full h-0.5 bg-border-subtle rounded-full overflow-hidden relative">
           {percent !== null ? (
             <div
-              className="h-full bg-accent transition-all duration-150 ease-out rounded-full"
+              className="h-full bg-status-success-text transition-all duration-150 ease-out rounded-full"
               style={{ width: `${percent}%` }}
             />
           ) : (
-            <div className="h-full bg-accent w-1/3 rounded-full animate-pulse" />
+            <div className="h-full bg-status-success-text w-1/3 rounded-full animate-pulse" />
           )}
         </div>
       )}

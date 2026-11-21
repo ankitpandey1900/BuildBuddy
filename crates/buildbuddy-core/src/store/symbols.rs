@@ -146,7 +146,7 @@ pub fn persist_file_parse_result(
             "INSERT INTO source_evidence (
                 project_id, file_path, start_line, end_line, start_column, end_column,
                 snippet, confidence, evidence_type
-            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 'export_stmt')",
+            ) VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 'ast_node')",
         )?;
 
         let mut export_stmt = tx.prepare(

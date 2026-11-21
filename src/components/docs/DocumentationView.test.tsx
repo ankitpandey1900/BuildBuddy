@@ -82,4 +82,19 @@ describe("DocumentationView Component", () => {
 
     expect(screen.getByText("Revision History")).toBeInTheDocument();
   });
+
+  it("renders New ADR button when ADRs document is selected and opens modal", () => {
+    const adrDocument: GeneratedDocument = {
+      doc_type: "adrs",
+      title: "Architecture Decision Records: TestProject",
+      sections: [],
+    };
+    render(<DocumentationView projectId={1} initialDocument={adrDocument} />);
+
+    const newAdrBtn = screen.getByRole("button", { name: /New ADR/i });
+    expect(newAdrBtn).toBeInTheDocument();
+
+    fireEvent.click(newAdrBtn);
+    expect(screen.getByText("New Architecture Decision Record")).toBeInTheDocument();
+  });
 });

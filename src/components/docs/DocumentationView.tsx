@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ChevronRight,
   FileBarChart,
+  Plus,
 } from "lucide-react";
 import type {
   DocumentType,
@@ -24,6 +25,8 @@ import {
   generateDocument,
   saveDocumentSection,
   listDocumentRevisions,
+  exportDocument,
+  isTauri,
 } from "@/lib/tauri";
 import {
   Badge,
@@ -32,9 +35,11 @@ import {
   SegmentedControl,
 } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { NewAdrModal } from "./NewAdrModal";
 
 export interface DocumentationViewProps {
   projectId?: number | null;
+  lastAnalysisRunId?: number;
   onNavigateToFileLine?: (filePath: string, line: number) => void;
   initialDocument?: GeneratedDocument | null;
 }
@@ -105,6 +110,7 @@ const DOCUMENT_ITEMS: DocumentItemConfig[] = [
 
 export const DocumentationView: React.FC<DocumentationViewProps> = ({
   projectId,
+  lastAnalysisRunId,
   onNavigateToFileLine,
   initialDocument,
 }) => {
@@ -129,6 +135,9 @@ export const DocumentationView: React.FC<DocumentationViewProps> = ({
   // Section Editing State
   const [editedSections, setEditedSections] = useState<Record<string, string>>({});
   const [savingSection, setSavingSection] = useState<string | null>(null);
+
+  // New ADR Modal State
+  const [isNewAdrOpen, setIsNewAdrOpen] = useState(false);
 
   // Load document on change
   useEffect(() => {
@@ -160,7 +169,7 @@ export const DocumentationView: React.FC<DocumentationViewProps> = ({
     listDocumentRevisions(projectId, selectedType)
       .then(setRevisions)
       .catch(() => setRevisions([]));
-  }, [projectId, selectedType, initialDocument]);
+  }, [projectId, selectedType, lastAnalysisRunId, initialDocument]);
 
   const handleRegenerate = async () => {
     if (!projectId) return;
@@ -202,9 +211,32 @@ export const DocumentationView: React.FC<DocumentationViewProps> = ({
     }
   };
 
-  const handleExport = (format: "markdown" | "html") => {
+  const handleExport = async (format: "markdown" | "html") => {
     if (!document) return;
     const filenameBase = `${selectedType}_${new Date().toISOString().slice(0, 10)}`;
+    const ext = format === "markdown" ? "md" : "html";
+
+    if (isTauri() && projectId) {
+      try {
+        const { save } = await import("@tauri-apps/plugin-dialog");
+        const filePath = await save({
+          defaultPath: `${filenameBase}.${ext}`,
+          filters: [
+            {
+              name: format === "markdown" ? "Markdown Document" : "HTML Document",
+              extensions: [ext],
+            },
+          ],
+        });
+        if (filePath) {
+          await exportDocument(projectId, selectedType, format, filePath);
+          return;
+        }
+      } catch (err) {
+        console.warn("Native file save dialog failed or cancelled, falling back to browser download:", err);
+      }
+    }
+
     const fullMd = document.sections
       .map((sec) => `## ${sec.title}\n\n${sec.content}`)
       .join("\n\n---\n\n");
@@ -280,11 +312,10 @@ th { background: #f6f8fa; }
                 key={item.type}
                 type="button"
                 onClick={() => setSelectedType(item.type)}
-                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-md text-left transition-colors focus-ring ${
-                  isSelected
-                    ? "bg-elevated text-text-primary font-medium"
-                    : "text-text-secondary hover:text-text-primary hover:bg-hover"
-                }`}
+                className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-md text-left transition-colors focus-ring ${isSelected
+                  ? "bg-elevated text-text-primary font-medium"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+                  }`}
               >
                 <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isSelected ? "text-accent" : "text-text-muted"}`} />
                 <div className="min-w-0 flex-1">
@@ -329,6 +360,18 @@ th { background: #f6f8fa; }
               value={mode}
               onChange={(v) => setMode(v as "preview" | "edit")}
             />
+
+            {/* New ADR Button (when in ADRs view) */}
+            {selectedType === "adrs" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Plus className="w-3.5 h-3.5" />}
+                onClick={() => setIsNewAdrOpen(true)}
+              >
+                New ADR
+              </Button>
+            )}
 
             {/* Revisions button */}
             <Button
@@ -402,9 +445,9 @@ th { background: #f6f8fa; }
                   Return to Live Document
                 </Button>
               </div>
-              <pre className="font-mono text-body text-text-primary whitespace-pre-wrap leading-relaxed">
-                {selectedRevision.content_markdown}
-              </pre>
+              <div className="py-2">
+                <MarkdownRenderer content={selectedRevision.content_markdown} />
+              </div>
             </article>
           ) : document && document.sections.length > 0 ? (
             <div className="max-w-4xl mx-auto space-y-6">
@@ -415,8 +458,8 @@ th { background: #f6f8fa; }
                   section.state === "user_edited"
                     ? "accent"
                     : section.state === "stale"
-                    ? "warning"
-                    : "neutral";
+                      ? "warning"
+                      : "neutral";
 
                 return (
                   <article
@@ -540,11 +583,10 @@ th { background: #f6f8fa; }
                     key={rev.revision_number}
                     type="button"
                     onClick={() => setSelectedRevision(rev)}
-                    className={`w-full p-3 rounded-md text-left border transition-colors focus-ring ${
-                      isSelected
-                        ? "border-accent bg-accent-subtle/30"
-                        : "border-border-default bg-elevated/40 hover:bg-hover"
-                    }`}
+                    className={`w-full p-3 rounded-md text-left border transition-colors focus-ring ${isSelected
+                      ? "border-accent bg-accent-subtle/30"
+                      : "border-border-default bg-elevated/40 hover:bg-hover"
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-semibold text-text-primary text-body">
@@ -562,6 +604,26 @@ th { background: #f6f8fa; }
           </div>
         </aside>
       )}
+
+      {/* New ADR Creation Modal */}
+      <NewAdrModal
+        isOpen={isNewAdrOpen}
+        onClose={() => setIsNewAdrOpen(false)}
+        existingAdrCount={document?.sections.length || 0}
+        onSave={async (sectionKey, title, content) => {
+          if (!projectId) return;
+          await saveDocumentSection(projectId, "adrs", sectionKey, content, title);
+          const doc = await getDocument(projectId, "adrs");
+          setDocument(doc);
+          const initialEdits: Record<string, string> = {};
+          for (const sec of doc.sections) {
+            initialEdits[sec.section_key] = sec.content;
+          }
+          setEditedSections(initialEdits);
+          const revs = await listDocumentRevisions(projectId, "adrs");
+          setRevisions(revs);
+        }}
+      />
     </div>
   );
 };

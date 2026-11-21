@@ -23,6 +23,8 @@ import type {
   GeneratedDocument,
   DocumentRevision,
   DocumentExportResult,
+  PackageInventoryItem,
+  FileIntelligenceDto,
 } from "@/types/ipc";
 import type {
   DiagramOptions,
@@ -345,10 +347,11 @@ export async function saveDocumentSection(
   projectId: number,
   docType: DocumentType,
   sectionKey: string,
-  content: string
+  content: string,
+  title?: string
 ): Promise<void> {
   if (!isTauri()) return;
-  await tauriInvoke("save_document_section", { projectId, docType, sectionKey, content });
+  await tauriInvoke("save_document_section", { projectId, docType, sectionKey, content, title: title ?? null });
 }
 
 export async function listDocumentRevisions(
@@ -373,6 +376,17 @@ export async function exportDocument(
     targetPath,
   });
 }
+
+export async function getPackageInventory(projectId: number): Promise<PackageInventoryItem[]> {
+  if (!isTauri()) return [];
+  return await tauriInvoke<PackageInventoryItem[]>("get_package_inventory", { projectId });
+}
+
+export async function getFileIntelligence(projectId: number, filePath: string): Promise<FileIntelligenceDto | null> {
+  if (!isTauri()) return null;
+  return await tauriInvoke<FileIntelligenceDto | null>("get_file_intelligence", { projectId, filePath });
+}
+
 
 
 

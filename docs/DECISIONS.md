@@ -556,12 +556,69 @@ The prior behavior hid the ReactFlow canvas entirely whenever `edges.length === 
 3. **Interactive Mermaid Diagram Viewer (`MermaidViewer.tsx`)**:
    - Added an interactive visual diagram renderer in `DocumentationView` supporting zoom (`+`, `-`, fit), pan, copy syntax, and fullscreen toggle matching workbench visual tokens.
 
+## 13. Pipeline Lifecycle & UI Reactive Refresh Wiring
 
+### Decision
+1. **Pipeline Execution Reporting**: In `start_scan` (`src-tauri/src/commands/scanner.rs`), `ScanCompletePayload.total_files` is set to the real count of indexed repository files from SQLite rather than the internal architecture graph node count.
+2. **Race-Condition Guard in Architecture Overview**: In `get_overview_data` (`src-tauri/src/commands/arch.rs`), auto-populating architecture via the legacy standalone analyzer is disabled whenever an automated pipeline run is actively executing or has already completed. This prevents concurrent read/write churn against partially inserted tables.
+3. **Reactive UI State Propagation**:
+   - `useProjectState()` in `src/stores/projectStore.ts` exposes `lastAnalysisRunId` derived from `scanSummary.analysis_run_id`.
+   - `OverviewView`, `CodeIntelligenceView`, `DependenciesView`, `ApiView`, and `DatabaseView` accept `lastAnalysisRunId` and include it in their respective `useEffect` / `fetchSymbols` / `loadData` dependency arrays.
+   - When background analysis finishes, all open views automatically re-query SQLite without requiring user interaction or full app restarts.
+   - During scanning, `OverviewView` displays active pipeline progress (`Analyzing repository...` and current file indicator) instead of showing an empty or 0-metric state.## 14. Engineering Workbench UI Reconstruction & Design System Architecture
 
+### Decision
 
+1. **Central Token Architecture**:
+   - Established `src/design-system/tokens/` containing centralized `colors`, `typography`, and `spacing` definitions.
+   - **Color System**: Layered charcoal dark palette (`#0d0e12`, `#14161d`, `#1a1d26`) and crisp neutral light palette (`#f8fafc`, `#ffffff`, `#f1f5f9`). Single restrained brand accent (precision orange `#ea580c` / `#f97316`). Semantic status and architectural layer tokens are desaturated and purpose-driven.
+   - **Typography**: Native system font stack (`Segoe UI Variable`, `SF Pro`, system UI) with monospace reserved strictly for code, hashes, file paths, and identifiers. Scale: 11 / 12 / 13 / 15 / 20 / 28 px.
+   - **Spacing & Elevation**: Strict 4px spacing grid, controlled component radii (6px sm, 10px md, 14px lg), 1px low-contrast borders, and elevation only for floating overlays.
 
+2. **Zero-AI Aesthetic Standard**:
+   - Eliminated all decorative gradients, glowing borders, floating assistant buttons, and cartoon badges.
+   - Established a calm, high-density desktop engineering workbench standard modeled on SpaceX telemetry consoles, Linear navigation discipline, Apple typography restraint, and Cursor productivity.
 
+3. **Application Shell & Navigation**:
+   - `TopBar`: Compact 48px header with workspace switcher, global search (Command Palette trigger), background scan status with file counter, theme toggle, and dedicated Settings trigger.
+   - `NavRail`: 10-screen primary navigation grouped into Explore, Analyze, and Document. Supports icon-only collapsed mode and expanded mode with filled pill active indicators without hard borders.
+   - `StatusBar`: 24px bottom footer with path display, file & line counters, offline engine guarantee, and keyboard shortcut indicators.
+   - `SettingsModal`: Workbench preferences modal supporting dark/light theme switching, 100% offline engine guarantees, and keyboard navigation reference.
+   - `Global Shortcuts`: Added `⌘B`/`Ctrl+B` (toggle sidebar), `⌘I`/`Ctrl+I` (toggle inspector), `⌘K`/`Ctrl+K` (command palette), `⌘,`/`Ctrl+,` (settings), and `⌘O`/`Ctrl+O` (open project).
 
+4. **Integration & Provenance Preservation**:
+   - Preserved all 100% offline analysis contracts, SQLite FTS5 symbol queries, ELK.js layout algorithms, and provenance labels (`confirmed`, `static`, `inferred`, `unknown`).
+
+## 15. Professional Architecture Diagrams & Graph Layout Resilience
+
+### Decision
+
+1. **ELK Hierarchy-Aware Processor Crossing Strategy**:
+   - ELK.js layered layout with `"elk.hierarchyHandling": "INCLUDE_CHILDREN"` does not support `"LAYER_SWEEP"` on compound graphs with cross-hierarchy edges, throwing `UnsupportedGraphException`.
+   - The layout engine dynamically detects compound hierarchy (`model.groups.length > 0 || externalChildren.length > 0`). When compound hierarchy is present, crossing minimization is set to `"INTERACTIVE"` (or `"NONE"` for dense graphs with >300 edges or >100 nodes). Flat graphs continue to use `"LAYER_SWEEP"` or `"NONE"`.
+
+2. **Resilient Stratified Rank Fallback Engine**:
+   - Created `src/diagram/layout/fallback.ts` implementing `computeStratifiedFallbackLayout`.
+   - Computes deterministic topological depth ranks using Kahn's algorithm and BFS longest path, assigning stratified tiers and enclosing bounding boxes.
+   - In `engine.ts`, `elk.layout(rootGraph)` is wrapped in a `try...catch` block. If ELK encounters any unsupported subgraph, it logs a warning and falls back to `computeStratifiedFallbackLayout`, ensuring 100% layout resilience and zero UI crashes.
+
+3. **Semantic Diagram Layout Tuning**:
+   - **ER Diagrams**: Configured with lateral card spacing (`nodeSpacing: 64`), vertical layer clearance (`layerSpacing: 88`), and minimum footprint allocation (`width: 240, height: 72`) to eliminate overlapping tables.
+   - **Multi-Tier Architecture (`system_flow`)**: Configured with tier-to-tier spacing (`layerSpacing: 76`, `nodeSpacing: 52`), aspect ratio 1.4, and grouped architectural containers.
+   - **Dependency Graphs**: Aspect ratio 1.6 with balanced straight edges (`BRANDES_KOEPF` node placement) and adaptive edge merging.
+
+4. **Professional Database ER Modeling**:
+   - Redesigned `ErEntityNodeComponent` into rectangular schema cards displaying table name, column count badge, primary keys (gold `Key` indicator), and foreign keys (accent `Link2` indicator).
+   - Added progressive disclosure for large schemas: schemas exceeding 5 fields display primary/foreign keys with a toggle to expand/collapse remaining columns.
+   - Added standard crow's-foot cardinality SVG markers (`bb-crowfoot` on N-side, `bb-one` on 1-side) in `DiagramLegend` and `OrthogonalEdge`.
+
+5. **Structured Multi-Tier Engineering Workbench**:
+   - Rebuilt `SystemFlowView` to render on the structured React Flow canvas (`viewFormat = "graph"`) by default using ELK layered tiers, rather than routing directly to freehand Excalidraw sketching.
+   - Structured three distinct architectural views:
+     - Multi-Tier Architecture: Presentation Layer -> Application / API Layer -> Data Access Layer -> External Services.
+     - System Protocol Flow: Inbound Client Entry -> Application Engine -> Database Cluster -> External Ecosystem.
+     - Operational Data Flow: Sequential user action -> API verify -> ORM mutation -> state hydration response.
+   - Excalidraw is preserved strictly as an optional whiteboard canvas mode (`viewFormat = "whiteboard"`), and Mermaid code is available via `viewFormat = "mermaid"`.
 
 
 

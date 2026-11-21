@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { TopBar } from "./TopBar";
 import { NavRail } from "./NavRail";
 import { InspectorPanel } from "./InspectorPanel";
 import { StatusBar } from "./StatusBar";
 import { PipelineProgress } from "@/components/pipeline/PipelineProgress";
+import { SettingsModal } from "@/components/settings/SettingsModal";
 import type { FileRecord, Project, ScanProgressPayload, SymbolRecord, ViewType } from "@/types/ipc";
 import type { SelectedDiagramElement } from "@/types/diagram";
 
@@ -64,6 +65,37 @@ export const AppShell: React.FC<AppShellProps> = ({
   onNavigateToSource,
   children,
 }) => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle nav sidebar with Cmd/Ctrl + B
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsNavCollapsed((prev) => !prev);
+      }
+      // Toggle inspector with Cmd/Ctrl + I
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
+        e.preventDefault();
+        onToggleInspector();
+      }
+      // Open settings with Cmd/Ctrl + ,
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+      // Open folder with Cmd/Ctrl + O
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        onOpenFolder();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onToggleInspector, onOpenFolder]);
+
   return (
     <div className="h-screen w-full flex flex-col bg-canvas text-text-primary overflow-hidden font-sans">
       <TopBar
@@ -79,6 +111,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onCancelScan={onCancelScan}
         onToggleTheme={onToggleTheme}
         onOpenCommandPalette={onOpenCommandPalette}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {isScanning && (
@@ -97,7 +130,12 @@ export const AppShell: React.FC<AppShellProps> = ({
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        <NavRail activeView={activeView} onSelectView={onSelectView} />
+        <NavRail
+          activeView={activeView}
+          onSelectView={onSelectView}
+          isCollapsed={isNavCollapsed}
+          onToggleCollapse={() => setIsNavCollapsed((prev) => !prev)}
+        />
 
         <main className="flex-1 min-w-0 flex overflow-hidden bg-canvas">
           {children}
@@ -114,6 +152,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           onClearDiagramElement={onClearDiagramElement}
           onSelectSymbol={onSelectSymbol}
           onNavigateToSource={onNavigateToSource}
+          onTriggerScan={onTriggerScan}
         />
       </div>
 
@@ -121,6 +160,13 @@ export const AppShell: React.FC<AppShellProps> = ({
         currentProject={currentProject}
         files={files}
         isScanning={isScanning}
+      />
+
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
       />
     </div>
   );

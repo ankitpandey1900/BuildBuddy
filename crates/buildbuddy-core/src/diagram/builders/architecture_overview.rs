@@ -86,6 +86,7 @@ pub fn build_architecture_overview_diagram(
                 import_count: None,
                 complexity: None,
             }),
+            members: Vec::new(),
         });
     }
 
@@ -139,6 +140,7 @@ pub fn build_architecture_overview_diagram(
                 end_line,
             }),
             metrics: None,
+            members: Vec::new(),
         });
 
         if let Some(mod_id) = target_mod_id {
@@ -269,6 +271,7 @@ pub fn build_architecture_overview_diagram(
             height: ext_h,
             source_ref: None,
             metrics: None,
+            members: Vec::new(),
         });
 
         if let Some(ev_id) = ev_id_opt {

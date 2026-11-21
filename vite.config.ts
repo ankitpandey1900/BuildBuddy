@@ -6,6 +6,9 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  define: {
+    "process.env.IS_PREACT": JSON.stringify("false"),
+  },
   server: {
     port: 5173,
     strictPort: true,

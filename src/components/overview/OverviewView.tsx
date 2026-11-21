@@ -8,14 +8,19 @@ import {
   Boxes,
   AlertTriangle,
   FolderGit2,
+  Network,
+  Database,
 } from "lucide-react";
 import type {
   FrameworkDetection,
   OverviewDataDto,
   Project,
   ViewType,
+  PackageInventoryItem,
+  ApiEndpoint,
+  DatabaseTable,
 } from "@/types/ipc";
-import { getOverviewData } from "@/lib/tauri";
+import { getOverviewData, getPackageInventory, getApiEndpoints, getDatabaseTables } from "@/lib/tauri";
 import { FrameworkEvidenceModal } from "./FrameworkEvidenceModal";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -31,21 +36,24 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 
-/** Distinct neutral palette for language slices — engineering-readable, not AI-gradient */
+/** Distinct neutral palette for language slices — Tallymate & engineering-grade */
 const CHART_COLORS = [
-  "#4D9EF7", // blue
-  "#56C99A", // green
-  "#F5A623", // amber
-  "#9B8AFB", // purple
-  "#F87171", // rose
-  "#67C8E8", // teal
-  "#A8B3C0", // slate
-  "#C8D1D9", // light gray
+  "#818cf8", // indigo
+  "#34d399", // emerald
+  "#fbbf24", // amber
+  "#22d3ee", // cyan
+  "#fb7185", // rose
+  "#a78bfa", // purple
+  "#2dd4bf", // teal
+  "#f472b6", // pink
 ];
 
 interface OverviewViewProps {
   projectId?: number;
   currentProject: Project | null;
+  lastAnalysisRunId?: number;
+  isScanning?: boolean;
+  scanProgress?: { stage?: string; current_file?: string; files_scanned?: number } | null;
   onNavigateToView: (view: ViewType) => void;
   onNavigateToFileLine?: (filePath: string, line: number) => void;
   onFilterFilesByLanguage?: (lang: string) => void;
@@ -77,6 +85,9 @@ const formatAnalyzedAt = (iso?: string | null, durationMs?: number | null) => {
 export const OverviewView: React.FC<OverviewViewProps> = ({
   projectId,
   currentProject,
+  lastAnalysisRunId,
+  isScanning,
+  scanProgress,
   onNavigateToView,
   onNavigateToFileLine,
   onFilterFilesByLanguage,
@@ -89,6 +100,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [isLoading, setIsLoading] = useState(!initialData && !!projectId);
   const [error, setError] = useState<string | null>(null);
   const [selectedFramework, setSelectedFramework] = useState<FrameworkDetection | null>(null);
+  const [packages, setPackages] = useState<PackageInventoryItem[]>([]);
+  const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
+  const [tables, setTables] = useState<DatabaseTable[]>([]);
+  const [packageCategoryFilter, setPackageCategoryFilter] = useState<string>("All");
+  const [packageSearch, setPackageSearch] = useState<string>("");
+  const [expandedPackage, setExpandedPackage] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -123,10 +140,28 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         }
       });
 
+    getPackageInventory(id)
+      .then((pkgs) => {
+        if (isMounted) setPackages(pkgs);
+      })
+      .catch(() => {});
+
+    getApiEndpoints(id)
+      .then((eps) => {
+        if (isMounted) setEndpoints(eps);
+      })
+      .catch(() => {});
+
+    getDatabaseTables(id)
+      .then((tbls) => {
+        if (isMounted) setTables(tbls);
+      })
+      .catch(() => {});
+
     return () => {
       isMounted = false;
     };
-  }, [projectId, currentProject?.id, initialData]);
+  }, [projectId, currentProject?.id, lastAnalysisRunId, initialData]);
 
   if (!currentProject && !data) {
     return (
@@ -186,10 +221,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <div className="flex-1 flex items-center justify-center bg-canvas">
         <EmptyState
           icon={<Clock className="w-5 h-5" />}
-          title="Loading overview"
-          description="No completed analysis is available yet. Run analysis to fill this screen."
+          title={isScanning ? "Analyzing repository..." : "Loading overview"}
+          description={
+            isScanning
+              ? scanProgress?.current_file
+                ? `Scanning & parsing files: ${scanProgress.current_file}`
+                : "Scanning repository, parsing ASTs, and indexing symbols..."
+              : "No completed analysis is available yet. Run analysis to fill this screen."
+          }
           action={
-            onReanalyze ? (
+            !isScanning && onReanalyze ? (
               <Button variant="primary" onClick={onReanalyze}>
                 Run analysis
               </Button>
@@ -205,9 +246,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const displayPath = stripUncPrefix(data.root_path);
 
   // ── Donut chart math (enlarged for prominence) ───────────────────────────
-  const DONUT_R = 72;
-  const DONUT_CX = 95;
-  const DONUT_CY = 95;
+  const DONUT_R = 86;
+  const DONUT_CX = 110;
+  const DONUT_CY = 110;
   const circumference = 2 * Math.PI * DONUT_R;
   const totalLangFiles = languages.reduce((s, l) => s + l.file_count, 0);
   const totalLangLines = languages.reduce((s, l) => s + l.line_count, 0);
@@ -226,7 +267,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       value: metrics.total_files,
       label: "Files",
       title: "Total source and asset files tracked in workspace. Click to view in Explorer.",
-      icon: <FileCode className="w-4 h-4 text-accent" />,
+      icon: <FileCode className="w-4 h-4 text-text-muted" />,
       onClick: () => onNavigateToView("explorer"),
     },
     {
@@ -274,6 +315,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     },
   ];
 
+  const filteredPackages = packages.filter((pkg) => {
+    const matchesCat = packageCategoryFilter === "All" || pkg.category === packageCategoryFilter;
+    const matchesSearch =
+      !packageSearch.trim() ||
+      pkg.name.toLowerCase().includes(packageSearch.toLowerCase()) ||
+      pkg.manifest_file.toLowerCase().includes(packageSearch.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+
   return (
     <div className="flex-1 overflow-y-auto bg-canvas">
       {/* Project header */}
@@ -309,8 +359,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         </div>
       </div>
 
+      {/* Prominent banner if last analysis failed */}
+      {completion?.status === "failed" && (
+        <div className="mx-6 mt-4 p-3 rounded-md bg-status-danger-bg/20 border border-status-danger-border flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-status-danger-text">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+            <span>Analysis did not complete. Click &quot;Re-analyze&quot; to parse files, extract symbols, APIs, and database schemas.</span>
+          </div>
+          {onReanalyze && (
+            <Button variant="secondary" size="sm" onClick={onReanalyze}>
+              Re-analyze Now
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Metric cards */}
-      <div className="flex items-stretch border-b border-border-default divide-x divide-border-subtle bg-surface/50">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 border-b border-border-default divide-y sm:divide-y-0 divide-x divide-border-subtle bg-surface/50">
         {metricItems.map((item) => {
           const body = (
             <>
@@ -361,12 +426,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <p className="text-body text-text-secondary">None detected</p>
           ) : (
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8 p-6 bg-surface border border-border-default rounded-lg">
-              {/* Enlarged Donut chart (190x190) */}
+              {/* Enlarged Donut chart (220x220) */}
               <div className="flex flex-col items-center flex-shrink-0">
                 <svg
-                  width="190"
-                  height="190"
-                  viewBox="0 0 190 190"
+                  width="220"
+                  height="220"
+                  viewBox="0 0 220 220"
                   aria-label="Language distribution donut chart"
                   className="flex-shrink-0 drop-shadow-sm"
                 >
@@ -377,7 +442,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     r={DONUT_R}
                     fill="none"
                     stroke="var(--bg-elevated)"
-                    strokeWidth={22}
+                    strokeWidth={24}
                   />
                   {/* Segments, rotated so 0° is at 12 o'clock */}
                   <g transform={`rotate(-90 ${DONUT_CX} ${DONUT_CY})`}>
@@ -397,7 +462,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                             r={DONUT_R}
                             fill="none"
                             stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                            strokeWidth={22}
+                            strokeWidth={24}
                             strokeDasharray={`${dashLen} ${circumference - dashLen}`}
                             strokeDashoffset={offset}
                           >
@@ -410,11 +475,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   {/* Center: file count */}
                   <text
                     x={DONUT_CX}
-                    y={DONUT_CY - 7}
+                    y={DONUT_CY - 8}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill="var(--text-primary)"
-                    fontSize="28"
+                    fontSize="32"
                     fontWeight="800"
                     fontFamily="system-ui, -apple-system, sans-serif"
                   >
@@ -422,11 +487,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   </text>
                   <text
                     x={DONUT_CX}
-                    y={DONUT_CY + 16}
+                    y={DONUT_CY + 18}
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill="var(--text-muted)"
-                    fontSize="12"
+                    fontSize="13"
                     fontFamily="system-ui, -apple-system, sans-serif"
                   >
                     files
@@ -633,6 +698,268 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        {/* Packages & Libraries Intelligence Matrix */}
+        <section id="packages-section" className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-2">
+            <h2 className="text-subheading font-semibold text-text-primary flex items-center gap-2">
+              <Boxes className="w-4 h-4 text-text-muted" />
+              <span>Packages ({packages.length})</span>
+            </h2>
+            {packages.length > 0 && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Filter packages..."
+                  value={packageSearch}
+                  onChange={(e) => setPackageSearch(e.target.value)}
+                  className="h-7 px-2.5 bg-canvas border border-border-default rounded text-[11px] text-text-primary placeholder:text-text-muted focus:border-border-focus focus:outline-none w-44"
+                />
+              </div>
+            )}
+          </div>
+
+          {packages.length === 0 ? (
+            <p className="text-body text-text-secondary">
+              No package manifests detected yet. Run analysis to discover packages.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                {["All", "Database & Persistence", "Web Framework & Routing", "UI & Components", "Validation & Type Safety", "State & Network", "Auth & Security", "Build & Tooling"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setPackageCategoryFilter(cat)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                      packageCategoryFilter === cat
+                        ? "bg-neutral-800 dark:bg-[#27272a] text-white"
+                        : "bg-elevated border border-border-subtle text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <Card className="overflow-hidden p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Package Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Declared In</TableHead>
+                      <TableHead>Source Usage</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPackages.map((pkg) => {
+                      const isExpanded = expandedPackage === pkg.name;
+                      return (
+                        <React.Fragment key={pkg.name}>
+                          <TableRow className="h-9">
+                            <TableCell className="font-semibold text-text-primary font-mono text-body">
+                              {pkg.name}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="neutral" size="sm">
+                                {pkg.category}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-caption text-text-muted">
+                              {pkg.version || "unspecified"}
+                            </TableCell>
+                            <TableCell className="font-mono text-caption text-text-secondary">
+                              {pkg.manifest_file}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-caption text-text-primary font-semibold">
+                                {pkg.usage_count} file{pkg.usage_count === 1 ? "" : "s"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {pkg.usage_count > 0 && (
+                                <Button
+                                  variant="plain"
+                                  size="sm"
+                                  onClick={() => setExpandedPackage(isExpanded ? null : pkg.name)}
+                                >
+                                  {isExpanded ? "Hide files" : "Show files"}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && pkg.usage_files.length > 0 && (
+                            <TableRow className="bg-elevated/40">
+                              <TableCell colSpan={6} className="py-2.5 px-4">
+                                <div className="text-[11px] font-semibold text-text-muted mb-1 uppercase tracking-wider">
+                                  Source files importing {pkg.name}:
+                                </div>
+                                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto">
+                                  {pkg.usage_files.map((file) => (
+                                    <button
+                                      key={file}
+                                      type="button"
+                                      onClick={() => {
+                                        onNavigateToFileLine?.(file, 1);
+                                      }}
+                                      className="font-mono text-micro text-accent hover:underline bg-surface px-2 py-1 rounded border border-border-subtle inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>→ {file}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            </div>
+          )}
+        </section>
+
+        {/* API Communication Routes */}
+        <section id="apis-section" className="space-y-4">
+          <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+            <h2 className="text-subheading font-semibold text-text-primary flex items-center gap-2">
+              <Network className="w-4 h-4 text-text-muted" />
+              <span>API Endpoints ({endpoints.length})</span>
+            </h2>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onNavigateToView("apis")}
+            >
+              Open API Explorer
+            </Button>
+          </div>
+
+          {endpoints.length === 0 ? (
+            <p className="text-body text-text-secondary">
+              No HTTP API routes detected in source code.
+            </p>
+          ) : (
+            <Card className="overflow-hidden p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Route Path</TableHead>
+                    <TableHead>Framework</TableHead>
+                    <TableHead>Handler Location</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {endpoints.slice(0, 10).map((ep, idx) => (
+                    <TableRow key={`${ep.method}-${ep.route}-${idx}`} className="h-9">
+                      <TableCell>
+                        <Badge
+                          variant={
+                            ep.method === "GET"
+                              ? "accent"
+                              : ep.method === "POST"
+                              ? "confirmed"
+                              : ep.method === "DELETE"
+                              ? "danger"
+                              : "neutral"
+                          }
+                          size="sm"
+                        >
+                          {ep.method}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-caption font-semibold text-text-primary">
+                        {ep.route}
+                      </TableCell>
+                      <TableCell className="text-caption text-text-secondary">
+                        {ep.framework}
+                      </TableCell>
+                      <TableCell className="font-mono text-caption text-text-muted truncate max-w-xs">
+                        {ep.file_path}:{ep.start_line}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToFileLine?.(ep.file_path, ep.start_line)}
+                          className="font-mono text-micro text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          Jump to code →
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </section>
+
+        {/* Database Architecture & Models */}
+        <section id="database-section" className="space-y-4">
+          <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+            <h2 className="text-subheading font-semibold text-text-primary flex items-center gap-2">
+              <Database className="w-4 h-4 text-text-muted" />
+              <span>Database Schemas ({tables.length})</span>
+            </h2>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onNavigateToView("database")}
+            >
+              Open Database Explorer
+            </Button>
+          </div>
+
+          {tables.length === 0 ? (
+            <p className="text-body text-text-secondary">
+              No database schemas or models detected yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tables.map((tbl) => (
+                <div
+                  key={tbl.name}
+                  className="p-3.5 bg-surface border border-border-default rounded-md space-y-2 hover:border-border-strong transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-text-primary font-mono text-body">
+                      {tbl.name}
+                    </span>
+                    <Badge variant="neutral" size="sm">
+                      {tbl.fields.length} fields
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] font-mono text-text-muted truncate">
+                    {tbl.file_path}:{tbl.start_line}
+                  </div>
+                  <div className="pt-1 flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                    {tbl.fields.map((f) => (
+                      <span
+                        key={f.name}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+                          f.is_primary_key
+                            ? "bg-accent/15 border-accent/30 text-accent font-semibold"
+                            : f.is_foreign_key
+                            ? "bg-status-warning-bg/20 border-status-warning-border text-status-warning-text"
+                            : "bg-elevated border-border-subtle text-text-secondary"
+                        }`}
+                      >
+                        {f.name}: {f.declared_type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
       </div>

@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
 // Polyfills for layout engines (ELK.js, React Flow) in jsdom test environment
 if (typeof (globalThis as any).DOMMatrixReadOnly === "undefined") {
@@ -56,5 +57,27 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   }
   globalThis.ResizeObserver = MockResizeObserver as any;
 }
+
+// Mock @excalidraw/excalidraw in jsdom test environment to bypass Node 24 ESM JSON attribute restrictions
+vi.mock("@excalidraw/excalidraw", () => {
+  const React = require("react");
+  return {
+    Excalidraw: ({ children }: any) => React.createElement("div", { "data-testid": "excalidraw-canvas" }, children),
+    MainMenu: Object.assign(
+      ({ children }: any) => React.createElement("div", null, children),
+      {
+        DefaultItems: {
+          SaveAsImage: () => null,
+          Export: () => null,
+          ToggleTheme: () => null,
+        },
+        Item: ({ children, onSelect }: any) =>
+          React.createElement("button", { onClick: onSelect }, children),
+      }
+    ),
+    convertToExcalidrawElements: (els: any[]) => els,
+  };
+});
+
 
 

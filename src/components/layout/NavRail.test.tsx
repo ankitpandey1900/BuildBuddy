@@ -25,8 +25,8 @@ describe("NavRail Sidebar Component", () => {
 
     const activeItem = screen.getByRole("button", { name: "Architecture" });
     expect(activeItem).toHaveAttribute("aria-current", "page");
-    expect(activeItem.className).toContain("bg-accent-subtle");
-    expect(activeItem.className).toContain("text-accent");
+    expect(activeItem.className).toContain("dark:bg-[#27272a]");
+    expect(activeItem.className).toContain("text-white");
     // No hard borders/outlines
     expect(activeItem.className).not.toContain("border-accent");
   });

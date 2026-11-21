@@ -1,6 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
 
 export interface SegmentItem<T extends string = string> {
   id: T;
@@ -40,12 +39,10 @@ export function SegmentedControl<T extends string = string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={twMerge(
-        clsx(
-          "inline-flex items-center bg-elevated border border-border-default rounded-sm select-none",
-          containerSizeClasses[size],
-          className
-        )
+      className={cn(
+        "inline-flex items-center bg-elevated border border-border-default rounded-sm select-none",
+        containerSizeClasses[size],
+        className
       )}
     >
       {items.map((item) => {
@@ -58,21 +55,19 @@ export function SegmentedControl<T extends string = string>({
             aria-checked={isSelected}
             tabIndex={isSelected ? 0 : -1}
             onClick={() => onChange(item.id)}
-            className={twMerge(
-              clsx(
-                "inline-flex items-center justify-center font-sans font-medium transition-colors duration-150 ease-out focus-ring cursor-pointer whitespace-nowrap",
-                itemSizeClasses[size],
-                isSelected
-                  ? "bg-surface text-text-primary shadow-xs border border-border-default/60 font-semibold"
-                  : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
-              )
+            className={cn(
+              "inline-flex items-center justify-center font-sans font-medium transition-colors duration-150 ease-out focus-ring cursor-pointer whitespace-nowrap",
+              itemSizeClasses[size],
+              isSelected
+                ? "bg-surface text-text-primary shadow-xs border border-border-default/60 font-semibold"
+                : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
             )}
           >
             {item.icon && <span className="mr-1.5 flex-shrink-0 flex items-center">{item.icon}</span>}
             <span>{item.label}</span>
             {item.badge !== undefined && (
               <span
-                className={clsx(
+                className={cn(
                   "ml-1.5 px-1 py-0.2 rounded-full text-[10px] font-sans",
                   isSelected
                     ? "bg-accent-subtle text-accent-text"

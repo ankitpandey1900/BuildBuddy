@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Search,
   X,
@@ -18,10 +18,19 @@ import {
   Plus,
   Minus,
   Maximize2,
+  Network,
+  Paintbrush,
 } from "lucide-react";
 import type { DiagramType } from "../../../types/diagram";
 import type { LayoutDirection } from "../../../diagram/layout/types";
 import type { ExportFormat } from "../../../types/export";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export interface DiagramToolbarProps {
   diagramType: DiagramType;
@@ -44,6 +53,10 @@ export interface DiagramToolbarProps {
   onCancelLayout?: () => void;
   isLegendOpen?: boolean;
   onToggleLegend?: () => void;
+  fileViewMode?: "graph" | "tree";
+  onToggleFileViewMode?: () => void;
+  canvasMode?: "graph" | "whiteboard";
+  onToggleCanvasMode?: (mode: "graph" | "whiteboard") => void;
 }
 
 const DIAGRAM_SEGMENTS: { type: DiagramType; label: string; icon: React.FC<{ className?: string }> }[] = [
@@ -77,13 +90,17 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
   onCancelLayout,
   isLegendOpen,
   onToggleLegend,
+  fileViewMode = "graph",
+  onToggleFileViewMode,
+  canvasMode = "graph",
+  onToggleCanvasMode,
 }) => {
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = React.useState(false);
 
   return (
-    <header className="h-10 px-3 bg-surface border-b border-border-default flex items-center justify-between text-xs font-mono select-none z-10 flex-shrink-0">
+    <header className="h-10 px-2.5 bg-surface border-b border-border-default flex items-center justify-between text-xs font-sans select-none z-10 flex-shrink-0 overflow-x-auto overflow-y-hidden gap-2">
       {/* Left: Diagram Type Segmented Control & Direction */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1.5 flex-shrink-0">
         {/* Segmented Control */}
         <div
           role="radiogroup"
@@ -100,7 +117,7 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => onSelectDiagramType(seg.type)}
-                className={`flex items-center space-x-1.5 px-2 py-1 rounded text-[11px] font-sans font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
+                className={`flex items-center space-x-1 px-1.5 py-1 rounded text-[11px] font-sans font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
                   isSelected
                     ? "bg-surface text-text-primary shadow-xs border border-border-default font-semibold"
                     : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
@@ -129,10 +146,60 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
           )}
           <span className="text-[11px] font-mono">{direction === "DOWN" ? "TB" : "LR"}</span>
         </button>
+
+        {/* Canvas Engine Mode Toggle: Graph vs Excalidraw Whiteboard */}
+        {onToggleCanvasMode && (
+          <div className="flex items-center p-0.5 bg-subtle border border-border-default rounded-md">
+            <button
+              type="button"
+              onClick={() => onToggleCanvasMode("graph")}
+              className={`flex items-center space-x-1 px-1.5 py-1 rounded text-[11px] font-sans font-medium transition-colors ${
+                canvasMode === "graph"
+                  ? "bg-surface text-text-primary shadow-xs border border-border-default font-semibold"
+                  : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
+              }`}
+              title="Interactive Node Graph Mode"
+            >
+              <Workflow className="w-3.5 h-3.5" />
+              <span>Graph</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggleCanvasMode("whiteboard")}
+              className={`flex items-center space-x-1 px-1.5 py-1 rounded text-[11px] font-sans font-medium transition-colors ${
+                canvasMode === "whiteboard"
+                  ? "bg-surface text-text-primary shadow-xs border border-border-default font-semibold"
+                  : "text-text-muted hover:text-text-primary hover:bg-hover border border-transparent"
+              }`}
+              title="Excalidraw Whiteboard Mode (Full Drawing & Architecture Canvas)"
+            >
+              <Paintbrush className="w-3.5 h-3.5 text-accent-default" />
+              <span>Excalidraw</span>
+            </button>
+          </div>
+        )}
+
+        {/* File View Mode Toggle (Obsidian Graph vs Hierarchical Tree) */}
+        {diagramType === "file_dependency" && onToggleFileViewMode && (
+          <button
+            type="button"
+            aria-label={`View mode: ${fileViewMode === "graph" ? "Obsidian Graph" : "Tree View"}`}
+            onClick={onToggleFileViewMode}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded border text-xs font-mono transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus ${
+              fileViewMode === "graph"
+                ? "bg-accent text-white border-accent shadow-xs"
+                : "bg-subtle text-text-secondary hover:text-text-primary hover:bg-hover border-border-default"
+            }`}
+            title="Toggle between Obsidian-style Graph View and Hierarchical Tree View"
+          >
+            <Network className="w-3.5 h-3.5" />
+            <span>{fileViewMode === "graph" ? "Graph View" : "Tree View"}</span>
+          </button>
+        )}
       </div>
 
       {/* Middle: Node Search Bar */}
-      <div className="flex items-center space-x-1.5 max-w-xs w-full mx-3">
+      <div className="flex items-center space-x-1.5 min-w-[100px] max-w-[200px] flex-1 mx-1.5">
         <div className="relative w-full flex items-center">
           <Search className="w-3.5 h-3.5 absolute left-2 text-text-muted pointer-events-none" />
           <input
@@ -170,7 +237,7 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
       </div>
 
       {/* Right: Actions, Filters, Legend, Export */}
-      <div className="flex items-center space-x-1.5">
+      <div className="flex items-center space-x-1.5 flex-shrink-0">
         {/* Worker Layout Progress & Cancellation Indicator */}
         {isLayoutRunning && (
           <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-accent-subtle text-accent-text text-[11px]">
@@ -290,69 +357,60 @@ export const DiagramToolbar: React.FC<DiagramToolbarProps> = ({
         )}
 
         {/* Export Dropdown */}
-        <div className="relative">
-          <button
-            type="button"
-            aria-label="Export diagram"
-            aria-haspopup="true"
-            aria-expanded={exportOpen}
-            onClick={() => setExportOpen(!exportOpen)}
-            className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-sans">Export</span>
-          </button>
-
-          {exportOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 top-8 w-44 bg-surface border border-border-default rounded-md shadow-lg py-1 z-30 text-xs font-mono"
+        <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Export diagram"
+              aria-expanded={exportOpen}
+              onClick={() => setExportOpen((prev) => !prev)}
+              className="flex items-center space-x-1 px-2 py-1 rounded bg-subtle border border-border-default hover:bg-hover text-text-secondary hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-sans">Export</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44 font-mono text-xs">
+            <DropdownMenuItem
+              onSelect={() => {
+                setExportOpen(false);
+                onExport("svg");
+              }}
+            >
+              SVG (Vector)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                setExportOpen(false);
+                onExport("png");
+              }}
+            >
+              PNG (High-Res 2x)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              asChild
+              disabled
+              title="Vector PDF generation is stubbed (requires external PDF generator library)"
             >
               <button
                 type="button"
-                role="menuitem"
-                onClick={() => {
-                  setExportOpen(false);
-                  onExport("svg");
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-hover text-text-primary"
-              >
-                SVG (Vector)
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setExportOpen(false);
-                  onExport("png");
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-hover text-text-primary"
-              >
-                PNG (High-Res 2x)
-              </button>
-              <button
-                type="button"
-                role="menuitem"
                 disabled
-                className="w-full text-left px-3 py-1.5 text-text-muted opacity-50 cursor-not-allowed"
-                title="Vector PDF generation is stubbed (requires external PDF generator library)"
+                className="w-full text-left cursor-not-allowed opacity-50"
               >
                 PDF (Vector - Stubbed)
               </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setExportOpen(false);
-                  onExport("mermaid");
-                }}
-                className="w-full text-left px-3 py-1.5 hover:bg-hover text-text-primary border-t border-border-subtle"
-              >
-                Mermaid (.mmd)
-              </button>
-            </div>
-          )}
-        </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
+                setExportOpen(false);
+                onExport("mermaid");
+              }}
+            >
+              Mermaid (.mmd)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

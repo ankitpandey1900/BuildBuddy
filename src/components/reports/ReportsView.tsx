@@ -93,7 +93,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   if (!projectId && !initialFindings) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6 bg-surface-primary">
+      <div className="flex-1 flex items-center justify-center p-6 bg-canvas">
         <EmptyState
           icon={<FileBarChart className="w-6 h-6" />}
           title="No Project Selected"
@@ -104,11 +104,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-surface-primary overflow-hidden select-text">
+    <div className="flex-1 flex flex-col h-full bg-canvas overflow-hidden select-text">
       {/* Header bar */}
-      <div className="px-6 py-4 border-b border-border-subtle bg-surface-secondary flex items-center justify-between gap-4">
+      <div className="px-6 py-4 border-b border-border-default bg-surface flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded bg-surface-tertiary border border-border-subtle text-accent">
+          <div className="p-2 rounded-md bg-elevated border border-border-default text-accent">
             <FileBarChart className="w-5 h-5" />
           </div>
           <div>
@@ -158,11 +158,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {/* Metric Cards Banner */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 border-b border-border-subtle bg-surface-primary">
-        <div className="p-4 rounded-lg bg-surface-secondary border border-border-subtle flex flex-col justify-between">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 border-b border-border-default bg-canvas">
+        <div className="p-4 rounded-xl bg-surface border border-border-default flex flex-col justify-between hover:border-border-strong transition-all shadow-xs">
           <div className="flex items-center justify-between text-text-muted text-xs font-medium">
             <span>Critical / High Issues</span>
-            <AlertTriangle className="w-4 h-4 text-danger" />
+            <AlertTriangle className="w-4 h-4 text-status-danger-text" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-text-primary">
             {metrics.criticalHigh}
@@ -170,10 +170,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div className="text-[11px] text-text-muted mt-1">Requires immediate attention</div>
         </div>
 
-        <div className="p-4 rounded-lg bg-surface-secondary border border-border-subtle flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-surface border border-border-default flex flex-col justify-between hover:border-border-strong transition-all shadow-xs">
           <div className="flex items-center justify-between text-text-muted text-xs font-medium">
             <span>Complexity Hotspots</span>
-            <Code className="w-4 h-4 text-warning" />
+            <Code className="w-4 h-4 text-status-warning-text" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-text-primary">
             {metrics.complexityCount}
@@ -181,7 +181,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div className="text-[11px] text-text-muted mt-1">Functions with Cyclomatic ≥ 10</div>
         </div>
 
-        <div className="p-4 rounded-lg bg-surface-secondary border border-border-subtle flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-surface border border-border-default flex flex-col justify-between hover:border-border-strong transition-all shadow-xs">
           <div className="flex items-center justify-between text-text-muted text-xs font-medium">
             <span>Dependency Loops</span>
             <Boxes className="w-4 h-4 text-accent" />
@@ -192,10 +192,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div className="text-[11px] text-text-muted mt-1">Circular import cycles</div>
         </div>
 
-        <div className="p-4 rounded-lg bg-surface-secondary border border-border-subtle flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-surface border border-border-default flex flex-col justify-between hover:border-border-strong transition-all shadow-xs">
           <div className="flex items-center justify-between text-text-muted text-xs font-medium">
             <span>Security Alerts</span>
-            <ShieldAlert className="w-4 h-4 text-danger" />
+            <ShieldAlert className="w-4 h-4 text-status-danger-text" />
           </div>
           <div className="mt-2 text-2xl font-bold font-mono text-text-primary">
             {metrics.securityCount}
@@ -205,7 +205,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {/* Toolbar / Filters */}
-      <div className="px-6 py-3 border-b border-border-subtle bg-surface-secondary flex flex-wrap items-center justify-between gap-4">
+      <div className="px-6 py-3 border-b border-border-default bg-surface flex flex-wrap items-center justify-between gap-4">
         <SegmentedControl
           value={selectedCategory}
           onChange={setSelectedCategory}
@@ -225,7 +225,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             placeholder="Search report items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded bg-surface-tertiary border border-border-subtle text-text-primary focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-muted"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-md bg-elevated border border-border-default text-text-primary focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-text-muted"
           />
         </div>
       </div>
@@ -239,10 +239,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             description="The selected filter or search query yielded no active codebase health issues."
           />
         ) : (
-          <div className="border border-border-subtle rounded-lg overflow-hidden bg-surface-secondary shadow-sm">
+          <div className="border border-border-default rounded-xl overflow-hidden bg-surface shadow-xs">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-border-subtle bg-surface-tertiary text-text-muted font-medium">
+                <tr className="border-b border-border-default bg-elevated text-text-muted font-medium">
                   <th className="py-2.5 px-4 w-28">Severity</th>
                   <th className="py-2.5 px-4 w-32">Category</th>
                   <th className="py-2.5 px-4">Finding Description</th>
@@ -263,7 +263,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   return (
                     <tr
                       key={item.id}
-                      className="hover:bg-surface-tertiary/50 transition-colors group"
+                      className="hover:bg-hover transition-colors group"
                     >
                       <td className="py-2.5 px-4">
                         <Badge variant={sevVariant}>

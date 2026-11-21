@@ -91,12 +91,10 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
         known_class_names.insert(qual_name.clone());
 
         // Derive group from directory
-        let group_id = if let Some(last_slash) = norm_path.rfind('/') {
-            let dir = &norm_path[..last_slash];
-            let gid = format!("group:dir:{}", dir);
+        let group_id = if let Some((gid, label)) = super::derive_dir_group(&norm_path) {
             groups_set.entry(gid.clone()).or_insert_with(|| DiagramGroup {
                 id: gid.clone(),
-                label: dir.to_string(),
+                label,
                 parent_group: None,
                 collapsed: false,
             });
@@ -115,13 +113,38 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
             .and_then(|v| v.as_array().map(|a| a.len()))
             .unwrap_or(0);
 
+        let mut members = Vec::new();
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&props_json) {
+            if let Some(arr) = v.as_array() {
+                for p in arr.iter().take(6) {
+                    if let Some(s) = p.as_str() {
+                        members.push(format!("prop|{}", s));
+                    }
+                }
+            }
+        }
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&methods_json) {
+            if let Some(arr) = v.as_array() {
+                for m in arr.iter().take(6) {
+                    if let Some(s) = m.as_str() {
+                        members.push(format!("method|{}", s));
+                    }
+                }
+            }
+        }
+        let dynamic_height = if members.is_empty() {
+            cls_h
+        } else {
+            (cls_h + (members.len() as f64 * 18.0)).max(70.0)
+        };
+
         nodes.push(DiagramNode {
             id: node_id.clone(),
             kind: DiagramNodeKind::Class,
             label: name.clone(),
             group_id,
             width: cls_w,
-            height: cls_h,
+            height: dynamic_height,
             source_ref: Some(SourceRef {
                 file_path: norm_path,
                 start_line,
@@ -134,6 +157,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                 import_count: None,
                 complexity: Some(props_count),
             }),
+            members,
         });
 
         class_rows_data.push((node_id, name, superclass_opt, ev_id_opt));
@@ -160,6 +184,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                         height: cls_h,
                         source_ref: None,
                         metrics: None,
+                        members: Vec::new(),
                     });
                     known_class_names.insert(trimmed.to_string());
                 }
@@ -225,7 +250,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
             row.get::<_, Option<String>>(9)?,
             row.get::<_, String>(10)?,
             row.get::<_, String>(11)?,
-            row.get::<_, i64>(12)?,
+            row.get::<_, Option<i64>>(12)?.unwrap_or(0),
         ))
     })?;
 
@@ -261,6 +286,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                 height: cls_h,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
             known_class_names.insert(from_ident.clone());
         }
@@ -279,6 +305,7 @@ pub fn build_class_diagram(conn: &Connection, project_id: i64) -> Result<Diagram
                 height: cls_h,
                 source_ref: None,
                 metrics: None,
+                members: Vec::new(),
             });
             known_class_names.insert(target_ident.clone());
         }

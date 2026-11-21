@@ -284,6 +284,10 @@ export interface ApiEndpoint {
   snippet: string;
   confidence: "confirmed" | "static" | "inferred" | "unknown";
   source_evidence_id: number;
+  caller_files?: string[];
+  affected_models?: string[];
+  downstream_packages?: string[];
+  blast_radius?: "critical" | "warning" | "low";
 }
 export interface DatabaseField { name: string; declared_type: string; is_primary_key: boolean; is_foreign_key: boolean; line: number; source_evidence_id: number; }
 export interface DatabaseTable { name: string; file_path: string; start_line: number; end_line: number; confidence: "confirmed" | "static" | "inferred" | "unknown"; source_evidence_id: number; fields: DatabaseField[]; }
@@ -463,3 +467,41 @@ export interface ArchitectureModel {
   edges: ArchitectureEdge[];
   groups: ArchitectureGroup[];
 }
+
+export interface SymbolSummaryDto {
+  name: string;
+  kind: string;
+  line_number: number;
+  is_exported: boolean;
+  complexity: number | null;
+}
+
+export interface FileApiEndpointDto {
+  method: string;
+  route: string;
+  framework: string;
+}
+
+export interface FileIntelligenceDto {
+  file_path: string;
+  role: string;
+  explanation: string;
+  blast_radius_level: "critical" | "warning" | "low";
+  direct_dependants_count: number;
+  direct_dependants: string[];
+  external_packages_used: string[];
+  internal_dependencies: string[];
+  exported_symbols: SymbolSummaryDto[];
+  api_endpoints?: FileApiEndpointDto[];
+}
+
+export interface PackageInventoryItem {
+  name: string;
+  version: string | null;
+  category: string;
+  dep_type: string;
+  manifest_file: string;
+  usage_count: number;
+  usage_files: string[];
+}
+

@@ -118,4 +118,52 @@ describe("WelcomeView Component", () => {
     fireEvent.click(removeBtn);
     expect(handleRemove).toHaveBeenCalledWith(1);
   });
+
+  it("triggers onReopenProject when clicking a sample fixture", () => {
+    const handleReopen = vi.fn();
+    render(
+      <WelcomeView
+        onOpenFolder={vi.fn()}
+        onReopenProject={handleReopen}
+        recentProjects={[]}
+      />
+    );
+
+    const sampleBtn = screen.getByText("Full-Stack Web (React + Express)").closest("button")!;
+    fireEvent.click(sampleBtn);
+    expect(handleReopen).toHaveBeenCalledWith("fixtures/arch-react-express");
+  });
+
+  it("filters recent projects when searching", () => {
+    const manyProjects: Project[] = [
+      ...mockRecentProjects,
+      {
+        id: 3,
+        name: "InventoryService",
+        root_path: "/projects/InventoryService",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        settings_json: "{}",
+      },
+    ];
+
+    render(
+      <WelcomeView
+        onOpenFolder={vi.fn()}
+        onReopenProject={vi.fn()}
+        recentProjects={manyProjects}
+      />
+    );
+
+    expect(screen.getByText("Tallymate")).toBeInTheDocument();
+    expect(screen.getByText("ByteMap")).toBeInTheDocument();
+    expect(screen.getByText("InventoryService")).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText("Filter projects...");
+    fireEvent.change(searchInput, { target: { value: "Inventory" } });
+
+    expect(screen.getByText("InventoryService")).toBeInTheDocument();
+    expect(screen.queryByText("Tallymate")).not.toBeInTheDocument();
+    expect(screen.queryByText("ByteMap")).not.toBeInTheDocument();
+  });
 });

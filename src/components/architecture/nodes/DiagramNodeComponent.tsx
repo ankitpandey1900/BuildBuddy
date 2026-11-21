@@ -17,6 +17,7 @@ import {
   LAYER_STYLES,
   type ArchitectureLayer,
 } from "../utils/layers";
+import { FloatingNodeToolbar } from "../controls/FloatingNodeToolbar";
 
 export interface DiagramNodeData extends DiagramNode {
   [key: string]: unknown;
@@ -142,23 +143,32 @@ export const DiagramNodeComponent: React.FC<NodeProps> = ({ data, selected }) =>
   const cardHeight = Math.max(node.height && node.height > 0 ? node.height : NODE_CARD_HEIGHT, hasFooter ? 66 : 50);
 
   return (
-    <div
-      tabIndex={0}
-      role="button"
-      aria-label={`${node.kind} node: ${node.label}`}
-      data-testid={`diagram-node-${node.id}`}
-      onKeyDown={handleKeyDown}
-      style={{
-        width: node.width && node.width > 0 ? node.width : NODE_CARD_WIDTH,
-        height: cardHeight,
-        minHeight: `${cardHeight}px`,
-        borderLeftColor: accentBorderColor,
-        borderLeftWidth: "3px",
-      }}
-      className={`group relative flex flex-col justify-between px-2.5 py-1.5 bg-surface text-text-primary rounded-[3px] select-none cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-all duration-150 ${stateClasses} ${
-        isDimmed ? "opacity-35" : "opacity-100"
-      }`}
-    >
+    <>
+      <FloatingNodeToolbar
+        isVisible={Boolean(selected)}
+        label={node.label}
+        kind={kindTag}
+        sourceFilePath={node.source_ref?.file_path}
+        sourceLine={node.source_ref?.start_line}
+        onOpenSource={node.onOpenSource}
+      />
+      <div
+        tabIndex={0}
+        role="button"
+        aria-label={`${node.kind} node: ${node.label}`}
+        data-testid={`diagram-node-${node.id}`}
+        onKeyDown={handleKeyDown}
+        style={{
+          width: node.width && node.width > 0 ? node.width : NODE_CARD_WIDTH,
+          height: cardHeight,
+          minHeight: `${cardHeight}px`,
+          borderLeftColor: accentBorderColor,
+          borderLeftWidth: "3px",
+        }}
+        className={`group relative flex flex-col justify-between px-2.5 py-1.5 bg-surface text-text-primary rounded-md select-none cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-border-focus transition-all duration-150 shadow-xs hover:shadow-subtle ${stateClasses} ${
+          isDimmed ? "opacity-35" : "opacity-100"
+        }`}
+      >
       {/* Handles for orthogonal connections on all 4 faces */}
       <Handle
         type="target"
@@ -221,5 +231,6 @@ export const DiagramNodeComponent: React.FC<NodeProps> = ({ data, selected }) =>
         </div>
       )}
     </div>
+    </>
   );
 };

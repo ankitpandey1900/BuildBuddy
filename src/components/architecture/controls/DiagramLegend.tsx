@@ -119,6 +119,18 @@ export const DiagramLegend: React.FC<DiagramLegendProps> = ({
                 </div>
                 <span className="text-[10px] text-text-muted">triangle head</span>
               </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2">
+                  <svg width="28" height="10" className="flex-shrink-0">
+                    <line x1="0" y1="5" x2="20" y2="5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M 20 1 L 27 5 L 20 9" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                    <line x1="4" y1="1" x2="4" y2="9" stroke="currentColor" strokeWidth="1.4" />
+                  </svg>
+                  <span className="font-medium text-text-primary">er fk (1:N)</span>
+                </div>
+                <span className="text-[10px] text-text-muted">crow's foot</span>
+              </div>
             </div>
           </div>
 
@@ -233,6 +245,102 @@ export const SvgMarkerDefs: React.FC = () => (
           fill="var(--bg-surface, #161B22)"
           stroke="var(--text-secondary, #C9D1D9)"
           strokeWidth="1.5"
+        />
+      </marker>
+
+      {/* ER Crow's Foot Cardinality Markers (N-side) */}
+      <marker
+        id="bb-crowfoot"
+        viewBox="0 0 14 14"
+        refX="12"
+        refY="7"
+        markerWidth="9"
+        markerHeight="9"
+        orient="auto-start-reverse"
+      >
+        <path
+          d="M 1 7 L 12 7 M 1 7 L 12 2 M 1 7 L 12 12"
+          fill="none"
+          stroke="var(--text-secondary, #C9D1D9)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </marker>
+
+      <marker
+        id="bb-crowfoot-highlight"
+        viewBox="0 0 14 14"
+        refX="12"
+        refY="7"
+        markerWidth="10"
+        markerHeight="10"
+        orient="auto-start-reverse"
+      >
+        <path
+          d="M 1 7 L 12 7 M 1 7 L 12 2 M 1 7 L 12 12"
+          fill="none"
+          stroke="var(--accent-default, #388BFD)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </marker>
+
+      {/* ER 1-side Cardinality Markers (Parent Entity) */}
+      <marker
+        id="bb-one"
+        viewBox="0 0 12 14"
+        refX="6"
+        refY="7"
+        markerWidth="8"
+        markerHeight="9"
+        orient="auto-start-reverse"
+      >
+        <line
+          x1="4"
+          y1="1"
+          x2="4"
+          y2="13"
+          stroke="var(--text-secondary, #C9D1D9)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <line
+          x1="8"
+          y1="1"
+          x2="8"
+          y2="13"
+          stroke="var(--text-secondary, #C9D1D9)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </marker>
+
+      <marker
+        id="bb-one-highlight"
+        viewBox="0 0 12 14"
+        refX="6"
+        refY="7"
+        markerWidth="8"
+        markerHeight="9"
+        orient="auto-start-reverse"
+      >
+        <line
+          x1="4"
+          y1="1"
+          x2="4"
+          y2="13"
+          stroke="var(--accent-default, #388BFD)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <line
+          x1="8"
+          y1="1"
+          x2="8"
+          y2="13"
+          stroke="var(--accent-default, #388BFD)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
         />
       </marker>
     </defs>

@@ -128,6 +128,28 @@ describe("ELK.js Layout Engine", () => {
     }
   });
 
+  it("positions nodes in group with 0 edges without overlapping group header", async () => {
+    const zeroEdgeModel: DiagramModel = {
+      diagram_type: "file_dependency",
+      nodes: [
+        { id: "f1", kind: "file", label: "README.md", group_id: "g:root", width: 180, height: 40 },
+        { id: "f2", kind: "file", label: "RUNTIME_OPERATIONS.md", group_id: "g:root", width: 180, height: 40 },
+        { id: "f3", kind: "file", label: "docker-compose.yml", group_id: "g:root", width: 180, height: 40 },
+        { id: "f4", kind: "file", label: "package.json", group_id: "g:root", width: 180, height: 40 },
+      ],
+      groups: [
+        { id: "g:root", label: "Project Root", collapsed: false },
+      ],
+      edges: [],
+    };
+    const positioned = await layout(zeroEdgeModel);
+    const group = positioned.groups[0];
+    expect(group).toBeDefined();
+    for (const node of positioned.nodes) {
+      expect(node.y).toBeGreaterThanOrEqual(group.y + 56);
+    }
+  });
+
   it("all edges have routes with valid waypoints/bend points", async () => {
     const positioned = await layout(sampleModel);
     expect(positioned.edges.length).toBe(sampleModel.edges.length);

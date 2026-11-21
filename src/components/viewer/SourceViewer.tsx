@@ -5,11 +5,21 @@ import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
+import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import {
+  PanelRightClose,
+  PanelRightOpen,
+  ShieldAlert,
+  AlertTriangle,
+  ShieldCheck,
+  ChevronDown,
+  ChevronRight,
+  Package,
+} from "lucide-react";
 
-import { getFileSymbols } from "@/lib/tauri";
-import type { FileContentDto, FileRecord, SymbolDto } from "@/types/ipc";
+import { getFileSymbols, getFileIntelligence } from "@/lib/tauri";
+import type { FileContentDto, FileRecord, SymbolDto, FileIntelligenceDto } from "@/types/ipc";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 
@@ -19,6 +29,7 @@ interface SourceViewerProps {
   isLoading: boolean;
   theme: "dark" | "light";
   targetLine?: number | null;
+  onSelectFileByPath?: (filePath: string) => void;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -27,17 +38,21 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   isLoading,
   theme,
   targetLine,
+  onSelectFileByPath,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
   const [symbols, setSymbols] = useState<SymbolDto[]>([]);
   const [isOutlineOpen, setIsOutlineOpen] = useState(true);
+  const [intel, setIntel] = useState<FileIntelligenceDto | null>(null);
+  const [isIntelExpanded, setIsIntelExpanded] = useState(false);
 
-  // Load symbols whenever selectedFile changes
+  // Load symbols and intelligence whenever selectedFile changes
   useEffect(() => {
     if (!selectedFile) {
       setSymbols([]);
+      setIntel(null);
       return;
     }
 
@@ -47,7 +62,14 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         console.error("Failed to load symbols:", err);
         setSymbols([]);
       });
-  }, [selectedFile?.id]);
+
+    getFileIntelligence(selectedFile.project_id, selectedFile.relative_path)
+      .then((data) => setIntel(data))
+      .catch((err: unknown) => {
+        console.error("Failed to load file intelligence:", err);
+        setIntel(null);
+      });
+  }, [selectedFile?.id, selectedFile?.project_id, selectedFile?.relative_path]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -113,6 +135,8 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
     if (theme === "dark") {
       extensions.push(oneDark);
+    } else {
+      extensions.push(syntaxHighlighting(defaultHighlightStyle));
     }
 
     const state = EditorState.create({
@@ -161,16 +185,16 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       kind === "function"
         ? "fn"
         : kind === "class"
-        ? "cls"
-        : kind === "method"
-        ? "mth"
-        : kind === "interface"
-        ? "intf"
-        : kind === "type_alias"
-        ? "type"
-        : kind === "constant"
-        ? "const"
-        : "var";
+          ? "cls"
+          : kind === "method"
+            ? "mth"
+            : kind === "interface"
+              ? "intf"
+              : kind === "type_alias"
+                ? "type"
+                : kind === "constant"
+                  ? "const"
+                  : "var";
     return (
       <span className="text-micro px-1 rounded-sm bg-elevated text-text-muted border border-border-subtle">
         {label}
@@ -230,8 +254,103 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         </div>
       </div>
 
+      {/* File Intelligence & Blast Radius Banner */}
+      {intel && (
+        <div className="border-b border-border-default bg-surface/30 px-3 py-1.5 flex-shrink-0 text-caption select-none">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 truncate min-w-0">
+              {/* Role Badge */}
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-surface text-text-primary border border-border-subtle shrink-0">
+                {intel.role}
+              </span>
+
+              {/* Blast Radius Pill */}
+              {intel.blast_radius_level === "critical" ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
+                  <ShieldAlert className="w-3 h-3" /> Critical ({intel.direct_dependants.length} dependents)
+                </span>
+              ) : intel.blast_radius_level === "warning" ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
+                  <AlertTriangle className="w-3 h-3" /> Warning ({intel.direct_dependants.length} dependents)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-surface text-text-muted border border-border-subtle shrink-0">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" /> Low Blast Radius
+                </span>
+              )}
+
+              {/* Explanation Summary */}
+              <span className="text-text-secondary truncate text-caption font-sans">
+                {intel.explanation}
+              </span>
+            </div>
+
+            {/* Expand / Collapse Button */}
+            <button
+              onClick={() => setIsIntelExpanded(!isIntelExpanded)}
+              className="text-[11px] text-text-muted hover:text-text-primary flex items-center gap-1 shrink-0 font-mono"
+            >
+              {isIntelExpanded ? (
+                <>Less <ChevronDown className="w-3 h-3" /></>
+              ) : (
+                <>Details <ChevronRight className="w-3 h-3" /></>
+              )}
+            </button>
+          </div>
+
+          {/* Expanded Drawer */}
+          {isIntelExpanded && (
+            <div className="mt-2 pt-2 border-t border-border-subtle/60 grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="text-[10px] uppercase font-mono text-text-muted tracking-wider mb-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>Dependent Files ({intel.direct_dependants.length})</span>
+                </div>
+                {intel.direct_dependants.length === 0 ? (
+                  <div className="text-text-muted italic text-[11px]">No internal files depend directly on this file.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+                    {intel.direct_dependants.map((dep: string) => (
+                      <button
+                        key={dep}
+                        onClick={() => onSelectFileByPath?.(dep)}
+                        className="px-1.5 py-0.5 rounded bg-surface hover:bg-hover border border-border-subtle font-mono text-[10px] text-accent hover:underline transition-colors truncate max-w-xs text-left"
+                        title={dep}
+                      >
+                        {dep}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase font-mono text-text-muted tracking-wider mb-1 flex items-center gap-1">
+                  <Package className="w-3 h-3 text-blue-400" />
+                  <span>External Packages Used ({intel.external_packages_used.length})</span>
+                </div>
+                {intel.external_packages_used.length === 0 ? (
+                  <div className="text-text-muted italic text-[11px]">No external package imports detected.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {intel.external_packages_used.map((pkg: string) => (
+                      <span
+                        key={pkg}
+                        className="px-1.5 py-0.5 rounded bg-surface border border-border-subtle font-mono text-[10px] text-text-secondary"
+                      >
+                        {pkg}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Editor & Outline Container */}
-      <div className="flex-1 flex h-[calc(100%-28px)] overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* CodeMirror Host Container */}
         <div ref={containerRef} className="flex-1 h-full overflow-hidden" />
 

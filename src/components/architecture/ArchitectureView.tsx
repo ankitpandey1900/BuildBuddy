@@ -19,7 +19,11 @@ import {
   RefreshCw,
   FolderOpen,
   Play,
+  Database,
+  GitFork,
+  Box,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 import type {
   DiagramModel,
@@ -38,16 +42,19 @@ import { getDiagram, drillDown } from "../../lib/tauri";
 import {
   DiagramNodeComponent,
   type DiagramNodeData,
-  NODE_CARD_WIDTH,
-  NODE_CARD_HEIGHT,
 } from "./nodes/DiagramNodeComponent";
 import { GroupNodeComponent, type GroupNodeData } from "./nodes/GroupNodeComponent";
+import { ErEntityNodeComponent } from "./nodes/ErEntityNodeComponent";
+import { CallNodeComponent } from "./nodes/CallNodeComponent";
+import { UmlClassNodeComponent } from "./nodes/UmlClassNodeComponent";
+import { FileGraphNodeComponent } from "./nodes/FileGraphNodeComponent";
 import { OrthogonalEdge, type OrthogonalEdgeData } from "./edges/OrthogonalEdge";
 import { DiagramToolbar } from "./controls/DiagramToolbar";
 import { DiagramFilterPanel, type DiagramFilterState } from "./controls/DiagramFilterPanel";
 import { DiagramLegend, SvgMarkerDefs } from "./controls/DiagramLegend";
 import { DiagramControls } from "./controls/DiagramControls";
 import { SystemFlowView } from "./SystemFlowView";
+import { ExcalidrawCanvas } from "./ExcalidrawCanvas";
 import {
   classifyNodeLayer,
   classifyGroupLayer,
@@ -75,6 +82,10 @@ export interface ArchitectureViewProps {
 const nodeTypes = {
   diagramNode: DiagramNodeComponent,
   groupNode: GroupNodeComponent,
+  erEntityNode: ErEntityNodeComponent,
+  callNode: CallNodeComponent,
+  umlClassNode: UmlClassNodeComponent,
+  fileGraphNode: FileGraphNodeComponent,
 };
 
 const edgeTypes = {
@@ -149,7 +160,11 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   );
   const isInitialMount = useRef(Boolean(initialPositionedModel));
   const [isCollapsedOverview, setIsCollapsedOverview] = useState(false);
+  const [fileViewMode, setFileViewMode] = useState<"graph" | "tree">("graph");
   const [totalRawNodeCount, setTotalRawNodeCount] = useState<number>(0);
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false);
+  const [isMinimapVisible, setIsMinimapVisible] = useState(true);
+  const [canvasMode, setCanvasMode] = useState<"graph" | "whiteboard">("graph");
 
   // Viewport & zoom state
   const { zoom } = useViewport();
@@ -448,33 +463,47 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
       workerClientRef.current = new LayoutWorkerClient();
     }
 
-    // If active model has 0 edges, do not run heavy layout
-    if (activeModel.edges.length === 0) {
+    // Filter activeModel based on active layers and isolated group before layout so hidden nodes never distort geometry
+    const visibleNodes = activeModel.nodes.filter((node) => {
+      if (filters.isolatedGroupId && node.group_id !== filters.isolatedGroupId) {
+        return false;
+      }
+      const layer = classifyNodeLayer(node);
+      if (filters.layers && !filters.layers.has(layer)) {
+        return false;
+      }
+      return true;
+    });
+
+    const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
+    const visibleEdges = activeModel.edges.filter(
+      (e) => visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to) && e.from !== e.to
+    );
+    const visibleGroupIds = new Set(visibleNodes.map((n) => n.group_id).filter(Boolean));
+    const visibleGroups = activeModel.groups.filter((g) => visibleGroupIds.has(g.id));
+
+    const modelToPosition: DiagramModel = {
+      diagram_type: activeModel.diagram_type,
+      nodes: visibleNodes,
+      edges: visibleEdges,
+      groups: visibleGroups,
+    };
+
+    // If active model has 0 nodes, nothing to position
+    if (modelToPosition.nodes.length === 0) {
       setPositionedModel({
         diagram_type: activeModel.diagram_type,
-        nodes: activeModel.nodes.map((n, i) => ({
-          ...n,
-          x: (i % 4) * (NODE_CARD_WIDTH + 40) + 40,
-          y: Math.floor(i / 4) * (NODE_CARD_HEIGHT + 40) + 40,
-          width: n.width > 0 ? n.width : NODE_CARD_WIDTH,
-          height: n.height > 0 ? n.height : NODE_CARD_HEIGHT,
-        })),
+        nodes: [],
         edges: [],
-        groups: activeModel.groups.map((g) => ({
-          ...g,
-          x: 20,
-          y: 20,
-          width: 800,
-          height: 600,
-        })),
-        width: 800,
-        height: 600,
+        groups: [],
+        width: 0,
+        height: 0,
       });
       return;
     }
 
     setIsLayoutRunning(true);
-    const calculation = workerClientRef.current.calculate(activeModel, {
+    const calculation = workerClientRef.current.calculate(modelToPosition, {
       direction,
       preset: "layered",
       nodeSpacing: 48,
@@ -491,7 +520,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
 
         // Camera: fit view with padding, minimum zoom 0.6 on initial fit
         setTimeout(() => {
-          reactFlow.fitView({ padding: 0.15, minZoom: 0.6, duration: 600 });
+          reactFlow.fitView({ padding: 0.18, minZoom: 0.5, maxZoom: 1.15, duration: 500 });
           // Check if graph fits or needs fit-all prompt
           setTimeout(() => {
             const currentZoom = reactFlow.getZoom();
@@ -500,7 +529,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
             } else {
               setShowFitAllPrompt(false);
             }
-          }, 650);
+          }, 550);
         }, 50);
       })
       .catch(async (err) => {
@@ -511,7 +540,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         // Fallback to direct in-process engine calculation if worker fails
         try {
           const { layout } = await import("../../diagram/layout/engine");
-          const fallbackPositioned = await layout(activeModel, {
+          const fallbackPositioned = await layout(modelToPosition, {
             direction,
             preset: "layered",
             nodeSpacing: 48,
@@ -519,7 +548,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
           });
           setPositionedModel(fallbackPositioned);
           setTimeout(() => {
-            reactFlow.fitView({ padding: 0.15, minZoom: 0.6, duration: 500 });
+            reactFlow.fitView({ padding: 0.18, minZoom: 0.5, maxZoom: 1.15, duration: 500 });
           }, 50);
         } catch (fallbackErr: any) {
           console.error("Worker & fallback layout error", fallbackErr);
@@ -535,7 +564,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         cancelActiveLayoutRef.current();
       }
     };
-  }, [activeModel, direction, reactFlow]);
+  }, [activeModel, direction, filters, reactFlow]);
 
   // Handle drill down into a collapsed group
   const handleDrillDown = useCallback(
@@ -665,45 +694,86 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     });
   }, [searchMatches, reactFlow]);
 
+  // Compute organic Obsidian-style clustering for file dependency graph view
+  const fileClusterPositions = useMemo(() => {
+    if (diagramType !== "file_dependency" || !positionedModel) return new Map<string, { x: number; y: number }>();
+    const clusterMap = new Map<string, { x: number; y: number }>();
+
+    // Group files by containing group or directory
+    const groups = new Map<string, typeof positionedModel.nodes>();
+    for (const node of positionedModel.nodes) {
+      const gid = node.group_id || "group:dir:root";
+      if (!groups.has(gid)) groups.set(gid, []);
+      groups.get(gid)!.push(node);
+    }
+
+    const groupKeys = Array.from(groups.keys());
+    const groupCount = Math.max(1, groupKeys.length);
+    const centerRadius = Math.max(280, groupCount * 90);
+
+    groupKeys.forEach((gid, gIdx) => {
+      const gAngle = (2 * Math.PI * gIdx) / groupCount;
+      const groupCenterX = Math.cos(gAngle) * centerRadius;
+      const groupCenterY = Math.sin(gAngle) * centerRadius;
+
+      const groupNodes = groups.get(gid)!;
+      const nodeCount = groupNodes.length;
+      const localRadius = Math.max(70, Math.sqrt(nodeCount) * 55);
+
+      groupNodes.forEach((node, nIdx) => {
+        const nAngle = (2 * Math.PI * nIdx) / Math.max(1, nodeCount) + (gIdx % 2 ? 0.35 : 0);
+        const dist = localRadius * (0.35 + 0.65 * ((nIdx % 4) / 3));
+        const nx = groupCenterX + Math.cos(nAngle) * dist;
+        const ny = groupCenterY + Math.sin(nAngle) * dist;
+        clusterMap.set(node.id, { x: nx, y: ny });
+      });
+    });
+
+    return clusterMap;
+  }, [diagramType, positionedModel]);
+
   // React Flow Nodes conversion with filtering and layer grouping
   const flowNodes: Node[] = useMemo(() => {
     if (!positionedModel) return [];
 
     const nodes: Node[] = [];
+    const isGraphMode = diagramType === "file_dependency" && fileViewMode === "graph";
 
-    // 1. Group nodes (rendered behind)
-    for (const group of positionedModel.groups) {
-      if (filters.isolatedGroupId && filters.isolatedGroupId !== group.id) {
-        continue;
-      }
+    // 1. Group nodes (rendered behind, hidden in organic graph view)
+    if (!isGraphMode) {
+      for (const group of positionedModel.groups) {
+        if (filters.isolatedGroupId && filters.isolatedGroupId !== group.id) {
+          continue;
+        }
 
-      const layer = classifyGroupLayer(group);
-      if (filters.layers && !filters.layers.has(layer)) {
-        continue;
-      }
+        const layer = classifyGroupLayer(group);
+        if (filters.layers && !filters.layers.has(layer)) {
+          continue;
+        }
 
-      nodes.push({
-        id: group.id,
-        type: "groupNode",
-        position: { x: group.x, y: group.y },
-        data: {
-          ...group,
-          width: group.width,
-          height: group.height,
-          layer,
-          onToggleCollapse: () => {
-            if (isCollapsedOverview) {
-              handleDrillDown(group.id);
-            }
+        nodes.push({
+          id: group.id,
+          type: "groupNode",
+          position: { x: group.x, y: group.y },
+          data: {
+            ...group,
+            width: group.width,
+            height: group.height,
+            layer,
+            onToggleCollapse: () => {
+              if (isCollapsedOverview) {
+                handleDrillDown(group.id);
+              }
+            },
+            onFocusGroup: handleFocusGroup,
+          } as GroupNodeData,
+          style: {
+            width: group.width,
+            height: group.height,
+            zIndex: 0,
           },
-          onFocusGroup: handleFocusGroup,
-        } as GroupNodeData,
-        style: {
-          width: group.width,
-          height: group.height,
-          zIndex: 0,
-        },
-      });
+        });
+      }
     }
 
     // 2. Leaf / domain nodes
@@ -726,10 +796,29 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
 
       const degree = nodeDegrees.get(node.id) || { inDegree: 0, outDegree: 0 };
 
+      let nodeType = "diagramNode";
+      let posX = node.x;
+      let posY = node.y;
+
+      if (diagramType === "er_diagram") {
+        nodeType = "erEntityNode";
+      } else if (diagramType === "call_graph") {
+        nodeType = "callNode";
+      } else if (diagramType === "class_diagram") {
+        nodeType = "umlClassNode";
+      } else if (isGraphMode) {
+        nodeType = "fileGraphNode";
+        if (fileClusterPositions.has(node.id)) {
+          const cp = fileClusterPositions.get(node.id)!;
+          posX = cp.x;
+          posY = cp.y;
+        }
+      }
+
       nodes.push({
         id: node.id,
-        type: "diagramNode",
-        position: { x: node.x, y: node.y },
+        type: nodeType,
+        position: { x: posX, y: posY },
         selected: isSelected,
         data: {
           ...node,
@@ -753,6 +842,9 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     return nodes;
   }, [
     positionedModel,
+    diagramType,
+    fileViewMode,
+    fileClusterPositions,
     filters.isolatedGroupId,
     filters.layers,
     upstreamNodeIds,
@@ -767,14 +859,31 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
     handleFocusGroup,
   ]);
 
-  // React Flow Edges conversion with filtering
+  // React Flow Edges conversion with filtering, self-loop suppression, and duplicate edge bundling
   const flowEdges: Edge[] = useMemo(() => {
     if (!positionedModel) return [];
 
-    const edges: Edge[] = [];
     const visibleNodeIds = new Set(flowNodes.map((n) => n.id));
+    const isCurvedGraph =
+      diagramType === "call_graph" ||
+      (diagramType === "file_dependency" && fileViewMode === "graph");
+
+    // Group multiple parallel edges between the same two nodes
+    const edgeMap = new Map<
+      string,
+      {
+        primary: (typeof positionedModel.edges)[0];
+        count: number;
+        allIds: string[];
+        labels: string[];
+      }
+    >();
 
     for (const edge of positionedModel.edges) {
+      // Suppress self-loops in architectural diagrams to prevent hairball loops
+      if (edge.from === edge.to) {
+        continue;
+      }
       if (!filters.relationshipTypes.has(edge.relationship)) {
         continue;
       }
@@ -785,19 +894,95 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         continue;
       }
 
-      const isConnected = connectedEdgeIds.has(edge.id);
-      const isEdgeHovered = hoveredEdgeId === edge.id;
+      const key = `${edge.from}->${edge.to}:${edge.relationship}`;
+      const existing = edgeMap.get(key);
+      if (existing) {
+        existing.count += 1;
+        existing.allIds.push(edge.id);
+        if (edge.label && !existing.labels.includes(edge.label)) {
+          existing.labels.push(edge.label);
+        }
+      } else {
+        edgeMap.set(key, {
+          primary: edge,
+          count: 1,
+          allIds: [edge.id],
+          labels: edge.label ? [edge.label] : [],
+        });
+      }
+    }
+
+    const edges: Edge[] = [];
+
+    for (const agg of edgeMap.values()) {
+      const edge = agg.primary;
+      const isConnected = agg.allIds.some((id) => connectedEdgeIds.has(id));
+      const isEdgeHovered = agg.allIds.some((id) => hoveredEdgeId === id);
+      const isSelected = agg.allIds.some((id) => selectedEdgeId === id);
+
+      let displayLabel = edge.label;
+      if (agg.count > 1) {
+        if (edge.relationship === "import") {
+          displayLabel = `${agg.count} imports`;
+        } else if (edge.relationship === "call") {
+          displayLabel = `${agg.count} calls`;
+        } else {
+          displayLabel = `${agg.count} connections`;
+        }
+      }
+
+      // Compute intelligent handle connection points based on node spatial geometry
+      const srcNode = positionedModel.nodes.find((n) => n.id === edge.from);
+      const tgtNode = positionedModel.nodes.find((n) => n.id === edge.to);
+      let sourceHandle = direction === "RIGHT" ? "right" : "bottom";
+      let targetHandle = direction === "RIGHT" ? "left" : "top";
+      if (!isCurvedGraph && srcNode && tgtNode) {
+        const dy = tgtNode.y - srcNode.y;
+        const dx = tgtNode.x - srcNode.x;
+        if (Math.abs(dy) >= Math.abs(dx)) {
+          sourceHandle = dy >= 0 ? "bottom" : "top";
+          targetHandle = dy >= 0 ? "top" : "bottom";
+        } else {
+          sourceHandle = dx >= 0 ? "right" : "left";
+          targetHandle = dx >= 0 ? "left" : "right";
+        }
+      }
 
       edges.push({
         id: edge.id,
-        type: "orthogonal",
+        type: isCurvedGraph ? "default" : "orthogonal",
         source: edge.from,
         target: edge.to,
-        sourceHandle: direction === "RIGHT" ? "right" : "bottom",
-        targetHandle: direction === "RIGHT" ? "left" : "top",
-        selected: selectedEdgeId === edge.id,
+        sourceHandle: isCurvedGraph ? undefined : sourceHandle,
+        targetHandle: isCurvedGraph ? undefined : targetHandle,
+        animated: isConnected,
+        markerEnd: isCurvedGraph
+          ? {
+              type: "arrowclosed" as any,
+              width: 14,
+              height: 14,
+              color: isConnected
+                ? "var(--accent-default, #388BFD)"
+                : isEdgeHovered
+                ? "var(--accent-default, #388BFD)"
+                : "rgba(139, 148, 158, 0.5)",
+            }
+          : undefined,
+        style: isCurvedGraph
+          ? {
+              stroke: isConnected
+                ? "var(--accent-default, #388BFD)"
+                : isEdgeHovered
+                ? "var(--accent-default, #388BFD)"
+                : "rgba(139, 148, 158, 0.35)",
+              strokeWidth: isConnected || isEdgeHovered ? 2 : 1.25,
+              opacity: isConnected || isEdgeHovered ? 1 : 0.65,
+            }
+          : undefined,
+        selected: isSelected,
         data: {
           ...edge,
+          label: displayLabel,
           points: edge.points,
           direction,
           isHighlighted: isConnected || isEdgeHovered,
@@ -812,6 +997,8 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
   }, [
     positionedModel,
     flowNodes,
+    diagramType,
+    fileViewMode,
     direction,
     filters.relationshipTypes,
     filters.confidences,
@@ -956,10 +1143,12 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         searchMatchCount={searchMatches.length}
         filterActiveCount={filterActiveCount}
         onToggleFilterPanel={() => setIsFilterPanelOpen((v) => !v)}
+        canvasMode={canvasMode}
+        onToggleCanvasMode={setCanvasMode}
         onZoomIn={() => reactFlow.zoomIn({ duration: 250 })}
         onZoomOut={() => reactFlow.zoomOut({ duration: 250 })}
         onFitView={() => {
-          reactFlow.fitView({ padding: 0.15, minZoom: 0.1, duration: 500 });
+          reactFlow.fitView({ padding: 0.22, minZoom: 0.1, duration: 500 });
           setShowFitAllPrompt(false);
         }}
         onResetZoom={() => reactFlow.zoomTo(1.0, { duration: 300 })}
@@ -975,6 +1164,8 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         }}
         isLegendOpen={isLegendOpen}
         onToggleLegend={() => setIsLegendOpen((v) => !v)}
+        fileViewMode={fileViewMode}
+        onToggleFileViewMode={() => setFileViewMode((m) => (m === "graph" ? "tree" : "graph"))}
       />
 
       {/* Progressive Disclosure Notification Banner */}
@@ -1080,9 +1271,15 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         </div>
       )}
 
-      {/* System Flow Diagram (Mermaid interactive workflow engine) */}
+      {/* System Flow Diagram (Excalidraw / Architecture Workflow Engine) */}
       {diagramType === "system_flow" && (
-        <SystemFlowView projectId={projectId} theme={theme} />
+        <SystemFlowView
+          projectId={projectId}
+          theme={theme}
+          onSelectDiagramElement={onSelectDiagramElement}
+          onNavigateToSource={onNavigateToSource}
+          canvasMode={canvasMode}
+        />
       )}
 
       {/* Empty State when no project is loaded */}
@@ -1102,34 +1299,80 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
         >
           <div className="max-w-md w-full bg-surface border border-border-default rounded-lg p-6 shadow-sm flex flex-col items-center space-y-3">
             <div className="w-10 h-10 rounded-full bg-subtle border border-border-subtle flex items-center justify-center text-text-muted mb-1">
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              {diagramType === "er_diagram" ? (
+                <Database className="w-5 h-5 text-accent" />
+              ) : diagramType === "call_graph" ? (
+                <GitFork className="w-5 h-5 text-accent" />
+              ) : diagramType === "class_diagram" ? (
+                <Box className="w-5 h-5 text-accent" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-warning" />
+              )}
             </div>
 
             <h2 className="text-[15px] font-sans font-semibold text-text-primary">
-              No dependencies detected
+              {diagramType === "er_diagram"
+                ? "No Database Entities Detected"
+                : diagramType === "call_graph"
+                ? "No Function Calls Mapped"
+                : diagramType === "class_diagram"
+                ? "No Classes Detected"
+                : "No dependencies detected"}
             </h2>
 
-            <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-xs">
-              0 files parsed. Run analysis or select a valid project root to generate the graph.
+            <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-sm">
+              {diagramType === "er_diagram"
+                ? "0 files parsed. Run analysis to extract Prisma schemas (*.prisma), SQL migrations, and database models."
+                : diagramType === "call_graph"
+                ? "0 files parsed. Run analysis to map function call sites and cross-file relationships."
+                : diagramType === "class_diagram"
+                ? "0 files parsed. Run analysis to index classes and inheritance hierarchies."
+                : "0 files parsed. Run analysis or select a valid project root to generate the graph."}
             </p>
 
-            <button
-              type="button"
-              data-testid="run-pipeline-btn"
-              onClick={handleRunPipeline}
-              className="mt-3 flex items-center space-x-2 px-3 py-1.5 rounded-md bg-accent-default hover:bg-accent-hover text-white text-xs font-sans font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus shadow-sm"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Run Analysis Pipeline</span>
-            </button>
+            <div className="pt-2 flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="md"
+                data-testid="run-pipeline-btn"
+                icon={<Play className="w-3.5 h-3.5 fill-current" />}
+                onClick={handleRunPipeline}
+              >
+                Run Analysis Pipeline
+              </Button>
+              {onTriggerScan && (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  icon={<RefreshCw className="w-3.5 h-3.5" />}
+                  onClick={onTriggerScan}
+                >
+                  Re-scan
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* React Flow Canvas (rendered when nodes exist — with or without edges) */}
-      {diagramType !== "system_flow" && (projectId || initialPositionedModel) && !hasNoData && (
+      {/* Excalidraw Whiteboard Canvas (rendered for all diagram views when toggled to whiteboard mode) */}
+      {canvasMode === "whiteboard" && diagramType !== "system_flow" && (projectId || initialPositionedModel) && !hasNoData && (
+        <div className="flex-1 w-full h-full relative" data-testid="excalidraw-wrapper">
+          <ExcalidrawCanvas
+            model={activeModel || positionedModel}
+            title={diagramType.replace(/_/g, " ")}
+            theme={theme}
+            onSelectDiagramElement={onSelectDiagramElement}
+            onNavigateToSource={onNavigateToSource}
+          />
+        </div>
+      )}
+
+      {/* React Flow Canvas (rendered in graph mode when nodes exist — with or without edges) */}
+      {canvasMode === "graph" && diagramType !== "system_flow" && (projectId || initialPositionedModel) && !hasNoData && (
         <div className="flex-1 w-full h-full relative" data-testid="react-flow-wrapper">
           <ReactFlow
+            colorMode={theme}
             nodes={flowNodes}
             edges={flowEdges}
             nodeTypes={nodeTypes}
@@ -1137,22 +1380,23 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
             fitView
-            minZoom={0.1}
+            fitViewOptions={{ padding: 0.18, minZoom: 0.5, maxZoom: 1.15 }}
+            minZoom={0.25}
             maxZoom={2.5}
             defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             className="bg-canvas"
             proOptions={{ hideAttribution: true }}
-            zoomOnScroll
-            panOnDrag
+            zoomOnScroll={!isCanvasLocked}
+            panOnDrag={!isCanvasLocked}
           >
             <Background color="var(--border-subtle, #21262D)" gap={20} size={1} />
 
-            {/* Informational banner when nodes exist but no edges detected */}
-            {hasNoEdges && (
+            {/* Informational banner when nodes exist but no edges detected (shown only in detailed view) */}
+            {hasNoEdges && !isCollapsedOverview && (
               <Panel position="top-center" className="!mt-3 !p-0 z-10">
                 <div
                   data-testid="isolated-nodes-banner"
-                  className="flex items-center space-x-2 bg-surface border border-border-default rounded-md px-3 py-1.5 text-xs font-mono text-text-secondary shadow-sm"
+                  className="flex items-center space-x-2 bg-surface/90 backdrop-blur-md border border-border-default rounded-lg px-3 py-1.5 text-xs font-sans text-text-secondary shadow-subtle"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
                   <span>
@@ -1161,7 +1405,7 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
                   <button
                     type="button"
                     onClick={handleRunPipeline}
-                    className="ml-1 px-2 py-0.5 rounded bg-accent-default hover:bg-accent-hover text-white text-[11px] font-sans font-medium transition-colors"
+                    className="ml-1 px-2.5 py-1 rounded bg-accent hover:bg-accent-hover text-white text-[11px] font-sans font-medium transition-colors shadow-xs"
                   >
                     Run Pipeline
                   </button>
@@ -1176,26 +1420,30 @@ const ArchitectureFlowInner: React.FC<ArchitectureViewProps> = ({
                 onZoomIn={() => reactFlow.zoomIn({ duration: 250 })}
                 onZoomOut={() => reactFlow.zoomOut({ duration: 250 })}
                 onFitView={() => {
-                  reactFlow.fitView({ padding: 0.15, minZoom: 0.1, duration: 500 });
+                  reactFlow.fitView({ padding: 0.22, minZoom: 0.1, duration: 500 });
                   setShowFitAllPrompt(false);
                 }}
                 onResetZoom={() => reactFlow.zoomTo(1.0, { duration: 300 })}
                 showFitAllPrompt={showFitAllPrompt}
+                isLocked={isCanvasLocked}
+                onToggleLock={() => setIsCanvasLocked((prev) => !prev)}
+                isMinimapOpen={isMinimapVisible}
+                onToggleMinimap={() => setIsMinimapVisible((prev) => !prev)}
               />
             </Panel>
 
-            {/* Minimap bottom-right: 160x100, layer colors, hidden when graph <= 4 nodes */}
-            {flowNodes.length > 4 && (
+            {/* Minimap bottom-right: 160x100, layer colors, hidden when graph <= 4 nodes or toggled off */}
+            {flowNodes.length > 4 && isMinimapVisible && (
               <MiniMap
                 nodeColor={(n) => {
                   const layer = (n.data as any)?.layer || "unclassified";
                   const style = LAYER_STYLES[layer as ArchitectureLayer];
                   return theme === "light"
-                    ? style?.accentColorLight || "#0969DA"
-                    : style?.accentColorDark || "#58A6FF";
+                    ? style?.accentColorLight || "#007AFF"
+                    : style?.accentColorDark || "#0A84FF";
                 }}
-                maskColor={theme === "light" ? "rgba(0, 0, 0, 0.08)" : "rgba(0, 0, 0, 0.5)"}
-                className="!bg-surface !border !border-border-default !rounded-md !w-[160px] !h-[100px] !bottom-4 !right-4 shadow-md"
+                maskColor={theme === "light" ? "rgba(248, 250, 252, 0.75)" : "rgba(14, 15, 19, 0.75)"}
+                className="!bg-surface !border !border-border-default !rounded-lg !w-[160px] !h-[100px] !bottom-4 !right-4 shadow-menu overflow-hidden"
                 zoomable
                 pannable
               />

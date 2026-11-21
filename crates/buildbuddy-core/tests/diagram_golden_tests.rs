@@ -546,6 +546,7 @@ fn test_synthetic_threshold_and_drill_down() {
             height: 40.0,
             source_ref: None,
             metrics: None,
+            members: Vec::new(),
         });
     }
 

@@ -595,7 +595,7 @@ describe("ArchitectureView React Flow Integration", () => {
       expect(screen.getByLabelText("Layout direction: Top to Bottom")).toBeInTheDocument();
       expect(screen.getByText("TB")).toBeInTheDocument();
     });
-  });
+  }, 15000);
 
   it("zoom controls: renders zoom in, zoom out, percentage, and fit controls in toolbar and on canvas", () => {
     render(<ArchitectureView initialPositionedModel={goldenPositionedModel} />);

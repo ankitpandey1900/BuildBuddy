@@ -22,6 +22,7 @@ import { Popover } from "@/components/ui/Popover";
 
 export interface CodeIntelligenceViewProps {
   projectId?: number | null;
+  lastAnalysisRunId?: number;
   selectedSymbol?: SymbolRecord | null;
   onSelectSymbol?: (symbol: SymbolRecord | null) => void;
   onNavigateToFileLine?: (filePath: string, line: number) => void;
@@ -32,6 +33,7 @@ const columnHelper = createColumnHelper<SymbolRecord>();
 
 export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
   projectId,
+  lastAnalysisRunId,
   selectedSymbol,
   onSelectSymbol,
   onNavigateToFileLine,
@@ -116,6 +118,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
     hasSideEffectsOnly,
     searchQuery,
     sorting,
+    lastAnalysisRunId,
   ]);
 
   useEffect(() => {

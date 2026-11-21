@@ -58,6 +58,9 @@ export const App: React.FC = () => {
           <OverviewView
             projectId={project.currentProject?.id}
             currentProject={project.currentProject}
+            lastAnalysisRunId={project.lastAnalysisRunId}
+            isScanning={project.isScanning}
+            scanProgress={project.scanProgress}
             onNavigateToView={(view) => ui.setActiveView(view)}
             onNavigateToFileLine={(filePath, line) => {
               project.openFileAtLine(filePath, line);
@@ -88,7 +91,7 @@ export const App: React.FC = () => {
               onSelectDiagramElement={handleSelectDiagramElement}
               onRunPipeline={project.triggerScan}
               onTriggerScan={project.triggerScan}
-              lastAnalysisRunId={project.scanSummary?.analysis_run_id}
+              lastAnalysisRunId={project.lastAnalysisRunId}
               onNavigateToSource={(filePath, line) => {
                 project.openFileAtLine(filePath, line);
                 ui.setActiveView("explorer");
@@ -100,6 +103,7 @@ export const App: React.FC = () => {
         return (
           <DependenciesView
             currentProject={project.currentProject}
+            lastAnalysisRunId={project.lastAnalysisRunId}
             onSelectFile={(filePath) => {
               const match = project.files.find((f) => f.relative_path === filePath);
               if (match) {
@@ -113,6 +117,7 @@ export const App: React.FC = () => {
         return (
           <ApiView
             projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
             onNavigateToFileLine={(filePath, line) => {
               project.openFileAtLine(filePath, line);
               ui.setActiveView("explorer");
@@ -121,12 +126,20 @@ export const App: React.FC = () => {
         );
       case "database":
         return (
-          <DatabaseView projectId={project.currentProject?.id} onNavigateToFileLine={(filePath,line)=>{project.openFileAtLine(filePath,line);ui.setActiveView("explorer");}} />
+          <DatabaseView
+            projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
+          />
         );
       case "intelligence":
         return (
           <CodeIntelligenceView
             projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
             selectedSymbol={project.selectedSymbol}
             onSelectSymbol={project.setSelectedSymbol}
             onNavigateToFileLine={(filePath, line) => {
@@ -156,6 +169,7 @@ export const App: React.FC = () => {
         return (
           <DocumentationView
             projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
             onNavigateToFileLine={(filePath, line) => {
               project.openFileAtLine(filePath, line);
               ui.setActiveView("explorer");

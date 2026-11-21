@@ -80,13 +80,32 @@ export const NavRail: React.FC<NavRailProps> = ({
         isCollapsed ? "w-14" : "w-60"
       }`}
     >
+      {/* Top Brand Logo / Header */}
+      <div className={`flex items-center px-3 pb-2 mb-2 border-b border-border-subtle ${isCollapsed ? "justify-center" : "justify-between"}`}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-md bg-elevated border border-border-default flex items-center justify-center flex-shrink-0 text-text-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+          </div>
+          {!isCollapsed && (
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-xs tracking-tight text-text-primary leading-none">BuildBuddy</span>
+              <span className="text-[9px] font-mono text-text-muted uppercase tracking-wider mt-0.5">Workbench</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Groups & Navigation Items */}
-      <nav className="flex flex-col gap-5 px-2 w-full overflow-y-auto">
+      <nav className="flex flex-col gap-4 px-2 w-full overflow-y-auto">
         {NAV_GROUPS.map((group) => (
           <div key={group.title} className="flex flex-col gap-0.5">
             {/* Group Title (hidden when collapsed) */}
             {!isCollapsed && (
-              <div className="px-2.5 py-1.5 text-meta font-sans font-semibold tracking-wide text-text-muted select-none">
+              <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted select-none">
                 {group.title}
               </div>
             )}
@@ -102,17 +121,17 @@ export const NavRail: React.FC<NavRailProps> = ({
                   title={isCollapsed ? item.label : undefined}
                   aria-label={item.label}
                   aria-current={isActive ? "page" : undefined}
-                  className={`w-full flex items-center rounded-sm transition-colors duration-150 ease-out focus-ring cursor-pointer ${
+                  className={`w-full flex items-center rounded-md transition-colors duration-150 ease-out focus-ring cursor-pointer ${
                     isCollapsed
                       ? "h-9 justify-center px-0"
                       : "h-9 px-2.5 gap-3 text-left"
                   } ${
                     isActive
-                      ? "bg-accent-subtle text-accent font-medium shadow-none"
+                      ? "bg-neutral-800 text-white dark:bg-[#27272a] dark:text-white font-medium shadow-xs"
                       : "text-text-secondary hover:text-text-primary hover:bg-hover font-normal"
                   }`}
                 >
-                  <span className="flex-shrink-0 flex items-center justify-center">
+                  <span className={`flex-shrink-0 flex items-center justify-center ${isActive ? "text-white" : "text-text-muted"}`}>
                     {item.icon}
                   </span>
                   {!isCollapsed && (

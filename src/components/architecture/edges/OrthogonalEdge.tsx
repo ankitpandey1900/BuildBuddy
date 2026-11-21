@@ -42,7 +42,15 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
   let labelX = (sourceX + targetX) / 2;
   let labelY = (sourceY + targetY) / 2;
 
-  if (points && points.length >= 2) {
+  // Validate that points actually connect near the source and target handles in canvas coordinates.
+  // If points are in local container coordinates or detached from handles, use React Flow's canonical getSmoothStepPath.
+  const isPointsValid =
+    points &&
+    points.length >= 2 &&
+    Math.hypot(points[0].x - sourceX, points[0].y - sourceY) <= 80 &&
+    Math.hypot(points[points.length - 1].x - targetX, points[points.length - 1].y - targetY) <= 80;
+
+  if (isPointsValid && points) {
     // Generate SVG path with rounded corners through bend points
     const r = 6;
     let d = `M ${points[0].x} ${points[0].y}`;
@@ -83,7 +91,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
       targetX,
       targetY,
       targetPosition: targetPosition || defaultTargetPos,
-      borderRadius: 6,
+      borderRadius: 8,
     });
     pathD = smoothPath;
     labelX = sx;
@@ -131,12 +139,21 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
     strokeWidth = Math.max(strokeWidth, 2);
   }
 
-  // Marker
+  // Marker configuration
   let markerEnd: string | undefined = undefined;
+  let markerStart: string | undefined = undefined;
+  const isErForeignKey =
+    relationship === "declared_dependency" ||
+    (Boolean(label) && (label!.toUpperCase().includes("FK") || label!.toUpperCase().includes("REFERENCES")));
+
   if (relationship === "inheritance") {
     markerEnd = "url(#bb-arrow-inheritance)";
   } else if (relationship === "entry") {
     markerEnd = "url(#bb-arrow-entry)";
+  } else if (isErForeignKey) {
+    // Professional Crow's foot cardinality notation for ER database relationships
+    markerEnd = isHovered || selected ? "url(#bb-crowfoot-highlight)" : "url(#bb-crowfoot)";
+    markerStart = isHovered || selected ? "url(#bb-one-highlight)" : "url(#bb-one)";
   } else {
     markerEnd = "url(#bb-arrow-default)";
   }
@@ -184,6 +201,7 @@ export const OrthogonalEdge: React.FC<EdgeProps> = ({
           cursor: "pointer",
           transition: "stroke 150ms ease, stroke-width 150ms ease",
         }}
+        markerStart={markerStart}
         markerEnd={markerEnd}
       />
 

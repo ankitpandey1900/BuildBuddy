@@ -36,6 +36,22 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         )}
       </div>
 
+      {/* Center: Quick Keyboard Navigation Hints */}
+      <div className="hidden lg:flex items-center gap-3 text-[11px] text-text-muted">
+        <span className="flex items-center gap-1">
+          <kbd className="px-1 py-0.2 rounded bg-subtle border border-border-subtle font-mono text-[10px]">Ctrl+K</kbd>
+          <span>Palette</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <kbd className="px-1 py-0.2 rounded bg-subtle border border-border-subtle font-mono text-[10px]">Ctrl+B</kbd>
+          <span>Nav</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <kbd className="px-1 py-0.2 rounded bg-subtle border border-border-subtle font-mono text-[10px]">Ctrl+I</kbd>
+          <span>Inspector</span>
+        </span>
+      </div>
+
       <div className="flex items-center gap-3">
         {isScanning ? (
           <span className="text-accent animate-pulse">Analyzing codebase...</span>

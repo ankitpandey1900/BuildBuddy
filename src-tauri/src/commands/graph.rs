@@ -50,6 +50,25 @@ pub async fn get_import_edges(
 }
 
 #[tauri::command]
+pub async fn get_package_inventory(
+    state: State<'_, AppState>,
+    project_id: i64,
+) -> Result<Vec<crate::core::store::graph::PackageInventoryItem>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    GraphStore::get_package_inventory(&conn, project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_file_intelligence(
+    state: State<'_, AppState>,
+    project_id: i64,
+    file_path: String,
+) -> Result<Option<crate::core::store::graph::FileIntelligenceDto>, String> {
+    let conn = state.conn().map_err(|e| e.to_string())?;
+    GraphStore::get_file_intelligence(&conn, project_id, &file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_git_status(project_path: String) -> Result<GitRepoStatus, String> {
     let path = Path::new(&project_path);
     Ok(detect_git_status(path))

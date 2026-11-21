@@ -16,6 +16,7 @@ import { CircularDependencyList } from "./CircularDependencyList";
 
 interface DependenciesViewProps {
   currentProject: Project | null;
+  lastAnalysisRunId?: number;
   onSelectFile?: (filePath: string) => void;
   /** When set, the view renders this index and does not call the backend. */
   initialEdges?: ImportEdge[];
@@ -25,6 +26,7 @@ interface DependenciesViewProps {
 
 export const DependenciesView: React.FC<DependenciesViewProps> = ({
   currentProject,
+  lastAnalysisRunId,
   onSelectFile,
   initialEdges,
   initialCycles,
@@ -96,7 +98,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
       return;
     }
     loadData();
-  }, [loadData, initialEdges, initialCycles, initialOverview]);
+  }, [loadData, lastAnalysisRunId, initialEdges, initialCycles, initialOverview]);
 
   if (!currentProject) {
     return (

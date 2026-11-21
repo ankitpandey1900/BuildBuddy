@@ -80,7 +80,14 @@ pub async fn start_scan(
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
         let (final_status, total_files) = match res {
-            Ok(report) => ("completed".to_string(), report.architecture_model.nodes.len()),
+            Ok(_report) => {
+                let count: i64 = db_conn.query_row(
+                    "SELECT count(*) FROM files WHERE project_id = ?1",
+                    rusqlite::params![project_id],
+                    |r| r.get(0),
+                ).unwrap_or(0);
+                ("completed".to_string(), count as usize)
+            }
             Err(e) => {
                 let is_cancelled = cancel_flag.load(Ordering::Relaxed);
                 let st = if is_cancelled { "cancelled" } else { "failed" };

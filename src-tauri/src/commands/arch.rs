@@ -35,7 +35,27 @@ pub async fn get_overview_data(
         )
         .unwrap_or(0);
 
-    if framework_count == 0 && module_count == 0 {
+    // Check if an analysis run is currently in progress or already completed
+    let is_in_progress: bool = conn
+        .query_row(
+            "SELECT count(*) FROM analysis_runs WHERE project_id = ?1 AND status IN ('in_progress', 'scanning', 'parsing', 'analyzing')",
+            rusqlite::params![project_id],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    let has_completed_run: bool = conn
+        .query_row(
+            "SELECT count(*) FROM analysis_runs WHERE project_id = ?1 AND status = 'completed'",
+            rusqlite::params![project_id],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    // Only auto-populate architecture if no pipeline run has been scheduled or completed
+    if !is_in_progress && !has_completed_run && framework_count == 0 && module_count == 0 {
         let root_path: Result<String, _> = conn.query_row(
             "SELECT root_path FROM projects WHERE id = ?1",
             rusqlite::params![project_id],

@@ -42,6 +42,7 @@ export interface DiagramNode {
   height: number;
   source_ref?: SourceRef;
   metrics?: NodeMetrics;
+  members?: string[];
 }
 
 export interface DiagramEdge {

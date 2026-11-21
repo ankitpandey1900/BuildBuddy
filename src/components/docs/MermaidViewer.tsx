@@ -310,24 +310,29 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
     }
 
     const nodeCoords = new Map<string, { x: number; y: number; width: number; height: number }>();
-    const nodeWidth = isLR ? 240 : 250;
-    const baseNodeHeight = isLR ? 68 : 64;
-    const gapX = isLR ? 150 : 110;  // Generous horizontal spacing to prevent text collision
-    const gapY = isLR ? 50 : 75;
+    const nodeWidth = isLR ? 240 : 260;
+    const baseNodeHeight = isLR ? 68 : 68;
+    const gapX = isLR ? 160 : 120;  // Generous horizontal spacing to prevent text collision
+    const gapY = isLR ? 55 : 80;
 
     const getNodeHeight = (n: ParsedNode) => {
       const maxChars = isLR ? 24 : 22;
       const wrapped = wrapLabel(n.label, maxChars);
+      const lineH = 17;
       // Diamond nodes need extra vertical space for the pointed shape
-      const extraForDiamond = n.shape === "diamond" ? 20 : 0;
-      return Math.max(baseNodeHeight, wrapped.length * 16 + 32) + extraForDiamond;
+      const extraForDiamond = n.shape === "diamond" ? 24 : 0;
+      return Math.max(baseNodeHeight, wrapped.length * lineH + 34) + extraForDiamond;
     };
 
-    // For TD: compute per-rank max node count to decide total canvas width
-    const maxRankSize = Math.max(...Array.from(ranks.values()).map((l) => l.length), 1);
-    const canvasCenterX = Math.max(600, (maxRankSize * (nodeWidth + gapX)) / 2 + 60);
+    // For TD: compute per-rank max column count to decide total canvas width (cap at 3 columns for human readability)
+    const maxCols = 3;
+    const effectiveRankCols = Math.min(
+      maxCols,
+      Math.max(...Array.from(ranks.values()).map((l) => l.length), 1)
+    );
+    const canvasCenterX = Math.max(500, (effectiveRankCols * (nodeWidth + gapX)) / 2 + 60);
 
-    let maxX = Math.max(800, maxRankSize * (nodeWidth + gapX) + 120);
+    let maxX = Math.max(800, effectiveRankCols * (nodeWidth + gapX) + 120);
     let maxY = 450;
 
     if (isLR) {
@@ -347,23 +352,30 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
         });
       }
     } else {
-      // TD Layout — dynamic vertical placement so ranks with taller nodes don't overlap
+      // TD Layout — wrap ranks with >3 nodes into a compact multi-row matrix (max 3 columns)
       let currentY = 60;
       for (const [, list] of ranks.entries()) {
-        const totalWidth = list.length * nodeWidth + (list.length - 1) * gapX;
-        const startX = Math.max(60, canvasCenterX - totalWidth / 2);
-        let maxRankNodeHeight = baseNodeHeight;
+        const cols = Math.min(maxCols, Math.max(1, list.length));
+        const numRows = Math.ceil(list.length / cols);
+        const rankW = cols * nodeWidth + (cols - 1) * gapX;
+        const startX = Math.max(60, canvasCenterX - rankW / 2);
 
-        list.forEach((n, idx) => {
-          const nh = getNodeHeight(n);
-          if (nh > maxRankNodeHeight) maxRankNodeHeight = nh;
-          const x = startX + idx * (nodeWidth + gapX);
-          nodeCoords.set(n.id, { x, y: currentY, width: nodeWidth, height: nh });
-          maxX = Math.max(maxX, x + nodeWidth + 80);
-          maxY = Math.max(maxY, currentY + nh + 80);
-        });
+        for (let r = 0; r < numRows; r++) {
+          const rowNodes = list.slice(r * cols, (r + 1) * cols);
+          let maxRowH = baseNodeHeight;
+          const rowStartX = startX + ((cols - rowNodes.length) * (nodeWidth + gapX)) / 2;
 
-        currentY += maxRankNodeHeight + gapY;
+          rowNodes.forEach((n, cIdx) => {
+            const nh = getNodeHeight(n);
+            if (nh > maxRowH) maxRowH = nh;
+            const x = rowStartX + cIdx * (nodeWidth + gapX);
+            nodeCoords.set(n.id, { x, y: currentY, width: nodeWidth, height: nh });
+            maxX = Math.max(maxX, x + nodeWidth + 80);
+            maxY = Math.max(maxY, currentY + nh + 80);
+          });
+
+          currentY += maxRowH + (r < numRows - 1 ? 24 : gapY);
+        }
       }
     }
 
@@ -603,6 +615,23 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
               >
                 <path d="M 10 1.5 L 0 5 L 10 8.5 z" fill="var(--text-muted)" />
               </marker>
+              {/* Per-node clip paths — prevents text from escaping node bounds */}
+              {parsed.nodes.map((node) => {
+                const c = layout.nodeCoords.get(node.id);
+                if (!c) return null;
+                const px = node.shape === "diamond" ? 10 : 8;
+                const py = node.shape === "diamond" ? 6 : 4;
+                return (
+                  <clipPath key={`clip-${node.id}`} id={`clip-${node.id}`}>
+                    <rect
+                      x={c.x + px}
+                      y={c.y + py}
+                      width={c.width - px * 2}
+                      height={c.height - py * 2}
+                    />
+                  </clipPath>
+                );
+              })}
             </defs>
 
             {/* Subgraphs - Clean Neutral Boundary Boxes */}
@@ -724,6 +753,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
                       fontSize="11"
                       fontFamily="system-ui, -apple-system, sans-serif"
                       fontWeight="600"
+                      clipPath={`url(#clip-${node.id})`}
                     >
                       {wrapped.map((dl, i) => (
                         <tspan key={i} x={cx} dy={i === 0 ? 0 : "1.3em"}>
@@ -786,6 +816,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
                       fontSize="11.5"
                       fontFamily="system-ui, -apple-system, sans-serif"
                       fontWeight="600"
+                      clipPath={`url(#clip-${node.id})`}
                     >
                       {wrapped.map((ln, i) => (
                         <tspan key={i} x={cx} dy={i === 0 ? 0 : "1.35em"}>
@@ -800,7 +831,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
               // Standard Rectangle / Pill Node
               const isPill = node.shape === "pill";
               const wrapped = wrapLabel(node.label, 22);
-              const lineHeight = 15;
+              const lineHeight = 16;
               const textBlockH = wrapped.length * lineHeight;
               const startY = cy - textBlockH / 2 + lineHeight / 2;
               return (
@@ -824,6 +855,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
                     fontSize="11.5"
                     fontFamily="system-ui, -apple-system, sans-serif"
                     fontWeight="600"
+                    clipPath={`url(#clip-${node.id})`}
                   >
                     {wrapped.map((ln, i) => (
                       <tspan key={i} x={cx} dy={i === 0 ? 0 : "1.35em"}>
@@ -860,7 +892,7 @@ export const MermaidViewer: React.FC<MermaidViewerProps> = ({ code, title, theme
           <span className="px-1 text-[11px] text-text-muted w-10 text-center">{Math.round(zoom * 100)}%</span>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.min(3.0, Number((z + 0.15).toFixed(2))))}
+            onClick={() => setZoom((z) => Math.min(3.5, Number((z + 0.15).toFixed(2))))}
             className="p-1 hover:bg-hover rounded text-text-muted hover:text-text-primary"
             title="Zoom In"
           >

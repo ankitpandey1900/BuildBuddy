@@ -71,6 +71,8 @@ export function useProjectState() {
       setFileContent(null);
       await refreshRecent();
       await refreshFiles(proj.id);
+      setIsScanning(true);
+      await startScan(proj.id);
     } catch (e) {
       console.error("Failed to reopen project", e);
     }
@@ -191,6 +193,7 @@ export function useProjectState() {
     isScanning,
     scanProgress,
     scanSummary,
+    lastAnalysisRunId: scanSummary?.analysis_run_id,
     searchQuery,
     setSearchQuery,
     languageFilter,

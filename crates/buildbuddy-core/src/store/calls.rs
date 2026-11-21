@@ -128,7 +128,7 @@ pub fn persist_file_calls_and_metrics_tx(
     // 3. Insert functions
     {
         let mut func_stmt = tx.prepare(
-            "INSERT INTO functions (
+            "INSERT OR REPLACE INTO functions (
                 project_id, file_id, symbol_id, name, parameters_json, return_type,
                 branch_count, loop_count, cyclomatic_complexity, has_error_handling,
                 side_effects_json, imports_used_json, callers_json, callees_json, source_evidence_id
@@ -167,7 +167,7 @@ pub fn persist_file_calls_and_metrics_tx(
     // 4. Insert classes
     {
         let mut class_stmt = tx.prepare(
-            "INSERT INTO classes (
+            "INSERT OR REPLACE INTO classes (
                 project_id, file_id, symbol_id, name, superclass_name, interfaces_json,
                 properties_json, methods_json, constructors_json, source_evidence_id
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",

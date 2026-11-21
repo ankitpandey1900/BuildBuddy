@@ -1,6 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
 
 export const Table = React.forwardRef<
   HTMLTableElement,
@@ -9,9 +8,7 @@ export const Table = React.forwardRef<
   <div className="w-full overflow-auto">
     <table
       ref={ref}
-      className={twMerge(
-        clsx("w-full caption-bottom text-body font-sans border-collapse", className)
-      )}
+      className={cn("w-full caption-bottom text-body font-sans border-collapse", className)}
       {...props}
     />
   </div>
@@ -24,9 +21,7 @@ export const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={twMerge(
-      clsx("bg-elevated/80 border-b border-border-default sticky top-0 z-10", className)
-    )}
+    className={cn("bg-elevated/80 border-b border-border-default sticky top-0 z-10", className)}
     {...props}
   />
 ));
@@ -38,7 +33,7 @@ export const TableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
-    className={twMerge(clsx("[&_tr:last-child]:border-0", className))}
+    className={cn("[&_tr:last-child]:border-0", className)}
     {...props}
   />
 ));
@@ -50,11 +45,9 @@ export const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
-    className={twMerge(
-      clsx(
-        "border-b border-border-subtle transition-colors duration-150 hover:bg-hover data-[state=selected]:bg-active",
-        className
-      )
+    className={cn(
+      "border-b border-border-subtle transition-colors duration-150 hover:bg-hover data-[state=selected]:bg-active",
+      className
     )}
     {...props}
   />
@@ -67,11 +60,9 @@ export const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
-    className={twMerge(
-      clsx(
-        "h-8 px-3 text-left align-middle font-medium text-caption text-text-muted select-none whitespace-nowrap",
-        className
-      )
+    className={cn(
+      "h-8 px-3 text-left align-middle font-medium text-caption text-text-muted select-none whitespace-nowrap",
+      className
     )}
     {...props}
   />
@@ -84,9 +75,7 @@ export const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={twMerge(
-      clsx("px-3 py-2 align-middle text-body text-text-primary whitespace-nowrap", className)
-    )}
+    className={cn("px-3 py-2 align-middle text-body text-text-primary whitespace-nowrap", className)}
     {...props}
   />
 ));

@@ -63,12 +63,10 @@ pub fn build_file_dependency_diagram(conn: &Connection, project_id: i64) -> Resu
 
         // Derive directory group
         let norm_path = rel_path.replace('\\', "/");
-        let group_id = if let Some(last_slash) = norm_path.rfind('/') {
-            let dir = &norm_path[..last_slash];
-            let gid = format!("group:dir:{}", dir);
+        let group_id = if let Some((gid, label)) = super::derive_dir_group(&norm_path) {
             groups_set.entry(gid.clone()).or_insert_with(|| DiagramGroup {
                 id: gid.clone(),
-                label: dir.to_string(),
+                label,
                 parent_group: None,
                 collapsed: false,
             });
@@ -97,6 +95,7 @@ pub fn build_file_dependency_diagram(conn: &Connection, project_id: i64) -> Resu
                 import_count: Some(imp_count),
                 complexity: None,
             }),
+            members: Vec::new(),
         });
     }
 
@@ -220,6 +219,7 @@ pub fn build_file_dependency_diagram(conn: &Connection, project_id: i64) -> Resu
             height: ext_h,
             source_ref: None,
             metrics: None,
+            members: Vec::new(),
         });
     }
 

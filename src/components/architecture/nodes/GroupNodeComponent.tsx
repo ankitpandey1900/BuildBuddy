@@ -47,10 +47,10 @@ export const GroupNodeComponent: React.FC<NodeProps> = ({ data, selected }) => {
       style={{
         width: group.width ? `${group.width}px` : "100%",
         height: group.height ? `${group.height}px` : "100%",
-        borderRadius: "8px",
+        borderRadius: "6px",
       }}
-      className={`relative border border-border-default bg-surface/50 p-2.5 select-none transition-colors ${
-        selected ? "border-accent-default ring-2 ring-accent-default/30" : "hover:border-border-strong"
+      className={`relative border border-border-default bg-surface/40 p-2.5 select-none transition-colors ${
+        selected ? "border-accent ring-1 ring-accent/30" : "hover:border-border-strong"
       }`}
       data-testid={`diagram-group-${group.id}`}
     >

@@ -129,7 +129,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-sm hover:bg-hover text-text-primary text-left cursor-pointer transition-colors duration-150"
           >
             <div className="flex items-center gap-2.5">
-              <FolderOpen className="w-4 h-4 text-accent" />
+              <FolderOpen className="w-4 h-4 text-text-muted" />
               <span>Open Project Folder...</span>
             </div>
             <Kbd>Ctrl+O</Kbd>

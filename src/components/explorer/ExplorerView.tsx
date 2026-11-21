@@ -32,6 +32,13 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   theme,
   targetLine,
 }) => {
+  const handleSelectByPath = (filePath: string) => {
+    const target = files.find((f) => f.relative_path === filePath);
+    if (target) {
+      onSelectFile(target);
+    }
+  };
+
   return (
     <div className="flex-1 flex h-full overflow-hidden">
       <FileTree
@@ -51,6 +58,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         isLoading={isLoadingContent}
         theme={theme}
         targetLine={targetLine}
+        onSelectFileByPath={handleSelectByPath}
       />
     </div>
   );
