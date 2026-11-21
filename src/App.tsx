@@ -150,12 +150,20 @@ export const App: React.FC = () => {
         );
       case "security":
         return (
-          <FindingsView projectId={project.currentProject?.id} onNavigateToFileLine={(filePath, line) => { project.openFileAtLine(filePath, line); ui.setActiveView("explorer"); }} />
+          <FindingsView
+            projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
+            onNavigateToFileLine={(filePath, line) => {
+              project.openFileAtLine(filePath, line);
+              ui.setActiveView("explorer");
+            }}
+          />
         );
       case "reports":
         return (
           <ReportsView
             projectId={project.currentProject?.id}
+            lastAnalysisRunId={project.lastAnalysisRunId}
             onNavigateToFileLine={(filePath, line) => {
               project.openFileAtLine(filePath, line);
               ui.setActiveView("explorer");
@@ -235,6 +243,11 @@ export const App: React.FC = () => {
         onTriggerScan={project.triggerScan}
         onToggleTheme={ui.toggleTheme}
         onSelectFile={project.selectFile}
+        projectId={project.currentProject?.id}
+        onNavigateToFileLine={(filePath, line) => {
+          project.openFileAtLine(filePath, line);
+          ui.setActiveView("explorer");
+        }}
       />
     </>
   );

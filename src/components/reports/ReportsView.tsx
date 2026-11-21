@@ -16,6 +16,7 @@ import { Badge, Button, EmptyState, SegmentedControl } from "@/components/ui";
 
 export interface ReportsViewProps {
   projectId?: number | null;
+  lastAnalysisRunId?: number;
   onNavigateToFileLine?: (filePath: string, line: number) => void;
   onNavigateToDocs?: (docType: string) => void;
   initialFindings?: Finding[];
@@ -23,6 +24,7 @@ export interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   projectId,
+  lastAnalysisRunId,
   onNavigateToFileLine,
   onNavigateToDocs,
   initialFindings,
@@ -53,7 +55,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     if (projectId) {
       void loadReportData();
     }
-  }, [projectId, initialFindings]);
+  }, [projectId, initialFindings, lastAnalysisRunId]);
 
   const metrics = useMemo(() => {
     const total = findings.length;

@@ -135,6 +135,17 @@ function renderMarkdownBlocks(markdown: string): React.ReactNode {
         i++;
       }
       if (i < lines.length) i++; // skip closing ```
+      const codeContent = codeLines.join("\n");
+
+      if (lang === "mermaid") {
+        elements.push(
+          <div key={`mermaid-${i}`} className="my-4 rounded-lg bg-surface border border-border-default p-2 overflow-hidden shadow-xs">
+            <MermaidViewer code={codeContent} />
+          </div>
+        );
+        continue;
+      }
+
       elements.push(
         <div key={`code-${i}`} className="my-3 rounded-md bg-surface border border-border-default overflow-hidden">
           {lang && (
@@ -143,7 +154,7 @@ function renderMarkdownBlocks(markdown: string): React.ReactNode {
             </div>
           )}
           <pre className="p-3 text-xs font-mono overflow-x-auto text-text-primary leading-relaxed">
-            <code>{codeLines.join("\n")}</code>
+            <code>{codeContent}</code>
           </pre>
         </div>
       );
@@ -194,7 +205,29 @@ function renderMarkdownBlocks(markdown: string): React.ReactNode {
                 {bodyRows.map((row, rIdx) => (
                   <tr key={rIdx} className="hover:bg-surface/60 transition-colors even:bg-surface/20">
                     {row.map((cell, cIdx) => {
-                      const isNumeric = /^-?\d+(\.\d+)?%?$/.test(cell);
+                      const trimmedCell = cell.trim();
+                      const upper = trimmedCell.toUpperCase();
+                      const isHttpMethod = ["GET", "POST", "PUT", "DELETE", "PATCH"].includes(upper);
+                      const isNumeric = /^-?\d+(\.\d+)?%?$/.test(trimmedCell);
+
+                      if (isHttpMethod) {
+                        const methodClass =
+                          upper === "GET"
+                            ? "bg-status-success-bg text-status-success-text border-status-success-text/30"
+                            : upper === "POST"
+                            ? "bg-status-warning-bg text-status-warning-text border-status-warning-text/30"
+                            : upper === "DELETE"
+                            ? "bg-status-danger-bg text-status-danger-text border-status-danger-text/30"
+                            : "bg-accent-subtle text-accent-text border-accent/30";
+                        return (
+                          <td key={cIdx} className="px-3.5 py-2 text-xs whitespace-nowrap">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border inline-block select-none ${methodClass}`}>
+                              {upper}
+                            </span>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={cIdx}

@@ -9,7 +9,6 @@ import {
   RefreshCw,
   XCircle,
   X,
-  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Kbd } from "@/components/ui/Kbd";
@@ -28,7 +27,6 @@ interface TopBarProps {
   onCancelScan: () => void;
   onToggleTheme: () => void;
   onOpenCommandPalette: () => void;
-  onOpenSettings?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -44,7 +42,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onCancelScan,
   onToggleTheme,
   onOpenCommandPalette,
-  onOpenSettings,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -186,7 +183,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Right: Theme Toggle & Settings */}
+      {/* Right: Theme Toggle */}
       <div className="flex items-center gap-1 pr-1 flex-shrink-0">
         <button
           onClick={onToggleTheme}
@@ -200,17 +197,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Moon className="w-4 h-4" />
           )}
         </button>
-
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            aria-label="Settings"
-            className="w-8 h-8 flex items-center justify-center rounded-sm hover:bg-hover text-text-muted hover:text-text-primary transition-colors duration-150 focus-ring cursor-pointer"
-            title="Settings (Ctrl+,)"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        )}
       </div>
     </header>
   );

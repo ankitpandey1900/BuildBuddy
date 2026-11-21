@@ -451,6 +451,35 @@ th { background: #f6f8fa; }
             </article>
           ) : document && document.sections.length > 0 ? (
             <div className="max-w-4xl mx-auto space-y-6">
+              {/* Visual Document Outline & Quick-Nav */}
+              <div className="p-4 rounded-xl bg-surface border border-border-default shadow-xs flex flex-col gap-2.5">
+                <div className="flex items-center justify-between text-caption font-semibold text-text-primary">
+                  <span className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-accent" />
+                    <span>Document Sections & Visual Outline</span>
+                  </span>
+                  <span className="text-micro text-text-muted font-mono tabular-nums">
+                    {document.sections.length} sections • grounded in local facts
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {document.sections.map((sec) => (
+                    <button
+                      key={sec.section_key}
+                      type="button"
+                      onClick={() => {
+                        const el = window.document.getElementById(`sec-${sec.section_key}`);
+                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      className="px-2.5 py-1 rounded bg-elevated hover:bg-hover border border-border-subtle text-caption text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent/70 inline-block" />
+                      <span>§ {sec.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {document.sections.map((section) => {
                 const isEditing = mode === "edit";
                 const isSaving = savingSection === section.section_key;
@@ -464,7 +493,8 @@ th { background: #f6f8fa; }
                 return (
                   <article
                     key={section.section_key}
-                    className="border border-border-default rounded-md bg-surface overflow-hidden shadow-xs"
+                    id={`sec-${section.section_key}`}
+                    className="border border-border-default rounded-xl bg-surface overflow-hidden shadow-xs scroll-mt-6"
                     data-testid={`doc-section-${section.section_key}`}
                   >
                     {/* Section Header */}

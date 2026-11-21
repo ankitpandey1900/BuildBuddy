@@ -370,4 +370,86 @@ describe("CodeIntelligenceView Component", () => {
     expect(row?.className).toContain("bg-accent-subtle");
     expect(row?.className).not.toContain("border-accent");
   });
+
+  it("renders top Architectural Intelligence KPI cards with accurate metrics", () => {
+    render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
+
+    // 4 KPI cards: Inventory, Hotspots, Hubs, Exports
+    expect(screen.getByTestId("kpi-card-total")).toBeInTheDocument();
+    expect(screen.getByTestId("kpi-card-hotspots")).toBeInTheDocument();
+    expect(screen.getByTestId("kpi-card-hubs")).toBeInTheDocument();
+    expect(screen.getByTestId("kpi-card-exports")).toBeInTheDocument();
+
+    // In mockSymbols: 4 total, 3 functions (parseFile, calculateComplexity, fetchRemoteData), 1 class (AstNode)
+    expect(screen.getByTestId("kpi-card-total")).toHaveTextContent("4");
+    expect(screen.getByTestId("kpi-card-total")).toHaveTextContent("3 functions • 1 classes • 0 types");
+
+    // Hotspots with complexity >= 10: fetchRemoteData (12)
+    expect(screen.getByTestId("kpi-card-hotspots")).toHaveTextContent("1");
+
+    // Exports: parseFile (true), fetchRemoteData (true) -> 2
+    expect(screen.getByTestId("kpi-card-exports")).toHaveTextContent("2");
+  });
+
+  it("filters immediately via instant perspective pills (Hotspots, Functions, Classes)", () => {
+    render(<CodeIntelligenceView initialSymbols={mockSymbols} />);
+
+    // Click Hotspots (CC ≥ 10) pill
+    const hotspotsBtn = screen.getByRole("button", { name: /Hotspots/i });
+    fireEvent.click(hotspotsBtn);
+
+    expect(screen.getByText("fetchRemoteData")).toBeInTheDocument();
+    expect(screen.queryByText("parseFile")).not.toBeInTheDocument();
+    expect(screen.queryByText("AstNode")).not.toBeInTheDocument();
+    expect(screen.queryByText("calculateComplexity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("result-count")).toHaveTextContent("1 symbol");
+
+    // Click Functions pill
+    const functionsBtn = screen.getByRole("button", { name: /^Functions/i });
+    fireEvent.click(functionsBtn);
+
+    expect(screen.getByText("parseFile")).toBeInTheDocument();
+    expect(screen.getByText("calculateComplexity")).toBeInTheDocument();
+    expect(screen.getByText("fetchRemoteData")).toBeInTheDocument();
+    expect(screen.queryByText("AstNode")).not.toBeInTheDocument();
+    expect(screen.getByTestId("result-count")).toHaveTextContent("3 symbols");
+
+    // Click All pill to reset
+    const allBtn = screen.getByRole("button", { name: "All" });
+    fireEvent.click(allBtn);
+    expect(screen.getByTestId("result-count")).toHaveTextContent("4 symbols");
+  });
+
+  it("renders the Selected Symbol Dossier with signature, complexity, and jump-to-code", () => {
+    const onNavigateToFileLine = vi.fn();
+    render(
+      <CodeIntelligenceView
+        initialSymbols={mockSymbols}
+        onNavigateToFileLine={onNavigateToFileLine}
+      />
+    );
+
+    // Click parseFile row
+    fireEvent.click(screen.getByText("parseFile"));
+
+    // Symbol dossier should be visible
+    expect(screen.getByTestId("symbol-detail-drawer")).toBeInTheDocument();
+    expect(screen.getByText("Symbol Dossier")).toBeInTheDocument();
+    expect(screen.getByText("CC 6")).toBeInTheDocument();
+    expect(screen.getByText(/Parses source file and extracts symbols/i)).toBeInTheDocument();
+
+    // Callers rendered
+    expect(screen.getByText("@main")).toBeInTheDocument();
+    expect(screen.getByText("@startScan")).toBeInTheDocument();
+
+    // Jump to Code button
+    const jumpBtn = screen.getByTestId("dossier-jump-btn");
+    fireEvent.click(jumpBtn);
+    expect(onNavigateToFileLine).toHaveBeenCalledWith("src/core/parser.ts", 45);
+
+    // Close preview drawer
+    const closeBtn = screen.getByTestId("close-detail-drawer");
+    fireEvent.click(closeBtn);
+    expect(screen.queryByTestId("symbol-detail-drawer")).not.toBeInTheDocument();
+  });
 });

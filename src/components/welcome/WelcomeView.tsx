@@ -3,7 +3,6 @@ import {
   FolderOpen,
   Clock,
   ArrowRight,
-  FolderGit2,
   X,
   Search,
   CheckCircle2,
@@ -86,9 +85,9 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
     >
       <div className="w-full max-w-xl flex flex-col space-y-6 my-auto">
         {/* Header Branding */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-12 h-12 rounded-xl bg-surface border border-border-default flex items-center justify-center shadow-xs">
-            <FolderGit2 className="w-6 h-6 text-text-primary" strokeWidth={1.8} />
+        <div className="flex flex-col items-center text-center space-y-3">
+          <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden flex-shrink-0">
+            <img src="/app-icon.png" alt="BuildBuddy Logo" className="w-full h-full object-contain rounded-2xl" />
           </div>
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-text-primary">

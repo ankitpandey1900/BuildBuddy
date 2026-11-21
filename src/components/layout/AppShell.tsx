@@ -4,7 +4,6 @@ import { NavRail } from "./NavRail";
 import { InspectorPanel } from "./InspectorPanel";
 import { StatusBar } from "./StatusBar";
 import { PipelineProgress } from "@/components/pipeline/PipelineProgress";
-import { SettingsModal } from "@/components/settings/SettingsModal";
 import type { FileRecord, Project, ScanProgressPayload, SymbolRecord, ViewType } from "@/types/ipc";
 import type { SelectedDiagramElement } from "@/types/diagram";
 
@@ -65,7 +64,6 @@ export const AppShell: React.FC<AppShellProps> = ({
   onNavigateToSource,
   children,
 }) => {
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
 
   useEffect(() => {
@@ -79,11 +77,6 @@ export const AppShell: React.FC<AppShellProps> = ({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "i") {
         e.preventDefault();
         onToggleInspector();
-      }
-      // Open settings with Cmd/Ctrl + ,
-      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen(true);
       }
       // Open folder with Cmd/Ctrl + O
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
@@ -111,7 +104,6 @@ export const AppShell: React.FC<AppShellProps> = ({
         onCancelScan={onCancelScan}
         onToggleTheme={onToggleTheme}
         onOpenCommandPalette={onOpenCommandPalette}
-        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {isScanning && (
@@ -160,13 +152,6 @@ export const AppShell: React.FC<AppShellProps> = ({
         currentProject={currentProject}
         files={files}
         isScanning={isScanning}
-      />
-
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
       />
     </div>
   );

@@ -9,7 +9,21 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUpDown, ArrowUp, ArrowDown, FileCode, Filter } from "lucide-react";
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  FileCode,
+  Filter,
+  ExternalLink,
+  X,
+  AlertTriangle,
+  GitBranch,
+  Layers,
+  Code,
+  Shield,
+  Zap,
+} from "lucide-react";
 import { listSymbols } from "@/lib/tauri";
 import type { ListSymbolsFilter, SymbolRecord } from "@/types/ipc";
 import { Badge } from "@/components/ui/Badge";
@@ -29,6 +43,14 @@ export interface CodeIntelligenceViewProps {
   initialSymbols?: SymbolRecord[];
 }
 
+export type PerspectiveTab =
+  | "all"
+  | "hotspots"
+  | "functions"
+  | "classes"
+  | "exports"
+  | "side_effects";
+
 const columnHelper = createColumnHelper<SymbolRecord>();
 
 export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
@@ -43,6 +65,9 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(!initialSymbols && !!projectId);
   const [error, setError] = useState<string | null>(null);
 
+  // Active Perspective
+  const [activePerspective, setActivePerspective] = useState<PerspectiveTab>("all");
+
   // Filters
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
@@ -53,16 +78,28 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
   const [hasErrorHandlingOnly, setHasErrorHandlingOnly] = useState<boolean>(false);
   const [hasSideEffectsOnly, setHasSideEffectsOnly] = useState<boolean>(false);
 
-  // Sorting
+  // Sorting (default alphabetical by name)
   const [sorting, setSorting] = useState<SortingState>([
     { id: "name", desc: false },
   ]);
 
-  // Selected row index for keyboard navigation
+  // Selected row index and explicit selected record for dossier inspection
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [selectedRecord, setSelectedRecord] = useState<SymbolRecord | null>(
+    selectedSymbol || null
+  );
+  const [showDetailDrawer, setShowDetailDrawer] = useState<boolean>(!!selectedSymbol);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sync selectedRecord when selectedSymbol prop changes
+  useEffect(() => {
+    if (selectedSymbol) {
+      setSelectedRecord(selectedSymbol);
+      setShowDetailDrawer(true);
+    }
+  }, [selectedSymbol]);
 
   // Load symbols from backend when filters change
   const fetchSymbols = useCallback(async () => {
@@ -125,6 +162,92 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
     fetchSymbols();
   }, [fetchSymbols]);
 
+  // Compute overall Project Intelligence KPI stats from available symbols
+  const stats = useMemo(() => {
+    const dataset = initialSymbols || symbols;
+    let total = dataset.length;
+    let functions = 0;
+    let classes = 0;
+    let types = 0;
+    let hotspots = 0;
+    let hubs = 0;
+    let exported = 0;
+    let sideEffects = 0;
+    let errorHandling = 0;
+
+    for (const s of dataset) {
+      const k = (s.kind || "").toLowerCase();
+      if (k === "function" || k === "method") {
+        functions++;
+      } else if (k === "class") {
+        classes++;
+      } else if (k === "interface" || k === "type" || k === "struct" || k === "enum") {
+        types++;
+      }
+
+      if ((s.complexity ?? 0) >= 10) hotspots++;
+      if ((s.callers?.length ?? 0) >= 1 || (s.callees?.length ?? 0) >= 2) hubs++;
+      if (s.is_exported) exported++;
+      if (s.has_side_effects) sideEffects++;
+      if (s.has_error_handling) errorHandling++;
+    }
+
+    return {
+      total,
+      functions,
+      classes,
+      types,
+      hotspots,
+      hubs,
+      exported,
+      sideEffects,
+      errorHandling,
+    };
+  }, [initialSymbols, symbols]);
+
+  // Handle switching perspective tabs
+  const handleSelectPerspective = (perspective: PerspectiveTab) => {
+    setActivePerspective(perspective);
+    switch (perspective) {
+      case "all":
+        setKindFilter("all");
+        setMinComplexity("all");
+        setIsExportedOnly(false);
+        setHasSideEffectsOnly(false);
+        break;
+      case "hotspots":
+        setKindFilter("all");
+        setMinComplexity(10);
+        setIsExportedOnly(false);
+        setHasSideEffectsOnly(false);
+        break;
+      case "functions":
+        setKindFilter("function");
+        setMinComplexity("all");
+        setIsExportedOnly(false);
+        setHasSideEffectsOnly(false);
+        break;
+      case "classes":
+        setKindFilter("class");
+        setMinComplexity("all");
+        setIsExportedOnly(false);
+        setHasSideEffectsOnly(false);
+        break;
+      case "exports":
+        setKindFilter("all");
+        setMinComplexity("all");
+        setIsExportedOnly(true);
+        setHasSideEffectsOnly(false);
+        break;
+      case "side_effects":
+        setKindFilter("all");
+        setMinComplexity("all");
+        setIsExportedOnly(false);
+        setHasSideEffectsOnly(true);
+        break;
+    }
+  };
+
   // If initialSymbols were supplied (e.g. testing), filter them client-side too
   const filteredData = useMemo(() => {
     if (!initialSymbols) return symbols;
@@ -135,14 +258,21 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         if (
           !sym.name.toLowerCase().includes(q) &&
           !sym.file_path.toLowerCase().includes(q) &&
-          !(sym.docstring || "").toLowerCase().includes(q)
+          !(sym.docstring || "").toLowerCase().includes(q) &&
+          !(sym.signature || "").toLowerCase().includes(q)
         ) {
           return false;
         }
       }
       if (languageFilter !== "all") {
         const ext = sym.file_path.split(".").pop()?.toLowerCase();
-        if (languageFilter === "typescript" && ext !== "ts" && ext !== "tsx" && ext !== "js" && ext !== "jsx") {
+        if (
+          languageFilter === "typescript" &&
+          ext !== "ts" &&
+          ext !== "tsx" &&
+          ext !== "js" &&
+          ext !== "jsx"
+        ) {
           return false;
         }
         if (languageFilter === "python" && ext !== "py") {
@@ -217,7 +347,10 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
         id: "file",
         header: "File",
         cell: (info) => (
-          <div className="flex items-center gap-1 text-text-muted text-micro font-mono truncate max-w-xs" title={info.getValue()}>
+          <div
+            className="flex items-center gap-1 text-text-muted text-micro font-mono truncate max-w-xs"
+            title={info.getValue()}
+          >
             <FileCode className="w-3 h-3 flex-shrink-0 text-text-muted" />
             <span className="truncate">{info.getValue()}</span>
           </div>
@@ -242,37 +375,59 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           const isHigh = val >= 10;
           const isMedium = val >= 5;
           return (
-            <span
-              className={`tabular-nums text-caption text-center block ${
-                isHigh
-                  ? "text-status-danger-text"
-                  : isMedium
-                  ? "text-status-warning-text"
-                  : "text-text-secondary"
-              }`}
-            >
-              {val}
-            </span>
+            <div className="flex items-center justify-center gap-1">
+              <span
+                className={`tabular-nums text-caption font-mono font-medium ${
+                  isHigh
+                    ? "text-status-danger-text"
+                    : isMedium
+                    ? "text-status-warning-text"
+                    : "text-text-secondary"
+                }`}
+              >
+                {val}
+              </span>
+              {isHigh && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-status-danger-text inline-block"
+                  title="Cyclomatic Complexity ≥ 10: High complexity hotspot"
+                />
+              )}
+            </div>
           );
         },
       }),
       columnHelper.accessor((row) => row.callers?.length ?? 0, {
         id: "callers",
         header: "Callers",
-        cell: (info) => (
-          <span className="tabular-nums text-caption text-center block text-text-muted">
-            {info.getValue()}
-          </span>
-        ),
+        cell: (info) => {
+          const count = info.getValue();
+          return (
+            <span
+              className={`tabular-nums text-caption text-center block ${
+                count > 0 ? "text-text-primary font-medium" : "text-text-muted"
+              }`}
+            >
+              {count}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor((row) => row.callees?.length ?? 0, {
         id: "callees",
         header: "Callees",
-        cell: (info) => (
-          <span className="tabular-nums text-caption text-center block text-text-muted">
-            {info.getValue()}
-          </span>
-        ),
+        cell: (info) => {
+          const count = info.getValue();
+          return (
+            <span
+              className={`tabular-nums text-caption text-center block ${
+                count > 0 ? "text-text-primary font-medium" : "text-text-muted"
+              }`}
+            >
+              {count}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor((row) => row, {
         id: "flags",
@@ -362,8 +517,11 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       setSelectedIndex((prev) => {
         const next = Math.min(prev + 1, rows.length - 1);
         const targetRow = rows[next]?.original;
-        if (targetRow && onSelectSymbol) {
-          onSelectSymbol(targetRow);
+        if (targetRow) {
+          setSelectedRecord(targetRow);
+          if (onSelectSymbol) {
+            onSelectSymbol(targetRow);
+          }
         }
         virtualizer.scrollToIndex(next);
         return next;
@@ -373,17 +531,25 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       setSelectedIndex((prev) => {
         const next = Math.max(prev - 1, 0);
         const targetRow = rows[next]?.original;
-        if (targetRow && onSelectSymbol) {
-          onSelectSymbol(targetRow);
+        if (targetRow) {
+          setSelectedRecord(targetRow);
+          if (onSelectSymbol) {
+            onSelectSymbol(targetRow);
+          }
         }
         virtualizer.scrollToIndex(next);
         return next;
       });
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const current = rows[selectedIndex]?.original;
+      const current = selectedRecord || rows[selectedIndex]?.original;
       if (current && onNavigateToFileLine) {
         onNavigateToFileLine(current.file_path, current.start_line);
+      }
+    } else if (e.key === "Escape") {
+      if (searchQuery) {
+        e.preventDefault();
+        setSearchQuery("");
       }
     }
   };
@@ -391,7 +557,11 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
   // Global keydown for "/" shortcut to focus search
   useEffect(() => {
     const onGlobalKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement !== searchInputRef.current && document.activeElement?.tagName !== "INPUT") {
+      if (
+        e.key === "/" &&
+        document.activeElement !== searchInputRef.current &&
+        document.activeElement?.tagName !== "INPUT"
+      ) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -403,8 +573,49 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
   const fieldClass =
     "bg-elevated border border-border-default rounded-sm px-2 py-1 text-caption text-text-primary focus-ring w-full";
 
+  // Check how many custom filters are applied
+  const activeCustomFilterCount = useMemo(() => {
+    let count = 0;
+    if (languageFilter !== "all") count++;
+    if (kindFilter !== "all") count++;
+    if (pathPrefix.trim()) count++;
+    if (minComplexity !== "all") count++;
+    if (isExportedOnly) count++;
+    if (hasErrorHandlingOnly) count++;
+    if (hasSideEffectsOnly) count++;
+    return count;
+  }, [
+    languageFilter,
+    kindFilter,
+    pathPrefix,
+    minComplexity,
+    isExportedOnly,
+    hasErrorHandlingOnly,
+    hasSideEffectsOnly,
+  ]);
+
   const renderSymbolFilters = () => (
     <div className="flex flex-col gap-2 text-caption font-sans">
+      <div className="flex items-center justify-between pb-1 border-b border-border-subtle font-medium text-text-primary">
+        <span>Filter Symbols</span>
+        {activeCustomFilterCount > 0 && (
+          <button
+            onClick={() => {
+              setLanguageFilter("all");
+              setKindFilter("all");
+              setPathPrefix("");
+              setMinComplexity("all");
+              setIsExportedOnly(false);
+              setHasErrorHandlingOnly(false);
+              setHasSideEffectsOnly(false);
+              setActivePerspective("all");
+            }}
+            className="text-micro text-text-muted hover:text-text-primary underline"
+          >
+            Reset
+          </button>
+        )}
+      </div>
       <label className="flex flex-col gap-1 text-text-muted">
         Language
         <select
@@ -459,35 +670,35 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           <option value="all">All</option>
           <option value="2">≥ 2</option>
           <option value="5">≥ 5</option>
-          <option value="10">≥ 10</option>
+          <option value="10">≥ 10 (Hotspot)</option>
         </select>
       </label>
-      <label className="flex items-center gap-2 text-text-secondary">
+      <label className="flex items-center gap-2 text-text-secondary cursor-pointer">
         <input
           type="checkbox"
           checked={isExportedOnly}
           onChange={(e) => setIsExportedOnly(e.target.checked)}
           data-testid="filter-exported"
         />
-        Exported
+        Exported only
       </label>
-      <label className="flex items-center gap-2 text-text-secondary">
+      <label className="flex items-center gap-2 text-text-secondary cursor-pointer">
         <input
           type="checkbox"
           checked={hasErrorHandlingOnly}
           onChange={(e) => setHasErrorHandlingOnly(e.target.checked)}
           data-testid="filter-error-handling"
         />
-        Error handling
+        Has error handling
       </label>
-      <label className="flex items-center gap-2 text-text-secondary">
+      <label className="flex items-center gap-2 text-text-secondary cursor-pointer">
         <input
           type="checkbox"
           checked={hasSideEffectsOnly}
           onChange={(e) => setHasSideEffectsOnly(e.target.checked)}
           data-testid="filter-side-effects"
         />
-        Side effects
+        Has side effects (I/O, state)
       </label>
     </div>
   );
@@ -499,41 +710,251 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
       tabIndex={0}
       data-testid="code-intelligence-view"
     >
-      <Toolbar>
-        <ToolbarGroup className="flex-1 min-w-0 gap-2">
-          <div className="w-full max-w-md">
+      {/* Top Architectural Intelligence KPI Ribbon */}
+      <div className="border-b border-border-default bg-surface px-4 py-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Card 1: Symbol Scale */}
+          <div
+            onClick={() => handleSelectPerspective("all")}
+            className={`p-3 rounded border transition-colors cursor-pointer ${
+              activePerspective === "all"
+                ? "bg-elevated border-border-strong shadow-xs"
+                : "bg-surface border-border-subtle hover:border-border-default hover:bg-hover"
+            }`}
+            data-testid="kpi-card-total"
+            title="Click to view all symbols"
+          >
+            <div className="flex items-center justify-between text-micro uppercase tracking-wider text-text-muted font-mono font-medium">
+              <span>Symbol Inventory</span>
+              <Layers className="w-3.5 h-3.5 text-text-muted" />
+            </div>
+            <div className="mt-1 text-xl font-mono font-bold text-text-primary tabular-nums">
+              {stats.total.toLocaleString()}
+            </div>
+            <div className="mt-0.5 text-caption text-text-secondary truncate">
+              {stats.functions} functions • {stats.classes} classes • {stats.types} types
+            </div>
+          </div>
+
+          {/* Card 2: Complexity Hotspots */}
+          <div
+            onClick={() => handleSelectPerspective("hotspots")}
+            className={`p-3 rounded border transition-colors cursor-pointer ${
+              activePerspective === "hotspots"
+                ? "bg-elevated border-status-warning-text/40 shadow-xs"
+                : "bg-surface border-border-subtle hover:border-border-default hover:bg-hover"
+            }`}
+            data-testid="kpi-card-hotspots"
+            title="Click to isolate high-complexity functions needing refactoring or testing"
+          >
+            <div className="flex items-center justify-between text-micro uppercase tracking-wider text-text-muted font-mono font-medium">
+              <span className="flex items-center gap-1.5">
+                <span>Complexity Hotspots</span>
+                {stats.hotspots > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-status-danger-text inline-block" />
+                )}
+              </span>
+              <AlertTriangle className="w-3.5 h-3.5 text-status-warning-text" />
+            </div>
+            <div className="mt-1 text-xl font-mono font-bold text-text-primary tabular-nums flex items-baseline gap-2">
+              <span>{stats.hotspots}</span>
+              <span className="text-micro font-sans font-normal text-text-muted">
+                (CC ≥ 10)
+              </span>
+            </div>
+            <div className="mt-0.5 text-caption text-text-secondary truncate">
+              {stats.hotspots > 0
+                ? "Heavily branched logic needing tests"
+                : "No high-complexity functions detected"}
+            </div>
+          </div>
+
+          {/* Card 3: Core Hubs & Callers */}
+          <div
+            onClick={() => {
+              // Sort by callers descending to surface hubs
+              setSorting([{ id: "callers", desc: true }]);
+            }}
+            className="p-3 rounded border bg-surface border-border-subtle hover:border-border-default hover:bg-hover transition-colors cursor-pointer"
+            data-testid="kpi-card-hubs"
+            title="Click to sort by caller fan-in and view central project hubs"
+          >
+            <div className="flex items-center justify-between text-micro uppercase tracking-wider text-text-muted font-mono font-medium">
+              <span>Architectural Hubs</span>
+              <GitBranch className="w-3.5 h-3.5 text-text-muted" />
+            </div>
+            <div className="mt-1 text-xl font-mono font-bold text-text-primary tabular-nums">
+              {stats.hubs}
+            </div>
+            <div className="mt-0.5 text-caption text-text-secondary truncate">
+              Central functions with inbound callers
+            </div>
+          </div>
+
+          {/* Card 4: Public Surface & I/O */}
+          <div
+            onClick={() => handleSelectPerspective("exports")}
+            className={`p-3 rounded border transition-colors cursor-pointer ${
+              activePerspective === "exports"
+                ? "bg-elevated border-border-strong shadow-xs"
+                : "bg-surface border-border-subtle hover:border-border-default hover:bg-hover"
+            }`}
+            data-testid="kpi-card-exports"
+            title="Click to view exported module API surface"
+          >
+            <div className="flex items-center justify-between text-micro uppercase tracking-wider text-text-muted font-mono font-medium">
+              <span>Public API Surface</span>
+              <Shield className="w-3.5 h-3.5 text-text-muted" />
+            </div>
+            <div className="mt-1 text-xl font-mono font-bold text-text-primary tabular-nums">
+              {stats.exported}
+            </div>
+            <div className="mt-0.5 text-caption text-text-secondary truncate">
+              {stats.sideEffects} with I/O effects • {stats.errorHandling} error handling
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar: Search, Perspective Pills, Filter, and Result Count */}
+      <Toolbar className="border-b border-border-default bg-surface/75 px-3 py-1.5 flex-wrap gap-2">
+        <ToolbarGroup className="flex-1 min-w-0 gap-2 items-center flex-wrap">
+          {/* FTS Search Input */}
+          <div className="w-64 max-w-sm">
             <SearchInput
               ref={searchInputRef}
-              placeholder='Search symbols with FTS (Press "/" to focus)...'
+              placeholder='Search symbols with FTS ("/" to focus)...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               size="sm"
               data-testid="symbol-search-input"
-              suffix={<Kbd>/</Kbd>}
+              suffix={
+                searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="text-text-muted hover:text-text-primary"
+                    title="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <Kbd>/</Kbd>
+                )
+              }
             />
           </div>
+
+          {/* Instant Perspective Pills (1-Click Filters) */}
+          <div className="flex items-center gap-1 overflow-x-auto py-0.5" data-testid="perspective-pills">
+            <button
+              onClick={() => handleSelectPerspective("all")}
+              className={`px-2.5 py-1 rounded text-caption font-medium transition-colors ${
+                activePerspective === "all"
+                  ? "bg-elevated text-text-primary border border-border-strong"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => handleSelectPerspective("hotspots")}
+              className={`px-2.5 py-1 rounded text-caption font-medium flex items-center gap-1.5 transition-colors ${
+                activePerspective === "hotspots"
+                  ? "bg-status-danger-bg text-status-danger-text border border-status-danger-text/40"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              <Zap className="w-3 h-3" />
+              Hotspots (CC ≥ 10)
+              {stats.hotspots > 0 && (
+                <span className="text-micro font-mono bg-status-danger-text/10 px-1 rounded">
+                  {stats.hotspots}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => handleSelectPerspective("functions")}
+              className={`px-2.5 py-1 rounded text-caption font-medium flex items-center gap-1.5 transition-colors ${
+                activePerspective === "functions"
+                  ? "bg-elevated text-text-primary border border-border-strong"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              <Code className="w-3 h-3" />
+              Functions
+            </button>
+            <button
+              onClick={() => handleSelectPerspective("classes")}
+              className={`px-2.5 py-1 rounded text-caption font-medium flex items-center gap-1.5 transition-colors ${
+                activePerspective === "classes"
+                  ? "bg-elevated text-text-primary border border-border-strong"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              <Layers className="w-3 h-3" />
+              Classes & Types
+            </button>
+            <button
+              onClick={() => handleSelectPerspective("exports")}
+              className={`px-2.5 py-1 rounded text-caption font-medium transition-colors ${
+                activePerspective === "exports"
+                  ? "bg-elevated text-text-primary border border-border-strong"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              Exports
+            </button>
+            <button
+              onClick={() => handleSelectPerspective("side_effects")}
+              className={`px-2.5 py-1 rounded text-caption font-medium transition-colors ${
+                activePerspective === "side_effects"
+                  ? "bg-elevated text-text-primary border border-border-strong"
+                  : "text-text-secondary hover:text-text-primary hover:bg-hover"
+              }`}
+            >
+              Side Effects (I/O)
+            </button>
+          </div>
+
+          {/* Advanced Filter Popover */}
           <Popover
             align="left"
-            className="w-72 p-2"
+            className="w-72 p-2.5"
             trigger={
-              <Button variant="secondary" size="sm" icon={<Filter className="w-3.5 h-3.5" />}>
-                Filter
+              <Button
+                variant={activeCustomFilterCount > 0 ? "secondary" : "ghost"}
+                size="sm"
+                icon={<Filter className="w-3.5 h-3.5" />}
+              >
+                <span>Filter</span>
+                {activeCustomFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 bg-elevated text-micro font-mono rounded border border-border-default">
+                    {activeCustomFilterCount}
+                  </span>
+                )}
               </Button>
             }
           >
             {renderSymbolFilters()}
           </Popover>
         </ToolbarGroup>
-        <div className="text-caption text-text-muted tabular-nums" data-testid="result-count">
-          {isLoading
-            ? "Loading..."
-            : `${rows.length.toLocaleString()} symbol${rows.length === 1 ? "" : "s"}`}
+
+        <div className="flex items-center gap-2">
+          <div className="text-caption text-text-muted tabular-nums" data-testid="result-count">
+            {isLoading
+              ? "Loading..."
+              : `${rows.length.toLocaleString()} symbol${rows.length === 1 ? "" : "s"}`}
+          </div>
         </div>
       </Toolbar>
+
       {/* Main Table / View Area */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         {isLoading && (
-          <div className="absolute inset-0 bg-canvas flex items-center justify-center z-20" data-testid="loading-state">
+          <div
+            className="absolute inset-0 bg-canvas flex items-center justify-center z-20"
+            data-testid="loading-state"
+          >
             <EmptyState
               title="Loading symbols"
               description="Reading the local symbol index. Run analysis if this project has not been scanned."
@@ -568,6 +989,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
                     setIsExportedOnly(false);
                     setHasErrorHandlingOnly(false);
                     setHasSideEffectsOnly(false);
+                    setActivePerspective("all");
                   }}
                 >
                   Clear filters
@@ -577,7 +999,7 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           </div>
         )}
 
-        {(!error && rows.length > 0) && (
+        {!error && rows.length > 0 && (
           <div
             ref={tableContainerRef}
             className="flex-1 overflow-auto outline-none"
@@ -649,14 +1071,16 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
                 {virtualRows.map((virtualRow) => {
                   const row = rows[virtualRow.index];
                   const isSelected =
-                    selectedSymbol?.id === row.original.id ||
-                    selectedIndex === virtualRow.index;
+                    selectedRecord?.id === row.original.id ||
+                    selectedSymbol?.id === row.original.id;
                   return (
                     <tr
                       key={row.id}
                       data-index={virtualRow.index}
                       onClick={() => {
                         setSelectedIndex(virtualRow.index);
+                        setSelectedRecord(row.original);
+                        setShowDetailDrawer(true);
                         if (onSelectSymbol) {
                           onSelectSymbol(row.original);
                         }
@@ -720,6 +1144,182 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
             </table>
           </div>
         )}
+
+        {/* Selected Symbol Intelligence Dossier (Split Drawer / Inspector) */}
+        {!isLoading && !error && selectedRecord && showDetailDrawer && (
+          <div
+            className="border-t border-border-default bg-surface flex flex-col max-h-56 overflow-hidden flex-shrink-0"
+            data-testid="symbol-detail-drawer"
+          >
+            {/* Dossier Header */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-subtle bg-elevated/40 text-caption font-sans">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-micro uppercase font-mono font-bold text-text-muted">
+                  Symbol Dossier
+                </span>
+                <span className="text-text-muted">•</span>
+                <Badge variant="neutral" size="sm">
+                  {selectedRecord.kind}
+                </Badge>
+                <span
+                  className="font-mono font-semibold text-text-primary truncate"
+                  data-testid="dossier-symbol-title"
+                  title={selectedRecord.name}
+                >
+                  Symbol: {selectedRecord.parent_name ? `${selectedRecord.parent_name}.${selectedRecord.name}` : selectedRecord.name}
+                </span>
+                <Badge variant={selectedRecord.confidence} size="sm">
+                  {selectedRecord.confidence}
+                </Badge>
+                <span className="text-text-muted text-micro font-mono truncate">
+                  {selectedRecord.file_path}:{selectedRecord.start_line}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    onNavigateToFileLine?.(selectedRecord.file_path, selectedRecord.start_line)
+                  }
+                  icon={<ExternalLink className="w-3 h-3" />}
+                  data-testid="dossier-jump-btn"
+                >
+                  Jump to Code
+                </Button>
+                <button
+                  onClick={() => setShowDetailDrawer(false)}
+                  className="p-1 text-text-muted hover:text-text-primary rounded transition-colors"
+                  title="Close Preview Drawer"
+                  data-testid="close-detail-drawer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Dossier Grid Body */}
+            <div className="p-3 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-3 text-caption font-sans">
+              {/* Column 1: Signature & Docstring */}
+              <div className="flex flex-col gap-1.5 md:col-span-1 min-w-0">
+                <span className="text-micro font-mono uppercase text-text-muted">Signature & Purpose</span>
+                <div className="bg-canvas border border-border-subtle rounded p-2 text-micro font-mono text-text-primary overflow-x-auto whitespace-pre max-h-16">
+                  {selectedRecord.signature || `${selectedRecord.kind} ${selectedRecord.name}`}
+                </div>
+                <div className="text-caption text-text-secondary text-xs line-clamp-2" title={selectedRecord.docstring || ""}>
+                  {selectedRecord.docstring ? (
+                    selectedRecord.docstring
+                  ) : (
+                    <span className="text-text-muted italic">No inline documentation comment.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Complexity & Risk Assessment */}
+              <div className="flex flex-col gap-1.5 md:col-span-1">
+                <span className="text-micro font-mono uppercase text-text-muted">Complexity & Health</span>
+                <div className="bg-canvas border border-border-subtle rounded p-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-mono text-base font-bold ${
+                        (selectedRecord.complexity ?? 0) >= 10
+                          ? "text-status-danger-text"
+                          : (selectedRecord.complexity ?? 0) >= 5
+                          ? "text-status-warning-text"
+                          : "text-status-success-text"
+                      }`}
+                    >
+                      CC {selectedRecord.complexity ?? "—"}
+                    </span>
+                    <span className="text-micro text-text-muted">
+                      {(selectedRecord.complexity ?? 0) >= 10
+                        ? "High branch density"
+                        : (selectedRecord.complexity ?? 0) >= 5
+                        ? "Moderate branching"
+                        : "Linear flow"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {selectedRecord.is_exported && (
+                      <Badge variant="neutral" size="sm">
+                        Exported
+                      </Badge>
+                    )}
+                    {selectedRecord.has_side_effects && (
+                      <Badge variant="neutral" size="sm">
+                        Side Effects
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-micro text-text-muted">
+                  <span>Lines: {selectedRecord.start_line} – {selectedRecord.end_line}</span>
+                  <span>•</span>
+                  <span>
+                    {selectedRecord.has_error_handling ? "Handled Errors" : "No Error Blocks"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Column 3: Call Graph Fan-in / Fan-out */}
+              <div className="flex flex-col gap-1.5 md:col-span-1 min-w-0">
+                <span className="text-micro font-mono uppercase text-text-muted">
+                  Call Graph Relationships
+                </span>
+                <div className="flex flex-col gap-1 text-xs">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="text-text-muted text-micro w-14 flex-shrink-0">Callers:</span>
+                    {selectedRecord.callers && selectedRecord.callers.length > 0 ? (
+                      <div className="flex items-center gap-1 overflow-x-auto truncate">
+                        {selectedRecord.callers.slice(0, 3).map((caller) => (
+                          <button
+                            key={caller}
+                            onClick={() => setSearchQuery(caller)}
+                            className="bg-elevated hover:bg-hover border border-border-subtle rounded px-1.5 py-0.2 text-micro font-mono text-text-primary"
+                            title={`Click to filter by ${caller}`}
+                          >
+                            @{caller}
+                          </button>
+                        ))}
+                        {selectedRecord.callers.length > 3 && (
+                          <span className="text-micro text-text-muted">
+                            +{selectedRecord.callers.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-text-muted italic text-micro">None detected</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="text-text-muted text-micro w-14 flex-shrink-0">Callees:</span>
+                    {selectedRecord.callees && selectedRecord.callees.length > 0 ? (
+                      <div className="flex items-center gap-1 overflow-x-auto truncate">
+                        {selectedRecord.callees.slice(0, 3).map((callee) => (
+                          <button
+                            key={callee}
+                            onClick={() => setSearchQuery(callee)}
+                            className="bg-elevated hover:bg-hover border border-border-subtle rounded px-1.5 py-0.2 text-micro font-mono text-text-primary"
+                            title={`Click to filter by ${callee}`}
+                          >
+                            @{callee}
+                          </button>
+                        ))}
+                        {selectedRecord.callees.length > 3 && (
+                          <span className="text-micro text-text-muted">
+                            +{selectedRecord.callees.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-text-muted italic text-micro">None detected</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Keyboard Shortcuts Hint Bar */}
@@ -732,11 +1332,15 @@ export const CodeIntelligenceView: React.FC<CodeIntelligenceViewProps> = ({
           </span>
           <span className="inline-flex items-center gap-1">
             <Kbd>Enter</Kbd>
-            Open in Explorer
+            Open in Editor
           </span>
           <span className="inline-flex items-center gap-1">
             <Kbd>/</Kbd>
             Search
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Kbd>Esc</Kbd>
+            Clear
           </span>
         </div>
         <div>Double-click a row to open that line</div>

@@ -83,12 +83,8 @@ export const NavRail: React.FC<NavRailProps> = ({
       {/* Top Brand Logo / Header */}
       <div className={`flex items-center px-3 pb-2 mb-2 border-b border-border-subtle ${isCollapsed ? "justify-center" : "justify-between"}`}>
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-md bg-elevated border border-border-default flex items-center justify-center flex-shrink-0 text-text-primary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-xs">
+            <img src="/app-icon.png" alt="BuildBuddy" className="w-full h-full object-contain rounded-lg" />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
